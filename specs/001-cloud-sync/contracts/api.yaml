@@ -1,0 +1,289 @@
+openapi: 3.0.0
+info:
+  title: Rclone Cloud Sync API
+  version: 1.0.0
+  description: API for managing rclone remotes and sync tasks.
+
+paths:
+  /remotes:
+    get:
+      summary: List all configured remotes
+      responses:
+        "200":
+          description: List of remotes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Remote"
+    post:
+      summary: Create a new remote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RemoteConfig"
+      responses:
+        "201":
+          description: Remote created
+
+  /remotes/{name}:
+    delete:
+      summary: Delete a remote
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Remote deleted
+
+  /tasks:
+    get:
+      summary: List all tasks
+      responses:
+        "200":
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+    post:
+      summary: Create a new task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskInput"
+      responses:
+        "201":
+          description: Task created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+
+  /tasks/{id}:
+    get:
+      summary: Get task details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Task details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+    put:
+      summary: Update task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskInput"
+      responses:
+        "200":
+          description: Task updated
+    delete:
+      summary: Delete task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Task deleted
+
+  /tasks/{id}/run:
+    post:
+      summary: Manually trigger a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          description: Job started (accepted)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+
+  /jobs:
+    get:
+      summary: List recent jobs (history)
+      parameters:
+        - name: taskId
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: List of jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Job"
+
+  /jobs/{id}/logs:
+    get:
+      summary: Get logs for a specific job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        "200":
+          description: Job logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/JobLog"
+
+components:
+  schemas:
+    Remote:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+
+    RemoteConfig:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        parameters:
+          type: object
+          additionalProperties:
+            type: string
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        sourcePath:
+          type: string
+        remoteName:
+          type: string
+        remotePath:
+          type: string
+        direction:
+          type: string
+          enum: [upload, download, bidirectional]
+        schedule:
+          type: string
+        realtime:
+          type: boolean
+        options:
+          type: object
+
+    TaskInput:
+      type: object
+      required: [name, sourcePath, remoteName, remotePath, direction]
+      properties:
+        name:
+          type: string
+        sourcePath:
+          type: string
+        remoteName:
+          type: string
+        remotePath:
+          type: string
+        direction:
+          type: string
+          enum: [upload, download, bidirectional]
+        schedule:
+          type: string
+        realtime:
+          type: boolean
+        options:
+          type: object
+
+    Job:
+      type: object
+      properties:
+        id:
+          type: string
+        taskId:
+          type: string
+        status:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        filesTransferred:
+          type: integer
+        bytesTransferred:
+          type: integer
+        errors:
+          type: string
+
+    JobLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        jobId:
+          type: string
+        level:
+          type: string
+          enum: [info, warning, error]
+        time:
+          type: string
+          format: date-time
+        path:
+          type: string
+        message:
+          type: string

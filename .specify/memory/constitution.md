@@ -1,50 +1,67 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+SYNC IMPACT REPORT
+Version change: 1.0.1 -> 1.0.2
+Modified principles: Governance (Compliance formatting), Typo fixes
+Added sections: None
+Removed sections: None
+Templates requiring updates: ✅ None
+Follow-up TODOs: None
+-->
+# Rclone Cloud Sync Manager Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Rclone-First Architecture
+All sync operations MUST be implemented through rclone as a library. Direct filesystem operations are prohibited except for configuration and state management. Rclone's configuration, remotes, and sync commands are the single source of truth for all cloud operations.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Web-First Interface
+All user interactions MUST be through the Web UI. CLI is for development and debugging only. The Web UI provides complete functionality for managing remotes, tasks, and monitoring sync operations.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. Test-Driven Development (NON-NEGOTIABLE)
+All features MUST be implemented with tests first. Unit tests for internal logic, integration tests for API endpoints, and end-to-end tests for user workflows. Red-Green-Refactor cycle is strictly enforced.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Independent User Stories
+Each user story (Manage Cloud Connections, Create Sync Tasks, Real-time/Scheduled Sync, Dashboard) MUST be independently implementable and testable. No story should depend on another for core functionality.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. Observability and Reliability
+All operations MUST be logged with structured logging. Sync operations MUST be resumable and handle network interruptions gracefully. The system MUST provide real-time status updates for all active operations.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+## Technical Constraints
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### Technology Stack
+- Backend: Go (latest stable) with Gin web framework
+- Frontend: SolidJS with TypeScript
+- Database: SQLite with Ent ORM
+- Sync Engine: rclone as Go library
+- Real-time Updates: Server-Sent Events (SSE)
+- File Watching: fsnotify
+- Configuration: TOML files with Viper
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+### Performance Requirements
+- Real-time sync MUST trigger within 30 seconds of file changes
+- System MUST handle thousands of files without memory leaks
+- Web UI MUST remain responsive during long-running sync operations
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### Security Requirements
+- All cloud credentials MUST be encrypted at rest
+- No credentials in logs or error messages
+- Secure communication between frontend and backend
+
+## Development Workflow
+
+### Code Quality
+- All code MUST pass golangci-lint checks
+- All PRs require review and passing tests
+- Documentation updates required for API changes
+
+### Testing Strategy
+- Unit tests for all internal packages
+- Integration tests for all API endpoints
+- End-to-end tests for critical user workflows
+- Performance tests for sync operations
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution supersedes all other development practices. Amendments REQUIRE documentation, team approval, and migration plan. Versioning follows Semantic Versioning (MAJOR.MINOR.PATCH). All code reviews MUST verify compliance with these principles. Complexity MUST be justified with clear business value.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.2 | **Ratified**: 2025-12-04 | **Last Amended**: 2025-12-07

@@ -115,7 +115,3 @@ func Handler(c *gin.Context) {
 		}
 	})
 }
-
-func RegisterRoutes(router *gin.RouterGroup) {
-	router.GET("/events", Handler)
-}

@@ -1,30 +1,35 @@
+import { Toaster } from '@/components/ui/toast';
+import AppShell from '@/layouts/AppShell';
+import ConnectionLayout from '@/modules/connections/layouts/ConnectionLayout';
+import History from '@/modules/connections/views/History';
+import Log from '@/modules/connections/views/Log';
+import Overview from '@/modules/connections/views/Overview';
+import Settings from '@/modules/connections/views/Settings';
+import Tasks from '@/modules/connections/views/Tasks';
+import WelcomeView from '@/modules/core/views/WelcomeView';
+import { HistoryProvider } from '@/store/history';
+import { TaskProvider } from '@/store/tasks';
+import { Route, Router } from '@solidjs/router';
 import { Component } from 'solid-js';
-import { Router, Route } from '@solidjs/router';
-import Layout from './components/Layout';
-import Remotes from './pages/Remotes';
-import Tasks from './pages/Tasks';
-import Dashboard from './pages/Dashboard';
-import JobDetails from './pages/JobDetails';
-
-const Settings: Component = () => (
-  <div>
-    <h1 class="text-2xl font-bold text-gray-800 mb-4">Settings</h1>
-    <div class="bg-white p-6 rounded-lg shadow-sm">
-      <p class="text-gray-600">Application settings.</p>
-    </div>
-  </div>
-);
 
 const App: Component = () => {
   return (
-    <Router root={Layout}>
-      <Route path="/" component={Dashboard} />
-      <Route path="/remotes" component={Remotes} />
-      <Route path="/tasks" component={Tasks} />
-      <Route path="/jobs/:id" component={JobDetails} />
-      <Route path="/settings" component={Settings} />
-    </Router>
+    <TaskProvider>
+      <HistoryProvider>
+        <Router root={AppShell}>
+          <Route path="/" component={WelcomeView} />
+          <Route path="/overview" component={WelcomeView} />
+          <Route path="/connections/:connectionName" component={ConnectionLayout}>
+            <Route path="/" component={Overview} />
+            <Route path="/tasks" component={Tasks} />
+            <Route path="/history" component={History} />
+            <Route path="/log" component={Log} />
+            <Route path="/settings" component={Settings} />
+          </Route>
+        </Router>
+        <Toaster />
+      </HistoryProvider>
+    </TaskProvider>
   );
 };
-
 export default App;

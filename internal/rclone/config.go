@@ -36,8 +36,26 @@ func ListRemotes() []string {
 	return config.GetRemoteNames()
 }
 
+// ListRemotesWithInfo lists all configured rclone remotes with their details.
+func ListRemotesWithInfo() ([]*RemoteInfo, error) {
+	remotes := config.GetRemoteNames()
+	var result []*RemoteInfo
+
+	for _, name := range remotes {
+		info, err := GetRemoteInfo(name)
+		if err != nil {
+			// Skip or log error? For now, we will just skip problematic remotes but maybe logging would be better.
+			// However, GetRemoteInfo essentially just reads config, so failure is unlikely if name comes from GetRemoteNames.
+			continue
+		}
+		result = append(result, info)
+	}
+	return result, nil
+}
+
 // RemoteInfo holds the configuration for a remote.
 type RemoteInfo struct {
+	Name   string `json:"name"`
 	Type   string `json:"type,omitempty"`
 	Remote string `json:"remote,omitempty"`
 }
@@ -52,7 +70,9 @@ func GetRemoteInfo(remoteName string) (*RemoteInfo, error) {
 		return nil, fmt.Errorf("remote %q not found", remoteName)
 	}
 
-	info := &RemoteInfo{}
+	info := &RemoteInfo{
+		Name: remoteName,
+	}
 
 	// This is a workaround as there is no direct `GetSection`
 	// We would need to parse the config file manually for a more robust solution
@@ -68,9 +88,26 @@ func GetRemoteInfo(remoteName string) (*RemoteInfo, error) {
 	return info, nil
 }
 
+// GetRemoteConfig gets all parameters for a given remote.
+func GetRemoteConfig(remoteName string) (map[string]any, error) {
+	sections := config.FileSections()
+
+	remoteExists := slices.Contains(sections, remoteName)
+
+	if !remoteExists {
+		return nil, fmt.Errorf("remote %q not found", remoteName)
+	}
+
+	return config.DumpRcRemote(remoteName), nil
+}
+
 // CreateRemote creates or updates a remote with the given parameters.
 func CreateRemote(remoteName string, params map[string]string) error {
 	for key, value := range params {
+		if value == "" {
+			config.FileDeleteKey(remoteName, key)
+			continue
+		}
 		config.FileSetValue(remoteName, key, value)
 	}
 	config.SaveConfig()

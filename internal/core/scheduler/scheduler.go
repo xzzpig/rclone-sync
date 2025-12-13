@@ -21,9 +21,9 @@ type Scheduler struct {
 	running bool
 }
 
-func NewScheduler(taskSvc ports.TaskService, runner ports.Runner) *Scheduler {
+func NewScheduler(taskSvc ports.TaskService, runner ports.Runner, opts ...cron.Option) *Scheduler {
 	return &Scheduler{
-		cron:    cron.New(cron.WithSeconds()), // Support seconds in cron spec
+		cron:    cron.New(opts...), // Standard 5-field cron (minute, hour, day, month, weekday)
 		taskSvc: taskSvc,
 		runner:  runner,
 		logger:  logger.L.Named("scheduler"),
@@ -97,12 +97,25 @@ func (s *Scheduler) RemoveTask(task *ent.Task) error {
 
 func (s *Scheduler) addJob(task *ent.Task) error {
 	taskIDStr := task.ID.String()
+	taskID := task.ID     // Capture uuid.UUID directly for use in closure
+	taskName := task.Name // For logging
+
 	s.removeJob(taskIDStr) // Remove existing job if any, to handle updates
 
 	entryID, err := s.cron.AddFunc(task.Schedule, func() {
-		s.logger.Info("Running scheduled task", zap.String("task_name", task.Name), zap.String("task_id", taskIDStr))
-		// Run in a new context to avoid cancellation from other jobs
-		s.runner.StartTask(task, "schedule")
+		s.logger.Info("Running scheduled task", zap.String("task_name", taskName), zap.String("task_id", taskIDStr))
+
+		// Reload task from database to get the latest configuration
+		ctx := context.Background()
+		currentTask, err := s.taskSvc.GetTask(ctx, taskID)
+		if err != nil {
+			s.logger.Error("Failed to get task for scheduled run",
+				zap.String("task_id", taskIDStr),
+				zap.Error(err))
+			return
+		}
+
+		s.runner.StartTask(currentTask, "schedule")
 	})
 
 	if err != nil {

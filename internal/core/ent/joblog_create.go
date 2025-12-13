@@ -56,9 +56,31 @@ func (jlc *JobLogCreate) SetNillablePath(s *string) *JobLogCreate {
 	return jlc
 }
 
-// SetMessage sets the "message" field.
-func (jlc *JobLogCreate) SetMessage(s string) *JobLogCreate {
-	jlc.mutation.SetMessage(s)
+// SetWhat sets the "what" field.
+func (jlc *JobLogCreate) SetWhat(j joblog.What) *JobLogCreate {
+	jlc.mutation.SetWhat(j)
+	return jlc
+}
+
+// SetNillableWhat sets the "what" field if the given value is not nil.
+func (jlc *JobLogCreate) SetNillableWhat(j *joblog.What) *JobLogCreate {
+	if j != nil {
+		jlc.SetWhat(*j)
+	}
+	return jlc
+}
+
+// SetSize sets the "size" field.
+func (jlc *JobLogCreate) SetSize(i int64) *JobLogCreate {
+	jlc.mutation.SetSize(i)
+	return jlc
+}
+
+// SetNillableSize sets the "size" field if the given value is not nil.
+func (jlc *JobLogCreate) SetNillableSize(i *int64) *JobLogCreate {
+	if i != nil {
+		jlc.SetSize(*i)
+	}
 	return jlc
 }
 
@@ -112,6 +134,10 @@ func (jlc *JobLogCreate) defaults() {
 		v := joblog.DefaultTime()
 		jlc.mutation.SetTime(v)
 	}
+	if _, ok := jlc.mutation.What(); !ok {
+		v := joblog.DefaultWhat
+		jlc.mutation.SetWhat(v)
+	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -127,8 +153,13 @@ func (jlc *JobLogCreate) check() error {
 	if _, ok := jlc.mutation.Time(); !ok {
 		return &ValidationError{Name: "time", err: errors.New(`ent: missing required field "JobLog.time"`)}
 	}
-	if _, ok := jlc.mutation.Message(); !ok {
-		return &ValidationError{Name: "message", err: errors.New(`ent: missing required field "JobLog.message"`)}
+	if _, ok := jlc.mutation.What(); !ok {
+		return &ValidationError{Name: "what", err: errors.New(`ent: missing required field "JobLog.what"`)}
+	}
+	if v, ok := jlc.mutation.What(); ok {
+		if err := joblog.WhatValidator(v); err != nil {
+			return &ValidationError{Name: "what", err: fmt.Errorf(`ent: validator failed for field "JobLog.what": %w`, err)}
+		}
 	}
 	if len(jlc.mutation.JobIDs()) == 0 {
 		return &ValidationError{Name: "job", err: errors.New(`ent: missing required edge "JobLog.job"`)}
@@ -171,9 +202,13 @@ func (jlc *JobLogCreate) createSpec() (*JobLog, *sqlgraph.CreateSpec) {
 		_spec.SetField(joblog.FieldPath, field.TypeString, value)
 		_node.Path = value
 	}
-	if value, ok := jlc.mutation.Message(); ok {
-		_spec.SetField(joblog.FieldMessage, field.TypeString, value)
-		_node.Message = value
+	if value, ok := jlc.mutation.What(); ok {
+		_spec.SetField(joblog.FieldWhat, field.TypeEnum, value)
+		_node.What = value
+	}
+	if value, ok := jlc.mutation.Size(); ok {
+		_spec.SetField(joblog.FieldSize, field.TypeInt64, value)
+		_node.Size = value
 	}
 	if nodes := jlc.mutation.JobIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

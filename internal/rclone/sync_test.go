@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/rclone/rclone/fs/accounting"
@@ -58,8 +59,8 @@ func (m *MockJobService) UpdateJobStats(ctx context.Context, jobID uuid.UUID, fi
 	return args.Get(0).(*ent.Job), args.Error(1)
 }
 
-func (m *MockJobService) AddJobLog(ctx context.Context, jobID uuid.UUID, level, message, path string) (*ent.JobLog, error) {
-	args := m.Called(ctx, jobID, level, message, path)
+func (m *MockJobService) AddJobLog(ctx context.Context, jobID uuid.UUID, level, what, path string, size int64) (*ent.JobLog, error) {
+	args := m.Called(ctx, jobID, level, what, path, size)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -82,8 +83,8 @@ func (m *MockJobService) GetLastJobByTaskID(ctx context.Context, taskID uuid.UUI
 	return args.Get(0).(*ent.Job), args.Error(1)
 }
 
-func (m *MockJobService) ListJobs(ctx context.Context, taskID *uuid.UUID, limit, offset int) ([]*ent.Job, error) {
-	args := m.Called(ctx, taskID, limit, offset)
+func (m *MockJobService) ListJobs(ctx context.Context, taskID *uuid.UUID, remoteName string, limit, offset int) ([]*ent.Job, error) {
+	args := m.Called(ctx, taskID, remoteName, limit, offset)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -96,6 +97,24 @@ func (m *MockJobService) GetJobWithLogs(ctx context.Context, jobID uuid.UUID) (*
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*ent.Job), args.Error(1)
+}
+
+func (m *MockJobService) CountJobs(ctx context.Context, taskID *uuid.UUID, remoteName string) (int, error) {
+	args := m.Called(ctx, taskID, remoteName)
+	return args.Int(0), args.Error(1)
+}
+
+func (m *MockJobService) ListJobLogs(ctx context.Context, remoteName string, taskID *uuid.UUID, jobID *uuid.UUID, level string, limit, offset int) ([]*ent.JobLog, error) {
+	args := m.Called(ctx, remoteName, taskID, jobID, level, limit, offset)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*ent.JobLog), args.Error(1)
+}
+
+func (m *MockJobService) CountJobLogs(ctx context.Context, remoteName string, taskID *uuid.UUID, jobID *uuid.UUID, level string) (int, error) {
+	args := m.Called(ctx, remoteName, taskID, jobID, level)
+	return args.Int(0), args.Error(1)
 }
 
 // TestPollStatsLogic tests the logic of pollStats using a mocked JobService
@@ -124,7 +143,7 @@ func TestPollStatsLogic(t *testing.T) {
 	// 4. Run loop
 	var wg sync.WaitGroup
 	wg.Go(func() {
-		engine.pollStats(ctx, jobID)
+		engine.pollStats(ctx, jobID, &ent.Task{ID: uuid.New()}, time.Now())
 	})
 
 	// Allow some time for the loop to run
@@ -161,4 +180,102 @@ func TestGetJobProgress(t *testing.T) {
 	progress, ok = engine.GetJobProgress(jobID1)
 	assert.False(t, ok, "Should return false when activeJobs is empty")
 	assert.Equal(t, JobProgress{}, progress, "Should return zero-value progress when activeJobs is empty")
+}
+
+// TestGetConflictResolutionFromOptions tests all branches of getConflictResolutionFromOptions
+func TestGetConflictResolutionFromOptions(t *testing.T) {
+	tests := []struct {
+		name            string
+		options         map[string]any
+		expectedResolve string
+		expectedLoser   string
+	}{
+		{
+			name:            "nil options - default",
+			options:         nil,
+			expectedResolve: "newer",
+			expectedLoser:   "num",
+		},
+		{
+			name:            "empty options - default",
+			options:         map[string]any{},
+			expectedResolve: "newer",
+			expectedLoser:   "num",
+		},
+		{
+			name: "resolution: newer",
+			options: map[string]any{
+				"conflict_resolution": "newer",
+			},
+			expectedResolve: "newer",
+			expectedLoser:   "num",
+		},
+		{
+			name: "resolution: local",
+			options: map[string]any{
+				"conflict_resolution": "local",
+			},
+			expectedResolve: "path1",
+			expectedLoser:   "delete",
+		},
+		{
+			name: "resolution: remote",
+			options: map[string]any{
+				"conflict_resolution": "remote",
+			},
+			expectedResolve: "path2",
+			expectedLoser:   "delete",
+		},
+		{
+			name: "resolution: both",
+			options: map[string]any{
+				"conflict_resolution": "both",
+			},
+			expectedResolve: "none",
+			expectedLoser:   "num",
+		},
+		{
+			name: "resolution: unknown - default to newer",
+			options: map[string]any{
+				"conflict_resolution": "unknown",
+			},
+			expectedResolve: "newer",
+			expectedLoser:   "num",
+		},
+		{
+			name: "resolution: wrong type - default",
+			options: map[string]any{
+				"conflict_resolution": 123,
+			},
+			expectedResolve: "newer",
+			expectedLoser:   "num",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolve, loser := getConflictResolutionFromOptions(tt.options)
+			assert.Equal(t, tt.expectedResolve, resolve.String())
+			assert.Equal(t, tt.expectedLoser, loser.String())
+		})
+	}
+}
+
+// TestFailJob tests the failJob method
+func TestFailJob(t *testing.T) {
+	mockJobService := new(MockJobService)
+	engine := NewSyncEngine(mockJobService, t.TempDir())
+	engine.logger = zap.NewNop()
+
+	jobID := uuid.New()
+	testErr := assert.AnError
+
+	// Expect UpdateJobStatus to be called
+	mockJobService.On("UpdateJobStatus", mock.Anything, jobID, "failed", testErr.Error()).
+		Return((*ent.Job)(nil), nil).Once()
+
+	ctx := context.Background()
+	engine.failJob(ctx, jobID, testErr)
+
+	mockJobService.AssertExpectations(t)
 }

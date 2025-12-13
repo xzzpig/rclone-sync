@@ -959,7 +959,9 @@ type JobLogMutation struct {
 	level         *joblog.Level
 	time          *time.Time
 	_path         *string
-	message       *string
+	what          *joblog.What
+	size          *int64
+	addsize       *int64
 	clearedFields map[string]struct{}
 	job           *uuid.UUID
 	clearedjob    bool
@@ -1187,40 +1189,110 @@ func (m *JobLogMutation) ResetPath() {
 	delete(m.clearedFields, joblog.FieldPath)
 }
 
-// SetMessage sets the "message" field.
-func (m *JobLogMutation) SetMessage(s string) {
-	m.message = &s
+// SetWhat sets the "what" field.
+func (m *JobLogMutation) SetWhat(j joblog.What) {
+	m.what = &j
 }
 
-// Message returns the value of the "message" field in the mutation.
-func (m *JobLogMutation) Message() (r string, exists bool) {
-	v := m.message
+// What returns the value of the "what" field in the mutation.
+func (m *JobLogMutation) What() (r joblog.What, exists bool) {
+	v := m.what
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// OldMessage returns the old "message" field's value of the JobLog entity.
+// OldWhat returns the old "what" field's value of the JobLog entity.
 // If the JobLog object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *JobLogMutation) OldMessage(ctx context.Context) (v string, err error) {
+func (m *JobLogMutation) OldWhat(ctx context.Context) (v joblog.What, err error) {
 	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldMessage is only allowed on UpdateOne operations")
+		return v, errors.New("OldWhat is only allowed on UpdateOne operations")
 	}
 	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldMessage requires an ID field in the mutation")
+		return v, errors.New("OldWhat requires an ID field in the mutation")
 	}
 	oldValue, err := m.oldValue(ctx)
 	if err != nil {
-		return v, fmt.Errorf("querying old value for OldMessage: %w", err)
+		return v, fmt.Errorf("querying old value for OldWhat: %w", err)
 	}
-	return oldValue.Message, nil
+	return oldValue.What, nil
 }
 
-// ResetMessage resets all changes to the "message" field.
-func (m *JobLogMutation) ResetMessage() {
-	m.message = nil
+// ResetWhat resets all changes to the "what" field.
+func (m *JobLogMutation) ResetWhat() {
+	m.what = nil
+}
+
+// SetSize sets the "size" field.
+func (m *JobLogMutation) SetSize(i int64) {
+	m.size = &i
+	m.addsize = nil
+}
+
+// Size returns the value of the "size" field in the mutation.
+func (m *JobLogMutation) Size() (r int64, exists bool) {
+	v := m.size
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSize returns the old "size" field's value of the JobLog entity.
+// If the JobLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *JobLogMutation) OldSize(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSize is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSize requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSize: %w", err)
+	}
+	return oldValue.Size, nil
+}
+
+// AddSize adds i to the "size" field.
+func (m *JobLogMutation) AddSize(i int64) {
+	if m.addsize != nil {
+		*m.addsize += i
+	} else {
+		m.addsize = &i
+	}
+}
+
+// AddedSize returns the value that was added to the "size" field in this mutation.
+func (m *JobLogMutation) AddedSize() (r int64, exists bool) {
+	v := m.addsize
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearSize clears the value of the "size" field.
+func (m *JobLogMutation) ClearSize() {
+	m.size = nil
+	m.addsize = nil
+	m.clearedFields[joblog.FieldSize] = struct{}{}
+}
+
+// SizeCleared returns if the "size" field was cleared in this mutation.
+func (m *JobLogMutation) SizeCleared() bool {
+	_, ok := m.clearedFields[joblog.FieldSize]
+	return ok
+}
+
+// ResetSize resets all changes to the "size" field.
+func (m *JobLogMutation) ResetSize() {
+	m.size = nil
+	m.addsize = nil
+	delete(m.clearedFields, joblog.FieldSize)
 }
 
 // SetJobID sets the "job" edge to the Job entity by id.
@@ -1296,7 +1368,7 @@ func (m *JobLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *JobLogMutation) Fields() []string {
-	fields := make([]string, 0, 4)
+	fields := make([]string, 0, 5)
 	if m.level != nil {
 		fields = append(fields, joblog.FieldLevel)
 	}
@@ -1306,8 +1378,11 @@ func (m *JobLogMutation) Fields() []string {
 	if m._path != nil {
 		fields = append(fields, joblog.FieldPath)
 	}
-	if m.message != nil {
-		fields = append(fields, joblog.FieldMessage)
+	if m.what != nil {
+		fields = append(fields, joblog.FieldWhat)
+	}
+	if m.size != nil {
+		fields = append(fields, joblog.FieldSize)
 	}
 	return fields
 }
@@ -1323,8 +1398,10 @@ func (m *JobLogMutation) Field(name string) (ent.Value, bool) {
 		return m.Time()
 	case joblog.FieldPath:
 		return m.Path()
-	case joblog.FieldMessage:
-		return m.Message()
+	case joblog.FieldWhat:
+		return m.What()
+	case joblog.FieldSize:
+		return m.Size()
 	}
 	return nil, false
 }
@@ -1340,8 +1417,10 @@ func (m *JobLogMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldTime(ctx)
 	case joblog.FieldPath:
 		return m.OldPath(ctx)
-	case joblog.FieldMessage:
-		return m.OldMessage(ctx)
+	case joblog.FieldWhat:
+		return m.OldWhat(ctx)
+	case joblog.FieldSize:
+		return m.OldSize(ctx)
 	}
 	return nil, fmt.Errorf("unknown JobLog field %s", name)
 }
@@ -1372,12 +1451,19 @@ func (m *JobLogMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetPath(v)
 		return nil
-	case joblog.FieldMessage:
-		v, ok := value.(string)
+	case joblog.FieldWhat:
+		v, ok := value.(joblog.What)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.SetMessage(v)
+		m.SetWhat(v)
+		return nil
+	case joblog.FieldSize:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSize(v)
 		return nil
 	}
 	return fmt.Errorf("unknown JobLog field %s", name)
@@ -1386,13 +1472,21 @@ func (m *JobLogMutation) SetField(name string, value ent.Value) error {
 // AddedFields returns all numeric fields that were incremented/decremented during
 // this mutation.
 func (m *JobLogMutation) AddedFields() []string {
-	return nil
+	var fields []string
+	if m.addsize != nil {
+		fields = append(fields, joblog.FieldSize)
+	}
+	return fields
 }
 
 // AddedField returns the numeric value that was incremented/decremented on a field
 // with the given name. The second boolean return value indicates that this field
 // was not set, or was not defined in the schema.
 func (m *JobLogMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case joblog.FieldSize:
+		return m.AddedSize()
+	}
 	return nil, false
 }
 
@@ -1401,6 +1495,13 @@ func (m *JobLogMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *JobLogMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case joblog.FieldSize:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSize(v)
+		return nil
 	}
 	return fmt.Errorf("unknown JobLog numeric field %s", name)
 }
@@ -1411,6 +1512,9 @@ func (m *JobLogMutation) ClearedFields() []string {
 	var fields []string
 	if m.FieldCleared(joblog.FieldPath) {
 		fields = append(fields, joblog.FieldPath)
+	}
+	if m.FieldCleared(joblog.FieldSize) {
+		fields = append(fields, joblog.FieldSize)
 	}
 	return fields
 }
@@ -1429,6 +1533,9 @@ func (m *JobLogMutation) ClearField(name string) error {
 	case joblog.FieldPath:
 		m.ClearPath()
 		return nil
+	case joblog.FieldSize:
+		m.ClearSize()
+		return nil
 	}
 	return fmt.Errorf("unknown JobLog nullable field %s", name)
 }
@@ -1446,8 +1553,11 @@ func (m *JobLogMutation) ResetField(name string) error {
 	case joblog.FieldPath:
 		m.ResetPath()
 		return nil
-	case joblog.FieldMessage:
-		m.ResetMessage()
+	case joblog.FieldWhat:
+		m.ResetWhat()
+		return nil
+	case joblog.FieldSize:
+		m.ResetSize()
 		return nil
 	}
 	return fmt.Errorf("unknown JobLog field %s", name)

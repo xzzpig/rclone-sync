@@ -65,9 +65,9 @@ func Path(v string) predicate.JobLog {
 	return predicate.JobLog(sql.FieldEQ(FieldPath, v))
 }
 
-// Message applies equality check predicate on the "message" field. It's identical to MessageEQ.
-func Message(v string) predicate.JobLog {
-	return predicate.JobLog(sql.FieldEQ(FieldMessage, v))
+// Size applies equality check predicate on the "size" field. It's identical to SizeEQ.
+func Size(v int64) predicate.JobLog {
+	return predicate.JobLog(sql.FieldEQ(FieldSize, v))
 }
 
 // LevelEQ applies the EQ predicate on the "level" field.
@@ -205,69 +205,74 @@ func PathContainsFold(v string) predicate.JobLog {
 	return predicate.JobLog(sql.FieldContainsFold(FieldPath, v))
 }
 
-// MessageEQ applies the EQ predicate on the "message" field.
-func MessageEQ(v string) predicate.JobLog {
-	return predicate.JobLog(sql.FieldEQ(FieldMessage, v))
+// WhatEQ applies the EQ predicate on the "what" field.
+func WhatEQ(v What) predicate.JobLog {
+	return predicate.JobLog(sql.FieldEQ(FieldWhat, v))
 }
 
-// MessageNEQ applies the NEQ predicate on the "message" field.
-func MessageNEQ(v string) predicate.JobLog {
-	return predicate.JobLog(sql.FieldNEQ(FieldMessage, v))
+// WhatNEQ applies the NEQ predicate on the "what" field.
+func WhatNEQ(v What) predicate.JobLog {
+	return predicate.JobLog(sql.FieldNEQ(FieldWhat, v))
 }
 
-// MessageIn applies the In predicate on the "message" field.
-func MessageIn(vs ...string) predicate.JobLog {
-	return predicate.JobLog(sql.FieldIn(FieldMessage, vs...))
+// WhatIn applies the In predicate on the "what" field.
+func WhatIn(vs ...What) predicate.JobLog {
+	return predicate.JobLog(sql.FieldIn(FieldWhat, vs...))
 }
 
-// MessageNotIn applies the NotIn predicate on the "message" field.
-func MessageNotIn(vs ...string) predicate.JobLog {
-	return predicate.JobLog(sql.FieldNotIn(FieldMessage, vs...))
+// WhatNotIn applies the NotIn predicate on the "what" field.
+func WhatNotIn(vs ...What) predicate.JobLog {
+	return predicate.JobLog(sql.FieldNotIn(FieldWhat, vs...))
 }
 
-// MessageGT applies the GT predicate on the "message" field.
-func MessageGT(v string) predicate.JobLog {
-	return predicate.JobLog(sql.FieldGT(FieldMessage, v))
+// SizeEQ applies the EQ predicate on the "size" field.
+func SizeEQ(v int64) predicate.JobLog {
+	return predicate.JobLog(sql.FieldEQ(FieldSize, v))
 }
 
-// MessageGTE applies the GTE predicate on the "message" field.
-func MessageGTE(v string) predicate.JobLog {
-	return predicate.JobLog(sql.FieldGTE(FieldMessage, v))
+// SizeNEQ applies the NEQ predicate on the "size" field.
+func SizeNEQ(v int64) predicate.JobLog {
+	return predicate.JobLog(sql.FieldNEQ(FieldSize, v))
 }
 
-// MessageLT applies the LT predicate on the "message" field.
-func MessageLT(v string) predicate.JobLog {
-	return predicate.JobLog(sql.FieldLT(FieldMessage, v))
+// SizeIn applies the In predicate on the "size" field.
+func SizeIn(vs ...int64) predicate.JobLog {
+	return predicate.JobLog(sql.FieldIn(FieldSize, vs...))
 }
 
-// MessageLTE applies the LTE predicate on the "message" field.
-func MessageLTE(v string) predicate.JobLog {
-	return predicate.JobLog(sql.FieldLTE(FieldMessage, v))
+// SizeNotIn applies the NotIn predicate on the "size" field.
+func SizeNotIn(vs ...int64) predicate.JobLog {
+	return predicate.JobLog(sql.FieldNotIn(FieldSize, vs...))
 }
 
-// MessageContains applies the Contains predicate on the "message" field.
-func MessageContains(v string) predicate.JobLog {
-	return predicate.JobLog(sql.FieldContains(FieldMessage, v))
+// SizeGT applies the GT predicate on the "size" field.
+func SizeGT(v int64) predicate.JobLog {
+	return predicate.JobLog(sql.FieldGT(FieldSize, v))
 }
 
-// MessageHasPrefix applies the HasPrefix predicate on the "message" field.
-func MessageHasPrefix(v string) predicate.JobLog {
-	return predicate.JobLog(sql.FieldHasPrefix(FieldMessage, v))
+// SizeGTE applies the GTE predicate on the "size" field.
+func SizeGTE(v int64) predicate.JobLog {
+	return predicate.JobLog(sql.FieldGTE(FieldSize, v))
 }
 
-// MessageHasSuffix applies the HasSuffix predicate on the "message" field.
-func MessageHasSuffix(v string) predicate.JobLog {
-	return predicate.JobLog(sql.FieldHasSuffix(FieldMessage, v))
+// SizeLT applies the LT predicate on the "size" field.
+func SizeLT(v int64) predicate.JobLog {
+	return predicate.JobLog(sql.FieldLT(FieldSize, v))
 }
 
-// MessageEqualFold applies the EqualFold predicate on the "message" field.
-func MessageEqualFold(v string) predicate.JobLog {
-	return predicate.JobLog(sql.FieldEqualFold(FieldMessage, v))
+// SizeLTE applies the LTE predicate on the "size" field.
+func SizeLTE(v int64) predicate.JobLog {
+	return predicate.JobLog(sql.FieldLTE(FieldSize, v))
 }
 
-// MessageContainsFold applies the ContainsFold predicate on the "message" field.
-func MessageContainsFold(v string) predicate.JobLog {
-	return predicate.JobLog(sql.FieldContainsFold(FieldMessage, v))
+// SizeIsNil applies the IsNil predicate on the "size" field.
+func SizeIsNil() predicate.JobLog {
+	return predicate.JobLog(sql.FieldIsNull(FieldSize))
+}
+
+// SizeNotNil applies the NotNil predicate on the "size" field.
+func SizeNotNil() predicate.JobLog {
+	return predicate.JobLog(sql.FieldNotNull(FieldSize))
 }
 
 // HasJob applies the HasEdge predicate on the "job" edge.

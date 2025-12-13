@@ -67,13 +67,25 @@ func ListJobs(c *gin.Context) {
 		}
 	}
 
-	jobs, err := service.ListJobs(c.Request.Context(), taskID, limit, offset)
+	// Support filtering by remote_name
+	remoteName := c.Query("remote_name")
+
+	total, err := service.CountJobs(c.Request.Context(), taskID, remoteName)
 	if err != nil {
 		HandleError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, jobs)
+	jobs, err := service.ListJobs(c.Request.Context(), taskID, remoteName, limit, offset)
+	if err != nil {
+		HandleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, Page[[]*ent.Job]{
+		Data:  jobs,
+		Total: total,
+	})
 }
 
 // GetJob returns a single job with logs

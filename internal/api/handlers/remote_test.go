@@ -37,10 +37,15 @@ func TestRemoteAPI_CreateAndList(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var remotes []string
+	var remotes []map[string]any
 	err = json.NewDecoder(resp.Body).Decode(&remotes)
 	require.NoError(t, err)
-	assert.Contains(t, remotes, remoteName)
+
+	var remoteNames []string
+	for _, remote := range remotes {
+		remoteNames = append(remoteNames, remote["name"].(string))
+	}
+	assert.Contains(t, remoteNames, remoteName)
 
 	// 3. Verify the rclone.conf file was updated
 	rcloneConfPath := filepath.Join(ts.AppDataDir, "rclone.conf")

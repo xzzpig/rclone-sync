@@ -40,7 +40,8 @@ var (
 		{Name: "level", Type: field.TypeEnum, Enums: []string{"info", "warning", "error"}},
 		{Name: "time", Type: field.TypeTime},
 		{Name: "path", Type: field.TypeString, Nullable: true},
-		{Name: "message", Type: field.TypeString},
+		{Name: "what", Type: field.TypeEnum, Enums: []string{"upload", "download", "delete", "move", "error", "unknown"}, Default: "unknown"},
+		{Name: "size", Type: field.TypeInt64, Nullable: true},
 		{Name: "job_logs", Type: field.TypeUUID},
 	}
 	// JobLogsTable holds the schema information for the "job_logs" table.
@@ -51,7 +52,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "job_logs_jobs_logs",
-				Columns:    []*schema.Column{JobLogsColumns[5]},
+				Columns:    []*schema.Column{JobLogsColumns[6]},
 				RefColumns: []*schema.Column{JobsColumns[0]},
 				OnDelete:   schema.Cascade,
 			},

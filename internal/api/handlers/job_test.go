@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/xzzpig/rclone-sync/internal/api/handlers"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 )
 
@@ -31,11 +32,12 @@ func TestJobAPI_ListJobs(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var jobs []*ent.Job
-	err = json.NewDecoder(resp.Body).Decode(&jobs)
+	var page handlers.Page[[]*ent.Job]
+	err = json.NewDecoder(resp.Body).Decode(&page)
 	require.NoError(t, err)
-	assert.GreaterOrEqual(t, len(jobs), 1)
-	assert.Equal(t, job1.ID, jobs[0].ID)
+	assert.GreaterOrEqual(t, len(page.Data), 1)
+	assert.Equal(t, 1, page.Total)
+	assert.Equal(t, job1.ID, page.Data[0].ID)
 }
 
 func TestJobAPI_GetJob(t *testing.T) {

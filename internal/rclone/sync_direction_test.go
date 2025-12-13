@@ -79,7 +79,7 @@ type = local
 	assert.True(t, os.IsNotExist(err), "Extra file in destination should be deleted")
 
 	// Verify Job Status
-	jobs, err := jobService.ListJobs(context.Background(), &testTask.ID, 10, 0)
+	jobs, err := jobService.ListJobs(context.Background(), &testTask.ID, "", 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs, 1)
 	assert.Equal(t, "success", string(jobs[0].Status))
@@ -144,7 +144,7 @@ type = local
 	assert.True(t, os.IsNotExist(err), "Extra file in source should be deleted")
 
 	// Verify Job Status
-	jobs, err := jobService.ListJobs(context.Background(), &testTask.ID, 10, 0)
+	jobs, err := jobService.ListJobs(context.Background(), &testTask.ID, "", 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs, 1)
 	assert.Equal(t, "success", string(jobs[0].Status))
@@ -210,7 +210,7 @@ type = local
 	assert.NoError(t, err, "Destination file should be synced to source")
 
 	// Verify Job Status
-	jobs, err := jobService.ListJobs(context.Background(), &testTask.ID, 10, 0)
+	jobs, err := jobService.ListJobs(context.Background(), &testTask.ID, "", 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs, 1)
 	assert.Equal(t, "success", string(jobs[0].Status))

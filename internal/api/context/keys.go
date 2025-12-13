@@ -5,4 +5,6 @@ const (
 	ContextKeySyncEngine = "SyncEngine"
 	ContextKeyTaskRunner = "TaskRunner"
 	ContextKeyJobService = "JobService"
+	ContextKeyWatcher    = "Watcher"
+	ContextKeyScheduler  = "Scheduler"
 )

@@ -1,0 +1,203 @@
+openapi: 3.1.0
+info:
+  title: Cloud Sync API
+  version: 1.1.0
+  description: API for managing rclone connections and sync tasks.
+servers:
+  - url: /api
+paths:
+  /connections:
+    get:
+      summary: List all connections
+      tags: [Connections]
+      responses:
+        "200":
+          description: List of configured connections
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Connection"
+    post:
+      summary: Create a new connection
+      tags: [Connections]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewConnectionRequest"
+      responses:
+        "201":
+          description: Connection created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Connection"
+
+  /connections/{id}:
+    get:
+      summary: Get connection details
+      tags: [Connections]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Connection details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Connection"
+    delete:
+      summary: Delete connection and all associated tasks
+      tags: [Connections]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Connection deleted successfully
+
+  /connections/{id}/quota:
+    get:
+      summary: Get connection quota (async supported)
+      tags: [Connections]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Quota information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quota"
+
+  /connections/{id}/tasks:
+    get:
+      summary: List tasks for a specific connection
+      tags: [Tasks]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+
+  /tasks:
+    post:
+      summary: Create a new sync task
+      tags: [Tasks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewTaskRequest"
+      responses:
+        "201":
+          description: Task created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+
+components:
+  schemas:
+    Connection:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [online, offline, error]
+        config:
+          type: object
+          additionalProperties: true
+
+    NewConnectionRequest:
+      type: object
+      required: [name, type, config]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        config:
+          type: object
+
+    Quota:
+      type: object
+      properties:
+        used:
+          type: integer
+          format: int64
+        total:
+          type: integer
+          format: int64
+        updated_at:
+          type: string
+          format: date-time
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+        connection_id:
+          type: string
+        local_path:
+          type: string
+        remote_path:
+          type: string
+        direction:
+          type: string
+          enum: [upload, download, bidirectional]
+        schedule:
+          $ref: "#/components/schemas/Schedule"
+
+    Schedule:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        cron:
+          type: string
+
+    NewTaskRequest:
+      type: object
+      required: [connection_id, local_path, remote_path, direction]
+      properties:
+        connection_id:
+          type: string
+        local_path:
+          type: string
+        remote_path:
+          type: string
+        direction:
+          type: string

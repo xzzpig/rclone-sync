@@ -85,7 +85,7 @@ func TestTaskAPI_RunTask(t *testing.T) {
 	// We need to wait a bit for the runner to create the job
 	time.Sleep(100 * time.Millisecond)
 
-	jobs, err := ts.JobService.ListJobs(context.Background(), &task.ID, 10, 0)
+	jobs, err := ts.JobService.ListJobs(context.Background(), &task.ID, "", 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs, 1)
 	assert.Equal(t, task.ID, jobs[0].Edges.Task.ID)

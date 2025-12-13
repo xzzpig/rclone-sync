@@ -78,17 +78,44 @@ func (jlu *JobLogUpdate) ClearPath() *JobLogUpdate {
 	return jlu
 }
 
-// SetMessage sets the "message" field.
-func (jlu *JobLogUpdate) SetMessage(s string) *JobLogUpdate {
-	jlu.mutation.SetMessage(s)
+// SetWhat sets the "what" field.
+func (jlu *JobLogUpdate) SetWhat(j joblog.What) *JobLogUpdate {
+	jlu.mutation.SetWhat(j)
 	return jlu
 }
 
-// SetNillableMessage sets the "message" field if the given value is not nil.
-func (jlu *JobLogUpdate) SetNillableMessage(s *string) *JobLogUpdate {
-	if s != nil {
-		jlu.SetMessage(*s)
+// SetNillableWhat sets the "what" field if the given value is not nil.
+func (jlu *JobLogUpdate) SetNillableWhat(j *joblog.What) *JobLogUpdate {
+	if j != nil {
+		jlu.SetWhat(*j)
 	}
+	return jlu
+}
+
+// SetSize sets the "size" field.
+func (jlu *JobLogUpdate) SetSize(i int64) *JobLogUpdate {
+	jlu.mutation.ResetSize()
+	jlu.mutation.SetSize(i)
+	return jlu
+}
+
+// SetNillableSize sets the "size" field if the given value is not nil.
+func (jlu *JobLogUpdate) SetNillableSize(i *int64) *JobLogUpdate {
+	if i != nil {
+		jlu.SetSize(*i)
+	}
+	return jlu
+}
+
+// AddSize adds i to the "size" field.
+func (jlu *JobLogUpdate) AddSize(i int64) *JobLogUpdate {
+	jlu.mutation.AddSize(i)
+	return jlu
+}
+
+// ClearSize clears the value of the "size" field.
+func (jlu *JobLogUpdate) ClearSize() *JobLogUpdate {
+	jlu.mutation.ClearSize()
 	return jlu
 }
 
@@ -148,6 +175,11 @@ func (jlu *JobLogUpdate) check() error {
 			return &ValidationError{Name: "level", err: fmt.Errorf(`ent: validator failed for field "JobLog.level": %w`, err)}
 		}
 	}
+	if v, ok := jlu.mutation.What(); ok {
+		if err := joblog.WhatValidator(v); err != nil {
+			return &ValidationError{Name: "what", err: fmt.Errorf(`ent: validator failed for field "JobLog.what": %w`, err)}
+		}
+	}
 	if jlu.mutation.JobCleared() && len(jlu.mutation.JobIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "JobLog.job"`)
 	}
@@ -178,8 +210,17 @@ func (jlu *JobLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if jlu.mutation.PathCleared() {
 		_spec.ClearField(joblog.FieldPath, field.TypeString)
 	}
-	if value, ok := jlu.mutation.Message(); ok {
-		_spec.SetField(joblog.FieldMessage, field.TypeString, value)
+	if value, ok := jlu.mutation.What(); ok {
+		_spec.SetField(joblog.FieldWhat, field.TypeEnum, value)
+	}
+	if value, ok := jlu.mutation.Size(); ok {
+		_spec.SetField(joblog.FieldSize, field.TypeInt64, value)
+	}
+	if value, ok := jlu.mutation.AddedSize(); ok {
+		_spec.AddField(joblog.FieldSize, field.TypeInt64, value)
+	}
+	if jlu.mutation.SizeCleared() {
+		_spec.ClearField(joblog.FieldSize, field.TypeInt64)
 	}
 	if jlu.mutation.JobCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -278,17 +319,44 @@ func (jluo *JobLogUpdateOne) ClearPath() *JobLogUpdateOne {
 	return jluo
 }
 
-// SetMessage sets the "message" field.
-func (jluo *JobLogUpdateOne) SetMessage(s string) *JobLogUpdateOne {
-	jluo.mutation.SetMessage(s)
+// SetWhat sets the "what" field.
+func (jluo *JobLogUpdateOne) SetWhat(j joblog.What) *JobLogUpdateOne {
+	jluo.mutation.SetWhat(j)
 	return jluo
 }
 
-// SetNillableMessage sets the "message" field if the given value is not nil.
-func (jluo *JobLogUpdateOne) SetNillableMessage(s *string) *JobLogUpdateOne {
-	if s != nil {
-		jluo.SetMessage(*s)
+// SetNillableWhat sets the "what" field if the given value is not nil.
+func (jluo *JobLogUpdateOne) SetNillableWhat(j *joblog.What) *JobLogUpdateOne {
+	if j != nil {
+		jluo.SetWhat(*j)
 	}
+	return jluo
+}
+
+// SetSize sets the "size" field.
+func (jluo *JobLogUpdateOne) SetSize(i int64) *JobLogUpdateOne {
+	jluo.mutation.ResetSize()
+	jluo.mutation.SetSize(i)
+	return jluo
+}
+
+// SetNillableSize sets the "size" field if the given value is not nil.
+func (jluo *JobLogUpdateOne) SetNillableSize(i *int64) *JobLogUpdateOne {
+	if i != nil {
+		jluo.SetSize(*i)
+	}
+	return jluo
+}
+
+// AddSize adds i to the "size" field.
+func (jluo *JobLogUpdateOne) AddSize(i int64) *JobLogUpdateOne {
+	jluo.mutation.AddSize(i)
+	return jluo
+}
+
+// ClearSize clears the value of the "size" field.
+func (jluo *JobLogUpdateOne) ClearSize() *JobLogUpdateOne {
+	jluo.mutation.ClearSize()
 	return jluo
 }
 
@@ -361,6 +429,11 @@ func (jluo *JobLogUpdateOne) check() error {
 			return &ValidationError{Name: "level", err: fmt.Errorf(`ent: validator failed for field "JobLog.level": %w`, err)}
 		}
 	}
+	if v, ok := jluo.mutation.What(); ok {
+		if err := joblog.WhatValidator(v); err != nil {
+			return &ValidationError{Name: "what", err: fmt.Errorf(`ent: validator failed for field "JobLog.what": %w`, err)}
+		}
+	}
 	if jluo.mutation.JobCleared() && len(jluo.mutation.JobIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "JobLog.job"`)
 	}
@@ -408,8 +481,17 @@ func (jluo *JobLogUpdateOne) sqlSave(ctx context.Context) (_node *JobLog, err er
 	if jluo.mutation.PathCleared() {
 		_spec.ClearField(joblog.FieldPath, field.TypeString)
 	}
-	if value, ok := jluo.mutation.Message(); ok {
-		_spec.SetField(joblog.FieldMessage, field.TypeString, value)
+	if value, ok := jluo.mutation.What(); ok {
+		_spec.SetField(joblog.FieldWhat, field.TypeEnum, value)
+	}
+	if value, ok := jluo.mutation.Size(); ok {
+		_spec.SetField(joblog.FieldSize, field.TypeInt64, value)
+	}
+	if value, ok := jluo.mutation.AddedSize(); ok {
+		_spec.AddField(joblog.FieldSize, field.TypeInt64, value)
+	}
+	if jluo.mutation.SizeCleared() {
+		_spec.ClearField(joblog.FieldSize, field.TypeInt64)
 	}
 	if jluo.mutation.JobCleared() {
 		edge := &sqlgraph.EdgeSpec{

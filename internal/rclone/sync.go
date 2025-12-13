@@ -59,6 +59,47 @@ func (e *SyncEngine) GetJobProgress(jobID uuid.UUID) (JobProgress, bool) {
 	return p, ok
 }
 
+// getConflictResolutionFromOptions extracts conflict resolution setting from task options.
+// Returns the default value (PreferNewer) if not specified.
+func getConflictResolutionFromOptions(options map[string]any) (bisync.Prefer, bisync.ConflictLoserAction) {
+	conflictResolve := bisync.PreferNewer
+	conflictLoser := bisync.ConflictLoserNumber // Default: rename conflicting files
+
+	if options == nil {
+		return conflictResolve, conflictLoser
+	}
+
+	resolution, ok := options["conflict_resolution"].(string)
+	if !ok {
+		return conflictResolve, conflictLoser
+	}
+
+	switch resolution {
+	case "newer":
+		// Keep newer file, rename the older one
+		conflictResolve = bisync.PreferNewer
+		conflictLoser = bisync.ConflictLoserNumber
+	case "local":
+		// Keep local (path1), delete remote
+		conflictResolve = bisync.PreferPath1
+		conflictLoser = bisync.ConflictLoserDelete
+	case "remote":
+		// Keep remote (path2), delete local
+		conflictResolve = bisync.PreferPath2
+		conflictLoser = bisync.ConflictLoserDelete
+	case "both":
+		// Keep both files, rename them with conflict suffix
+		conflictResolve = bisync.PreferNone
+		conflictLoser = bisync.ConflictLoserNumber
+	default:
+		// Default to newer
+		conflictResolve = bisync.PreferNewer
+		conflictLoser = bisync.ConflictLoserNumber
+	}
+
+	return conflictResolve, conflictLoser
+}
+
 // RunTask executes a sync task using the appropriate method based on task.Direction.
 // Supports bidirectional sync using bisync, and one-way sync (upload/download) using rclone sync.
 func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger string) error {
@@ -101,7 +142,7 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger string
 	// This runs in the background and collects transfer events
 	var wg sync.WaitGroup
 	wg.Go(func() {
-		e.pollStats(statsCtx, jobEntity.ID)
+		e.pollStats(statsCtx, jobEntity.ID, task, jobEntity.StartTime)
 	})
 
 	// 5. Create Fs objects
@@ -124,7 +165,7 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger string
 	var syncErr error
 	switch task.Direction {
 	case taskent.DirectionBidirectional:
-		syncErr = e.runBidirectional(statsCtx, fSrc, fDst)
+		syncErr = e.runBidirectional(statsCtx, task, fSrc, fDst)
 	case taskent.DirectionUpload:
 		syncErr = e.runOneWay(statsCtx, fSrc, fDst)
 	case taskent.DirectionDownload:
@@ -146,20 +187,40 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger string
 			if _, updateErr := e.jobService.UpdateJobStatus(ctx, jobEntity.ID, string(job.StatusCancelled), "Task cancelled by user or shutdown"); updateErr != nil {
 				e.logger.Error("Failed to update job status to cancelled", zap.Error(updateErr))
 			}
+			// Broadcast cancellation
+			s := accounting.Stats(statsCtx)
+			var files, bytes int64
+			if s != nil {
+				files, bytes = s.GetTransfers(), s.GetBytes()
+			}
+			e.broadcastJobUpdate(jobEntity.ID, task.ID, task.RemoteName, string(job.StatusCancelled), jobEntity.StartTime, time.Now(), files, bytes)
 			return syncErr
+		}
+
+		if _, updateErr := e.jobService.AddJobLog(ctx, jobEntity.ID, string(joblog.LevelError), string(joblog.WhatError), syncErr.Error(), 0); updateErr != nil {
+			e.logger.Error("Failed to add job log for sync failure", zap.Error(updateErr))
 		}
 
 		e.logger.Error("Sync operation failed", zap.Error(syncErr))
 		if _, updateErr := e.jobService.UpdateJobStatus(ctx, jobEntity.ID, string(job.StatusFailed), syncErr.Error()); updateErr != nil {
 			e.logger.Error("Failed to update job status to failed", zap.Error(updateErr))
 		}
+		// Broadcast failure
+		s := accounting.Stats(statsCtx)
+		var files, bytes int64
+		if s != nil {
+			files, bytes = s.GetTransfers(), s.GetBytes()
+		}
+		e.broadcastJobUpdate(jobEntity.ID, task.ID, task.RemoteName, string(job.StatusFailed), jobEntity.StartTime, time.Now(), files, bytes)
 		return syncErr
 	}
 
 	// Update final stats
 	s := accounting.Stats(statsCtx)
+	var files, bytes int64
 	if s != nil {
-		if _, updateErr := e.jobService.UpdateJobStats(ctx, jobEntity.ID, s.GetTransfers(), s.GetBytes()); updateErr != nil {
+		files, bytes = s.GetTransfers(), s.GetBytes()
+		if _, updateErr := e.jobService.UpdateJobStats(ctx, jobEntity.ID, files, bytes); updateErr != nil {
 			e.logger.Error("Failed to update final job stats", zap.Error(updateErr))
 		}
 	}
@@ -167,6 +228,10 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger string
 	if _, updateErr := e.jobService.UpdateJobStatus(ctx, jobEntity.ID, string(job.StatusSuccess), ""); updateErr != nil {
 		e.logger.Error("Failed to update job status to success", zap.Error(updateErr))
 	}
+
+	// Broadcast success
+	e.broadcastJobUpdate(jobEntity.ID, task.ID, task.RemoteName, string(job.StatusSuccess), jobEntity.StartTime, time.Now(), files, bytes)
+
 	e.logger.Info("Sync task completed successfully", zap.Stringer("job_id", jobEntity.ID))
 
 	return nil
@@ -178,7 +243,7 @@ func (e *SyncEngine) failJob(ctx context.Context, jobID uuid.UUID, err error) {
 }
 
 // runBidirectional executes a bidirectional sync using bisync.
-func (e *SyncEngine) runBidirectional(ctx context.Context, f1, f2 fs.Fs) error {
+func (e *SyncEngine) runBidirectional(ctx context.Context, task *ent.Task, f1, f2 fs.Fs) error {
 	// Determine Resync necessity
 	// Calculate base path and listing file names to check if they exist
 	basePath := bilib.BasePath(ctx, e.workDir, f1, f2)
@@ -191,13 +256,22 @@ func (e *SyncEngine) runBidirectional(ctx context.Context, f1, f2 fs.Fs) error {
 		resync = true
 	}
 
+	// Get conflict resolution settings from task options
+	conflictResolve, conflictLoser := getConflictResolutionFromOptions(task.Options)
+	e.logger.Debug("Conflict resolution settings",
+		zap.String("conflict_resolve", conflictResolve.String()),
+		zap.String("conflict_loser", conflictLoser.String()),
+	)
+
 	// Prepare Bisync options
 	opt := &bisync.Options{
-		Resync:      resync,
-		Workdir:     e.workDir,
-		NoCleanup:   true, // Keep workdir for state
-		CheckAccess: false,
-		// TODO: Map other options from task.Options JSON
+		Resync:          resync,
+		Workdir:         e.workDir,
+		NoCleanup:       true, // Keep workdir for state
+		Force:           true, // TODO: Expose as task option
+		CheckAccess:     false,
+		ConflictResolve: conflictResolve,
+		ConflictLoser:   conflictLoser,
 	}
 
 	// Run Bisync
@@ -226,24 +300,24 @@ func (e *SyncEngine) runOneWay(ctx context.Context, fSrc, fDst fs.Fs) error {
 //     strategy, this could lead to race conditions or deadlocks.
 //
 // Future: If rclone adds a proper event bus or callback system for transfers, this should be replaced immediately.
-func (e *SyncEngine) pollStats(ctx context.Context, jobID uuid.UUID) {
-	ticker := time.NewTicker(500 * time.Millisecond)
+func (e *SyncEngine) pollStats(ctx context.Context, jobID uuid.UUID, task *ent.Task, startTime time.Time) {
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			// Final flush to capture any remaining completed transfers
-			e.processStats(ctx, jobID)
+			// Final stats update
+			e.processStats(ctx, jobID, task, startTime)
 			return
 		case <-ticker.C:
-			e.processStats(ctx, jobID)
+			e.processStats(ctx, jobID, task, startTime)
 		}
 	}
 }
 
 // processStats is the core logic for polling rclone stats, creating logs, and updating progress.
-func (e *SyncEngine) processStats(ctx context.Context, jobID uuid.UUID) {
+func (e *SyncEngine) processStats(ctx context.Context, jobID uuid.UUID, task *ent.Task, startTime time.Time) {
 	s := accounting.Stats(ctx)
 	if s == nil {
 		return
@@ -264,18 +338,65 @@ func (e *SyncEngine) processStats(ctx context.Context, jobID uuid.UUID) {
 	for _, tr := range *transfers {
 		if tr.IsDone() {
 			snapshot := tr.Snapshot()
+			transfersToRemove = append(transfersToRemove, tr)
 
-			// Create log entry
-			if snapshot.Bytes > 0 {
+			// Handle failed transfers
+			if snapshot.Error != nil {
 				logsToSave = append(logsToSave, &ent.JobLog{
-					Level:   joblog.LevelInfo,
-					Message: fmt.Sprintf("Transferred %s (%d bytes)", snapshot.Name, snapshot.Bytes),
-					Path:    snapshot.Name,
-					Time:    time.Now(),
+					Level: joblog.LevelError,
+					What:  joblog.WhatError,
+					Path:  snapshot.Name + ": " + snapshot.Error.Error(), //TODO: better error handling
+					Size:  snapshot.Size,
+					Time:  snapshot.CompletedAt,
 				})
+				continue
 			}
 
-			transfersToRemove = append(transfersToRemove, tr)
+			// Categorize and log based on operation type (snapshot.What)
+			switch snapshot.What {
+			case "deleting":
+				// Log file deletion operations
+				logsToSave = append(logsToSave, &ent.JobLog{
+					Level: joblog.LevelInfo,
+					What:  joblog.WhatDelete,
+					Path:  snapshot.Name,
+					Size:  snapshot.Size,
+					Time:  snapshot.CompletedAt,
+				})
+			case "moving":
+				// Log file move operations
+				logsToSave = append(logsToSave, &ent.JobLog{
+					Level: joblog.LevelInfo,
+					What:  joblog.WhatMove,
+					Path:  snapshot.Name,
+					Size:  snapshot.Size,
+					Time:  snapshot.CompletedAt,
+				})
+			case "checking", "hashing", "listing", "listing file - Path1", "listing file - Path2":
+				// Skip pure check operations (e.g., MD5 verification, listing)
+				continue
+			case "transferring":
+				what := joblog.WhatUpload
+				if snapshot.SrcFs != task.SourcePath {
+					what = joblog.WhatDownload
+				}
+				// Log successful transfers (including 0-byte files)
+				logsToSave = append(logsToSave, &ent.JobLog{
+					Level: joblog.LevelInfo,
+					What:  what,
+					Path:  snapshot.Name,
+					Size:  snapshot.Size,
+					Time:  snapshot.CompletedAt,
+				})
+			default:
+				// Unknown operation type
+				logsToSave = append(logsToSave, &ent.JobLog{
+					Level: joblog.LevelWarning,
+					What:  joblog.WhatUnknown,
+					Size:  snapshot.Size,
+					Time:  time.Now(),
+				})
+			}
 		}
 	}
 
@@ -306,13 +427,28 @@ func (e *SyncEngine) processStats(ctx context.Context, jobID uuid.UUID) {
 	e.statsMu.Unlock()
 
 	// Broadcast progress update
+	e.broadcastJobUpdate(jobID, task.ID, task.RemoteName, string(job.StatusRunning), startTime, time.Time{}, s.GetTransfers(), s.GetBytes())
+}
+
+func (e *SyncEngine) broadcastJobUpdate(jobID, taskID uuid.UUID, remoteName, status string, startTime, endTime time.Time, files, bytes int64) {
+	data := gin.H{
+		"id":                jobID.String(), // Map job_id to id for frontend compatibility
+		"job_id":            jobID.String(),
+		"task_id":           taskID.String(),
+		"files_transferred": files,
+		"bytes_transferred": bytes,
+		"remote_name":       remoteName,
+		"status":            status,
+		"start_time":        startTime,
+	}
+
+	if !endTime.IsZero() {
+		data["end_time"] = endTime
+	}
+
 	sse.GetBroker().Submit(sse.Event{
 		Type: "job_progress",
-		Data: gin.H{
-			"job_id":            jobID.String(),
-			"files_transferred": s.GetTransfers(),
-			"bytes_transferred": s.GetBytes(),
-		},
+		Data: data,
 	})
 }
 

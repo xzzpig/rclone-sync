@@ -21,8 +21,10 @@ const (
 	FieldTime = "time"
 	// FieldPath holds the string denoting the path field in the database.
 	FieldPath = "path"
-	// FieldMessage holds the string denoting the message field in the database.
-	FieldMessage = "message"
+	// FieldWhat holds the string denoting the what field in the database.
+	FieldWhat = "what"
+	// FieldSize holds the string denoting the size field in the database.
+	FieldSize = "size"
 	// EdgeJob holds the string denoting the job edge name in mutations.
 	EdgeJob = "job"
 	// Table holds the table name of the joblog in the database.
@@ -42,7 +44,8 @@ var Columns = []string{
 	FieldLevel,
 	FieldTime,
 	FieldPath,
-	FieldMessage,
+	FieldWhat,
+	FieldSize,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "job_logs"
@@ -95,6 +98,36 @@ func LevelValidator(l Level) error {
 	}
 }
 
+// What defines the type for the "what" enum field.
+type What string
+
+// WhatUnknown is the default value of the What enum.
+const DefaultWhat = WhatUnknown
+
+// What values.
+const (
+	WhatUpload   What = "upload"
+	WhatDownload What = "download"
+	WhatDelete   What = "delete"
+	WhatMove     What = "move"
+	WhatError    What = "error"
+	WhatUnknown  What = "unknown"
+)
+
+func (w What) String() string {
+	return string(w)
+}
+
+// WhatValidator is a validator for the "what" field enum values. It is called by the builders before save.
+func WhatValidator(w What) error {
+	switch w {
+	case WhatUpload, WhatDownload, WhatDelete, WhatMove, WhatError, WhatUnknown:
+		return nil
+	default:
+		return fmt.Errorf("joblog: invalid enum value for what field: %q", w)
+	}
+}
+
 // OrderOption defines the ordering options for the JobLog queries.
 type OrderOption func(*sql.Selector)
 
@@ -118,9 +151,14 @@ func ByPath(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPath, opts...).ToFunc()
 }
 
-// ByMessage orders the results by the message field.
-func ByMessage(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldMessage, opts...).ToFunc()
+// ByWhat orders the results by the what field.
+func ByWhat(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldWhat, opts...).ToFunc()
+}
+
+// BySize orders the results by the size field.
+func BySize(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSize, opts...).ToFunc()
 }
 
 // ByJobField orders the results by job field.

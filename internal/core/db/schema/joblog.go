@@ -22,7 +22,11 @@ func (JobLog) Fields() []ent.Field {
 			Default(time.Now),
 		field.String("path").
 			Optional(),
-		field.String("message"),
+		field.Enum("what").
+			Values("upload", "download", "delete", "move", "error", "unknown").
+			Default("unknown"),
+		field.Int64("size").
+			Optional(),
 	}
 }
 

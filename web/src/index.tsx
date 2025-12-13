@@ -1,16 +1,21 @@
 /* @refresh reload */
-import './index.css';
+import { ColorModeProvider, ColorModeScript } from '@kobalte/core';
+import { QueryClient, QueryClientProvider } from '@tanstack/solid-query';
 import { render } from 'solid-js/web';
-import 'solid-devtools';
+import App from './App.tsx';
+import './index.css';
 
-import App from './App';
-
+const queryClient = new QueryClient();
 const root = document.getElementById('root');
 
-if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
-  throw new Error(
-    'Root element not found. Did you forget to add it to your index.html? Or maybe the id attribute got misspelled?',
-  );
-}
-
-render(() => <App />, root!);
+render(
+  () => (
+    <QueryClientProvider client={queryClient}>
+      <ColorModeScript />
+      <ColorModeProvider>
+        <App />
+      </ColorModeProvider>
+    </QueryClientProvider>
+  ),
+  root!
+);

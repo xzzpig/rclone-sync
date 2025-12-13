@@ -81,14 +81,19 @@ func (s *JobService) UpdateJobStats(ctx context.Context, jobID uuid.UUID, files,
 }
 
 // AddJobLog adds a log entry for a job.
-func (s *JobService) AddJobLog(ctx context.Context, jobID uuid.UUID, level, message, path string) (*ent.JobLog, error) {
-	l, err := s.client.JobLog.Create().
+func (s *JobService) AddJobLog(ctx context.Context, jobID uuid.UUID, level, what, path string, size int64) (*ent.JobLog, error) {
+	create := s.client.JobLog.Create().
 		SetJobID(jobID).
 		SetLevel(joblog.Level(level)).
-		SetMessage(message).
+		SetWhat(joblog.What(what)).
 		SetNillablePath(&path).
-		SetTime(time.Now()).
-		Save(ctx)
+		SetTime(time.Now())
+
+	if size > 0 {
+		create.SetSize(size)
+	}
+
+	l, err := create.Save(ctx)
 	if err != nil {
 		return nil, errors.Join(errs.ErrSystem, err)
 	}
@@ -102,12 +107,18 @@ func (s *JobService) AddJobLogsBatch(ctx context.Context, jobID uuid.UUID, logs 
 	}
 	builders := make([]*ent.JobLogCreate, len(logs))
 	for i, l := range logs {
-		builders[i] = s.client.JobLog.Create().
+		builder := s.client.JobLog.Create().
 			SetJobID(jobID).
 			SetLevel(l.Level).
-			SetMessage(l.Message).
+			SetWhat(l.What).
 			SetNillablePath(&l.Path).
 			SetTime(l.Time)
+
+		if l.Size > 0 {
+			builder.SetSize(l.Size)
+		}
+
+		builders[i] = builder
 	}
 	_, err := s.client.JobLog.CreateBulk(builders...).Save(ctx)
 	if err != nil {
@@ -164,23 +175,44 @@ func (s *JobService) GetLastJobByTaskID(ctx context.Context, taskID uuid.UUID) (
 	return j, nil
 }
 
-// ListJobs retrieves jobs with optional filtering (taskID) and pagination.
-func (s *JobService) ListJobs(ctx context.Context, taskID *uuid.UUID, limit, offset int) ([]*ent.Job, error) {
-	query := s.client.Job.Query().
-		Order(ent.Desc(job.FieldStartTime)).
-		Limit(limit).
-		Offset(offset).
-		WithTask()
+func (s *JobService) buildJobQuery(taskID *uuid.UUID, remoteName string) *ent.JobQuery {
+	query := s.client.Job.Query()
 
 	if taskID != nil {
 		query.Where(job.HasTaskWith(task.ID(*taskID)))
 	}
 
-	jobs, err := query.All(ctx)
+	if remoteName != "" {
+		query.Where(job.HasTaskWith(task.RemoteName(remoteName)))
+	}
+
+	return query
+}
+
+// ListJobs retrieves jobs with optional filtering (taskID, remoteName) and pagination.
+func (s *JobService) ListJobs(ctx context.Context, taskID *uuid.UUID, remoteName string, limit, offset int) ([]*ent.Job, error) {
+	query := s.buildJobQuery(taskID, remoteName)
+	jobs, err := query.
+		Order(ent.Desc(job.FieldStartTime)).
+		Limit(limit).
+		Offset(offset).
+		WithTask().
+		All(ctx)
+
 	if err != nil {
 		return nil, errors.Join(errs.ErrSystem, err)
 	}
 	return jobs, nil
+}
+
+// CountJobs returns the total count of jobs with optional filtering.
+func (s *JobService) CountJobs(ctx context.Context, taskID *uuid.UUID, remoteName string) (int, error) {
+	query := s.buildJobQuery(taskID, remoteName)
+	count, err := query.Count(ctx)
+	if err != nil {
+		return 0, errors.Join(errs.ErrSystem, err)
+	}
+	return count, nil
 }
 
 // GetJobWithLogs retrieves a job by ID, including its logs.
@@ -199,4 +231,56 @@ func (s *JobService) GetJobWithLogs(ctx context.Context, jobID uuid.UUID) (*ent.
 		return nil, errors.Join(errs.ErrSystem, err)
 	}
 	return j, nil
+}
+
+func (s *JobService) buildJobLogQuery(remoteName string, taskID *uuid.UUID, jobID *uuid.UUID, level string) *ent.JobLogQuery {
+	query := s.client.JobLog.Query()
+
+	// Filter by remote_name through job -> task relationship
+	if remoteName != "" {
+		query.Where(joblog.HasJobWith(job.HasTaskWith(task.RemoteName(remoteName))))
+	}
+
+	// Optional: filter by task_id
+	if taskID != nil {
+		query.Where(joblog.HasJobWith(job.HasTaskWith(task.ID(*taskID))))
+	}
+
+	// Optional: filter by job_id
+	if jobID != nil {
+		query.Where(joblog.HasJobWith(job.ID(*jobID)))
+	}
+
+	// Optional: filter by level
+	if level != "" {
+		query.Where(joblog.LevelEQ(joblog.Level(level)))
+	}
+
+	return query
+}
+
+// ListJobLogs retrieves job logs with flexible filtering.
+// Required: remoteName
+// Optional: taskID, jobID, level
+func (s *JobService) ListJobLogs(ctx context.Context, remoteName string, taskID *uuid.UUID, jobID *uuid.UUID, level string, limit, offset int) ([]*ent.JobLog, error) {
+	query := s.buildJobLogQuery(remoteName, taskID, jobID, level)
+	logs, err := query.
+		Order(ent.Desc(joblog.FieldTime)).
+		Limit(limit).
+		Offset(offset).
+		All(ctx)
+	if err != nil {
+		return nil, errors.Join(errs.ErrSystem, err)
+	}
+	return logs, nil
+}
+
+// CountJobLogs returns the total count of job logs with flexible filtering.
+func (s *JobService) CountJobLogs(ctx context.Context, remoteName string, taskID *uuid.UUID, jobID *uuid.UUID, level string) (int, error) {
+	query := s.buildJobLogQuery(remoteName, taskID, jobID, level)
+	count, err := query.Count(ctx)
+	if err != nil {
+		return 0, errors.Join(errs.ErrSystem, err)
+	}
+	return count, nil
 }

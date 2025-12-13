@@ -66,12 +66,16 @@ type = local
 	syncEngine := rclone.NewSyncEngine(jobService, appDataDir)
 	runner := runner.NewRunner(syncEngine)
 
+	// Create mock watcher and scheduler for testing
+	mockWatcher := &mockWatcher{}
+	mockScheduler := &mockScheduler{}
+
 	// 5. Setup Gin router and register routes
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 
 	// Add TaskRunner middleware
-	router.Use(apiContext.Middleware(syncEngine, runner, jobService))
+	router.Use(apiContext.Middleware(syncEngine, runner, jobService, mockWatcher, mockScheduler))
 
 	apiGroup := router.Group("/api")
 	api.RegisterAPIRoutes(apiGroup)
@@ -95,3 +99,19 @@ type = local
 		Cleanup:     cleanup,
 	}
 }
+
+// mockWatcher is a mock implementation of ports.Watcher for testing
+type mockWatcher struct{}
+
+func (m *mockWatcher) Start()                          {}
+func (m *mockWatcher) Stop()                           {}
+func (m *mockWatcher) AddTask(task *ent.Task) error    { return nil }
+func (m *mockWatcher) RemoveTask(task *ent.Task) error { return nil }
+
+// mockScheduler is a mock implementation of ports.Scheduler for testing
+type mockScheduler struct{}
+
+func (m *mockScheduler) Start()                          {}
+func (m *mockScheduler) Stop()                           {}
+func (m *mockScheduler) AddTask(task *ent.Task) error    { return nil }
+func (m *mockScheduler) RemoveTask(task *ent.Task) error { return nil }

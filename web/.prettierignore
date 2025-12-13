@@ -1,0 +1,17 @@
+# 依赖
+node_modules
+pnpm-lock.yaml
+
+# 构建输出
+dist
+*.tsbuildinfo
+
+# 配置文件
+vite.config.d.ts
+src/components/ui
+
+# 公共资源
+public
+
+# 其他
+.gitignore

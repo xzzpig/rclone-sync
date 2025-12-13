@@ -85,7 +85,7 @@ type = local
 	assert.NoError(t, err, "File should exist in destination")
 
 	// Check database for job and logs
-	jobs, err := jobService.ListJobs(context.Background(), &testTask.ID, 10, 0)
+	jobs, err := jobService.ListJobs(context.Background(), &testTask.ID, "", 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs, 1, "Should be one job in the database")
 
@@ -149,7 +149,7 @@ type = local
 	assert.Error(t, err, "RunTask should return an error for non-existent source")
 
 	// 5. Verify results
-	jobs, err := jobService.ListJobs(context.Background(), &testTask.ID, 10, 0)
+	jobs, err := jobService.ListJobs(context.Background(), &testTask.ID, "", 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs, 1, "Should be one job in the database")
 
@@ -208,7 +208,7 @@ type = local
 	assert.Contains(t, err.Error(), "context canceled", "Error should mention context cancellation")
 
 	// 6. Verify that no job was created because the context was cancelled before any work
-	jobs, err := jobService.ListJobs(context.Background(), &testTask.ID, 10, 0)
+	jobs, err := jobService.ListJobs(context.Background(), &testTask.ID, "", 10, 0)
 	require.NoError(t, err)
 	assert.Empty(t, jobs, "No job should be created if the context is already cancelled")
 }

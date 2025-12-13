@@ -109,29 +109,31 @@ func TestJobService(t *testing.T) {
 		j, _ := service.CreateJob(ctx, taskID, "manual")
 
 		t.Run("AddJobLog", func(t *testing.T) {
-			l, err := service.AddJobLog(ctx, j.ID, string(joblog.LevelInfo), "test message", "/path")
+			l, err := service.AddJobLog(ctx, j.ID, string(joblog.LevelInfo), string(joblog.WhatUpload), "/path", 1024)
 			assert.NoError(t, err)
 
 			fetchedJob, err := l.QueryJob().Only(ctx)
 			assert.NoError(t, err)
 			assert.Equal(t, j.ID, fetchedJob.ID)
 
-			assert.Equal(t, "test message", l.Message)
+			assert.Equal(t, joblog.WhatUpload, l.What)
+			assert.Equal(t, int64(1024), l.Size)
 		})
 
 		t.Run("AddJobLogsBatch", func(t *testing.T) {
 			logs := []*ent.JobLog{
 				{
-					Level:   joblog.LevelInfo,
-					Message: "batch message 1",
-					Path:    "/path/1",
-					Time:    time.Now(),
+					Level: joblog.LevelInfo,
+					What:  joblog.WhatDownload,
+					Path:  "/path/1",
+					Size:  2048,
+					Time:  time.Now(),
 				},
 				{
-					Level:   joblog.LevelError,
-					Message: "batch message 2",
-					Path:    "/path/2",
-					Time:    time.Now(),
+					Level: joblog.LevelError,
+					What:  joblog.WhatError,
+					Path:  "/path/2",
+					Time:  time.Now(),
 				},
 			}
 			err := service.AddJobLogsBatch(ctx, j.ID, logs)
@@ -169,7 +171,7 @@ func TestJobService(t *testing.T) {
 		})
 
 		t.Run("ListJobs", func(t *testing.T) {
-			list, err := service.ListJobs(ctx, &taskID, 10, 0)
+			list, err := service.ListJobs(ctx, &taskID, "", 10, 0)
 			assert.NoError(t, err)
 			assert.Len(t, list, 2)
 			// Should be ordered by StartTime Desc
@@ -198,13 +200,13 @@ func TestJobService(t *testing.T) {
 		j, _ := service.CreateJob(ctx, taskID, "manual")
 
 		// Add multiple logs with slight delays to ensure different timestamps
-		_, err := service.AddJobLog(ctx, j.ID, string(joblog.LevelInfo), "log message 1", "")
+		_, err := service.AddJobLog(ctx, j.ID, string(joblog.LevelInfo), string(joblog.WhatUpload), "", 512)
 		require.NoError(t, err)
 		time.Sleep(time.Millisecond) // Ensure different timestamps
-		_, err = service.AddJobLog(ctx, j.ID, string(joblog.LevelError), "log message 2", "/path/to/file")
+		_, err = service.AddJobLog(ctx, j.ID, string(joblog.LevelError), string(joblog.WhatError), "/path/to/file", 0)
 		require.NoError(t, err)
 		time.Sleep(time.Millisecond)
-		_, err = service.AddJobLog(ctx, j.ID, string(joblog.LevelWarning), "log message 3", "")
+		_, err = service.AddJobLog(ctx, j.ID, string(joblog.LevelWarning), string(joblog.WhatDelete), "", 0)
 		require.NoError(t, err)
 
 		// Call the method under test
@@ -220,21 +222,123 @@ func TestJobService(t *testing.T) {
 
 		// Verify logs are loaded and ordered by time ascending
 		require.Len(t, got.Edges.Logs, 3)
-		assert.Equal(t, "log message 1", got.Edges.Logs[0].Message)
+		assert.Equal(t, joblog.WhatUpload, got.Edges.Logs[0].What)
 		assert.Equal(t, joblog.LevelInfo, got.Edges.Logs[0].Level)
 		assert.Equal(t, "", got.Edges.Logs[0].Path)
+		assert.Equal(t, int64(512), got.Edges.Logs[0].Size)
 
-		assert.Equal(t, "log message 2", got.Edges.Logs[1].Message)
+		assert.Equal(t, joblog.WhatError, got.Edges.Logs[1].What)
 		assert.Equal(t, joblog.LevelError, got.Edges.Logs[1].Level)
 		assert.Equal(t, "/path/to/file", got.Edges.Logs[1].Path)
+		assert.Equal(t, int64(0), got.Edges.Logs[1].Size)
 
-		assert.Equal(t, "log message 3", got.Edges.Logs[2].Message)
+		assert.Equal(t, joblog.WhatDelete, got.Edges.Logs[2].What)
 		assert.Equal(t, joblog.LevelWarning, got.Edges.Logs[2].Level)
 		assert.Equal(t, "", got.Edges.Logs[2].Path)
+		assert.Equal(t, int64(0), got.Edges.Logs[2].Size)
 	})
 
 	t.Run("GetJobWithLogs_NotFound", func(t *testing.T) {
 		_, err := service.GetJobWithLogs(ctx, uuid.New())
+		assert.ErrorIs(t, err, errs.ErrNotFound)
+	})
+
+	t.Run("CountJobs", func(t *testing.T) {
+		newTaskID := createTask(t)
+		_, err := service.CreateJob(ctx, newTaskID, "manual")
+		require.NoError(t, err)
+		_, err = service.CreateJob(ctx, newTaskID, "schedule")
+		require.NoError(t, err)
+
+		t.Run("NoFilters", func(t *testing.T) {
+			// There might be jobs from other tests, so we just check count > 0 or specific logic
+			count, err := service.CountJobs(ctx, nil, "")
+			assert.NoError(t, err)
+			assert.GreaterOrEqual(t, count, 2)
+		})
+
+		t.Run("FilterByTaskID", func(t *testing.T) {
+			count, err := service.CountJobs(ctx, &newTaskID, "")
+			assert.NoError(t, err)
+			assert.Equal(t, 2, count)
+		})
+
+		t.Run("FilterByRemoteName", func(t *testing.T) {
+			// The helper createTask uses fixed remote names, let's create a specific one
+			uniqueRemote := "unique-remote-" + uuid.NewString()
+			uniqueTask, err := taskService.CreateTask(ctx, "Unique Remote Task", "/l", uniqueRemote, "/r", "bidirectional", "", false, nil)
+			require.NoError(t, err)
+			_, err = service.CreateJob(ctx, uniqueTask.ID, "manual")
+			require.NoError(t, err)
+
+			count, err := service.CountJobs(ctx, nil, uniqueRemote)
+			assert.NoError(t, err)
+			assert.Equal(t, 1, count)
+		})
+	})
+
+	t.Run("JobLogs_ListAndCount", func(t *testing.T) {
+		// Setup: One task, One job, Multiple logs
+		taskID := createTask(t)
+		job, err := service.CreateJob(ctx, taskID, "manual")
+		require.NoError(t, err)
+		jobID := job.ID
+
+		_, err = service.AddJobLog(ctx, jobID, "info", "upload", "", 1024)
+		require.NoError(t, err)
+		_, err = service.AddJobLog(ctx, jobID, "error", "error", "", 0)
+		require.NoError(t, err)
+		_, err = service.AddJobLog(ctx, jobID, "info", "download", "", 2048)
+		require.NoError(t, err)
+
+		t.Run("ListJobLogs_FilterByLevel", func(t *testing.T) {
+			logs, err := service.ListJobLogs(ctx, "", nil, &jobID, "info", 10, 0)
+			assert.NoError(t, err)
+			assert.Len(t, logs, 2)
+			for _, l := range logs {
+				assert.Equal(t, joblog.LevelInfo, l.Level)
+			}
+		})
+
+		t.Run("CountJobLogs_FilterByLevel", func(t *testing.T) {
+			count, err := service.CountJobLogs(ctx, "", nil, &jobID, "error")
+			assert.NoError(t, err)
+			assert.Equal(t, 1, count)
+		})
+
+		t.Run("ListJobLogs_Pagination", func(t *testing.T) {
+			// Determine order (default desc time)
+			logs, err := service.ListJobLogs(ctx, "", nil, &jobID, "", 1, 0) // First page, size 1
+			assert.NoError(t, err)
+			require.Len(t, logs, 1)
+
+			logs2, err := service.ListJobLogs(ctx, "", nil, &jobID, "", 1, 1) // Second page, size 1
+			assert.NoError(t, err)
+			require.Len(t, logs2, 1)
+
+			assert.NotEqual(t, logs[0].ID, logs2[0].ID)
+		})
+	})
+
+	t.Run("AddJobLogsBatch_Empty", func(t *testing.T) {
+		taskID := createTask(t)
+		j, err := service.CreateJob(ctx, taskID, "manual")
+		require.NoError(t, err)
+
+		err = service.AddJobLogsBatch(ctx, j.ID, []*ent.JobLog{})
+		assert.NoError(t, err) // Should simply return nil
+	})
+
+	t.Run("ResetStuckJobs_NoOp", func(t *testing.T) {
+		// Ensure no running jobs exist (or clean state)
+		// We can't guarantee global state easily but we can check it doesn't error
+		err := service.ResetStuckJobs(ctx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("GetLastJobByTaskID_NoJobs", func(t *testing.T) {
+		emptyTask := createTask(t)
+		_, err := service.GetLastJobByTaskID(ctx, emptyTask)
 		assert.ErrorIs(t, err, errs.ErrNotFound)
 	})
 }

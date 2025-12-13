@@ -18,10 +18,9 @@ import (
 
 	"github.com/xzzpig/rclone-sync/internal/api/context"
 	"github.com/xzzpig/rclone-sync/internal/api/handlers"
-	"github.com/xzzpig/rclone-sync/internal/api/sse"
 )
 
-func SetupRouter(syncEngine *rclone.SyncEngine, taskRunner *runner.Runner, jobService ports.JobService) *gin.Engine {
+func SetupRouter(syncEngine *rclone.SyncEngine, taskRunner *runner.Runner, jobService ports.JobService, watcher ports.Watcher, scheduler ports.Scheduler) *gin.Engine {
 	if config.Cfg.App.Environment == "development" {
 		gin.SetMode(gin.DebugMode)
 	} else {
@@ -33,7 +32,7 @@ func SetupRouter(syncEngine *rclone.SyncEngine, taskRunner *runner.Runner, jobSe
 	// Middleware
 	r.Use(ginLogger(logger.L))
 	r.Use(gin.Recovery())
-	r.Use(context.Middleware(syncEngine, taskRunner, jobService))
+	r.Use(context.Middleware(syncEngine, taskRunner, jobService, watcher, scheduler))
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"}, // Adjust for production
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
@@ -53,7 +52,7 @@ func SetupRouter(syncEngine *rclone.SyncEngine, taskRunner *runner.Runner, jobSe
 	{
 		// Register routes here
 		RegisterAPIRoutes(api)
-		sse.RegisterRoutes(api)
+		// sse.RegisterRoutes(api)
 	}
 
 	// Serve Frontend

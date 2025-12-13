@@ -18,6 +18,7 @@
             pkgs.nodejs_22
             pkgs.pnpm
             pkgs.golangci-lint
+            pkgs.sqlite
           ];
           shellHook = ''
             export CGO_CFLAGS="-Wno-error=cpp"

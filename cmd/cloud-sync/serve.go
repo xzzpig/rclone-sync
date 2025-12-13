@@ -71,7 +71,7 @@ var serveCmd = &cobra.Command{
 
 		// Setup graceful shutdowncontext
 		// Start API Server
-		r := api.SetupRouter(syncEngine, taskRunner, jobSvc)
+		r := api.SetupRouter(syncEngine, taskRunner, jobSvc, watch, sched)
 
 		addr := fmt.Sprintf("%s:%d", config.Cfg.Server.Host, config.Cfg.Server.Port)
 		logger.L.Info("Server starting", zap.String("address", addr))

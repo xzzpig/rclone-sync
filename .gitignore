@@ -27,7 +27,6 @@ result*
 .direnv/
 
 # IDE settings
-.vscode/
 .idea/
 
 # OS-specific files

@@ -25,8 +25,10 @@ type JobLog struct {
 	Time time.Time `json:"time,omitempty"`
 	// Path holds the value of the "path" field.
 	Path string `json:"path,omitempty"`
-	// Message holds the value of the "message" field.
-	Message string `json:"message,omitempty"`
+	// What holds the value of the "what" field.
+	What joblog.What `json:"what,omitempty"`
+	// Size holds the value of the "size" field.
+	Size int64 `json:"size,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the JobLogQuery when eager-loading is set.
 	Edges        JobLogEdges `json:"edges"`
@@ -59,9 +61,9 @@ func (*JobLog) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case joblog.FieldID:
+		case joblog.FieldID, joblog.FieldSize:
 			values[i] = new(sql.NullInt64)
-		case joblog.FieldLevel, joblog.FieldPath, joblog.FieldMessage:
+		case joblog.FieldLevel, joblog.FieldPath, joblog.FieldWhat:
 			values[i] = new(sql.NullString)
 		case joblog.FieldTime:
 			values[i] = new(sql.NullTime)
@@ -106,11 +108,17 @@ func (jl *JobLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				jl.Path = value.String
 			}
-		case joblog.FieldMessage:
+		case joblog.FieldWhat:
 			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field message", values[i])
+				return fmt.Errorf("unexpected type %T for field what", values[i])
 			} else if value.Valid {
-				jl.Message = value.String
+				jl.What = joblog.What(value.String)
+			}
+		case joblog.FieldSize:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field size", values[i])
+			} else if value.Valid {
+				jl.Size = value.Int64
 			}
 		case joblog.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -169,8 +177,11 @@ func (jl *JobLog) String() string {
 	builder.WriteString("path=")
 	builder.WriteString(jl.Path)
 	builder.WriteString(", ")
-	builder.WriteString("message=")
-	builder.WriteString(jl.Message)
+	builder.WriteString("what=")
+	builder.WriteString(fmt.Sprintf("%v", jl.What))
+	builder.WriteString(", ")
+	builder.WriteString("size=")
+	builder.WriteString(fmt.Sprintf("%v", jl.Size))
 	builder.WriteByte(')')
 	return builder.String()
 }

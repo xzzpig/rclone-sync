@@ -1,3 +1,4 @@
+import * as m from '@/paraglide/messages.js';
 import TableSkeleton from '@/components/common/TableSkeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,11 +26,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatBytes } from '@/lib/utils';
+import { formatRelativeTime } from '@/lib/date';
 import { useHistory } from '@/store/history';
 import { useTasks } from '@/store/tasks';
 import { useParams, useSearchParams } from '@solidjs/router';
-import { formatDistanceToNow } from 'date-fns';
-import { enUS } from 'date-fns/locale';
 import { Component, For, Show, createEffect, createMemo, onMount } from 'solid-js';
 import IconAlertCircle from '~icons/lucide/alert-circle';
 import IconAlertTriangle from '~icons/lucide/alert-triangle';
@@ -160,7 +160,7 @@ const Log: Component = () => {
 
   return (
     <ConnectionViewLayout
-      title="Sync Logs"
+      title={m.log_syncLogs()}
       actions={
         <>
           <Button
@@ -175,11 +175,11 @@ const Log: Component = () => {
             value={selectedTaskId()}
             onChange={(value) => setSelectedTaskId(value ?? '')}
             options={['', ...(filteredTasks().map((t) => t.id) ?? [])]}
-            placeholder="Select Task"
+            placeholder={m.log_selectTask()}
             itemComponent={(props) => (
               <SelectItem item={props.item}>
                 {props.item.rawValue === ''
-                  ? 'Select Task'
+                  ? m.log_selectTask()
                   : (filteredTasks().find((t) => t.id === props.item.rawValue)?.name ??
                     props.item.rawValue)}
               </SelectItem>
@@ -189,8 +189,8 @@ const Log: Component = () => {
               <SelectValue>
                 {(state) => {
                   const taskId = state.selectedOption();
-                  if (!taskId) return 'Select Task';
-                  return filteredTasks().find((t) => t.id === taskId)?.name ?? 'Select Task';
+                  if (!taskId) return m.log_selectTask();
+                  return filteredTasks().find((t) => t.id === taskId)?.name ?? m.log_selectTask();
                 }}
               </SelectValue>
             </SelectTrigger>
@@ -202,12 +202,17 @@ const Log: Component = () => {
               value={selectedJobId() ?? ''}
               onChange={(value) => setSelectedJobId(value ?? undefined)}
               options={['', ...(historyState.jobs.map((j) => j.id) ?? [])]}
-              placeholder="Select Execution"
+              placeholder={m.log_selectExecution()}
               itemComponent={(props) => (
                 <SelectItem item={props.item}>
                   {props.item.rawValue === ''
-                    ? 'Select Execution'
-                    : `Ran ${formatDistanceToNow(new Date(historyState.jobs.find((j) => j.id === props.item.rawValue)?.start_time ?? ''), { addSuffix: true, locale: enUS })}`}
+                    ? m.log_selectExecution()
+                    : m.log_ranAgo({
+                        time: formatRelativeTime(
+                          historyState.jobs.find((j) => j.id === props.item.rawValue)?.start_time ??
+                            ''
+                        ),
+                      })}
                 </SelectItem>
               )}
             >
@@ -215,10 +220,12 @@ const Log: Component = () => {
                 <SelectValue>
                   {(state) => {
                     const jobId = state.selectedOption() as string;
-                    if (!jobId) return 'Select Execution';
+                    if (!jobId) return m.log_selectExecution();
                     const job = historyState.jobs.find((j) => j.id === jobId);
-                    if (!job) return 'Select Execution';
-                    return `Ran ${formatDistanceToNow(new Date(job.start_time), { addSuffix: true, locale: enUS })}`;
+                    if (!job) return m.log_selectExecution();
+                    return m.log_ranAgo({
+                      time: formatRelativeTime(job.start_time),
+                    });
                   }}
                 </SelectValue>
               </SelectTrigger>
@@ -230,10 +237,10 @@ const Log: Component = () => {
             value={levelFilter() ?? 'all'}
             onChange={(value) => setLevelFilter(value ?? 'all')}
             options={['all', 'info', 'warning', 'error']}
-            placeholder="Log Level"
+            placeholder={m.log_logLevel()}
             itemComponent={(props) => (
               <SelectItem item={props.item}>
-                {props.item.rawValue === 'all' ? 'All Levels' : props.item.rawValue}
+                {props.item.rawValue === 'all' ? m.log_allLevels() : props.item.rawValue}
               </SelectItem>
             )}
           >
@@ -241,7 +248,7 @@ const Log: Component = () => {
               <SelectValue<string>>
                 {(state) =>
                   (state.selectedOption() === 'all'
-                    ? 'All Levels'
+                    ? m.log_allLevels()
                     : state.selectedOption()) as string
                 }
               </SelectValue>
@@ -255,7 +262,7 @@ const Log: Component = () => {
         when={historyState.logs.length > 0 || historyState.isLoadingLogs}
         fallback={
           <div class="flex flex-1 items-center justify-center text-muted-foreground">
-            No logs found
+            {m.log_noLogs()}
           </div>
         }
       >
@@ -264,11 +271,11 @@ const Log: Component = () => {
           <Table>
             <TableHeader class="sticky top-0 z-10 bg-card shadow-sm">
               <TableRow>
-                <TableHead class="w-[100px] whitespace-nowrap">Level</TableHead>
-                <TableHead class="w-[160px] whitespace-nowrap">Time</TableHead>
-                <TableHead class="w-[120px] whitespace-nowrap">Action</TableHead>
-                <TableHead class="w-[100px] whitespace-nowrap">Size</TableHead>
-                <TableHead class="min-w-[300px]">Path</TableHead>
+                <TableHead class="w-[100px] whitespace-nowrap">{m.common_level()}</TableHead>
+                <TableHead class="w-[160px] whitespace-nowrap">{m.log_tableTime()}</TableHead>
+                <TableHead class="w-[120px] whitespace-nowrap">{m.log_tableAction()}</TableHead>
+                <TableHead class="w-[100px] whitespace-nowrap">{m.common_size()}</TableHead>
+                <TableHead class="min-w-[300px]">{m.log_tablePath()}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -286,10 +293,7 @@ const Log: Component = () => {
                         </div>
                       </TableCell>
                       <TableCell class="whitespace-nowrap py-2 align-top text-sm text-muted-foreground">
-                        {formatDistanceToNow(new Date(log.time), {
-                          addSuffix: true,
-                          locale: enUS,
-                        })}
+                        {formatRelativeTime(log.time)}
                       </TableCell>
                       <TableCell class="py-2 align-top text-sm">
                         <Badge variant="outline">{log.what}</Badge>

@@ -1,0 +1,109 @@
+# Chinese (Simplified) translations
+
+# Error messages
+[error_generic]
+other = "发生错误"
+
+[error_not_found]
+other = "资源不存在"
+
+[error_already_exists]
+other = "资源已存在"
+
+[error_unauthorized]
+other = "未授权访问"
+
+[error_validation_failed]
+other = "验证失败"
+
+[error_connection_failed]
+other = "连接失败: {{.Reason}}"
+
+[error_sync_failed]
+other = "同步操作失败"
+
+[error_task_not_found]
+other = "任务未找到"
+
+[error_connection_not_found]
+other = "连接未找到"
+
+[error_invalid_input]
+other = "输入无效"
+
+[error_invalid_schedule]
+other = "定时任务格式无效"
+
+[error_invalid_id_format]
+other = "ID 格式无效"
+
+[error_database_error]
+other = "数据库错误"
+
+[error_missing_parameter]
+other = "缺少必需参数"
+
+[error_invalid_request_body]
+other = "请求体无效"
+
+[error_path_not_exist]
+other = "路径不存在"
+
+[error_path_not_directory]
+other = "路径不是目录"
+
+[error_remote_not_found]
+other = "远程连接未找到"
+
+[error_job_not_active]
+other = "任务未激活"
+
+[error_job_not_found]
+other = "任务未找到"
+
+[error_provider_not_found]
+other = "提供商未找到"
+
+[error_connection_test_failed]
+other = "连接测试失败"
+
+[error_failed_to_list_remotes]
+other = "列出远程连接失败"
+
+[error_failed_to_create_remote]
+other = "创建远程连接失败"
+
+[error_failed_to_get_quota]
+other = "获取远程配额失败"
+
+# Status messages
+[status_syncing]
+other = "同步中"
+
+[status_syncing_files]
+other = "正在同步 {{.Count}} 个文件"
+
+[status_completed]
+other = "已完成"
+
+[status_failed]
+other = "失败"
+
+[status_idle]
+other = "空闲"
+
+[status_cancelled]
+other = "已取消"
+
+# Success messages
+[success_created]
+other = "创建成功"
+
+[success_updated]
+other = "更新成功"
+
+[success_deleted]
+other = "删除成功"
+
+[success_sync_started]
+other = "同步已开始"

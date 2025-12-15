@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/xzzpig/rclone-sync/internal/api/context"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
+	"github.com/xzzpig/rclone-sync/internal/i18n"
 )
 
 type JobHandler struct {
@@ -18,14 +19,14 @@ func GetJobProgress(c *gin.Context) {
 	idParam := c.Param("id")
 	jobID, err := uuid.Parse(idParam)
 	if err != nil {
-		HandleError(c, NewError(http.StatusBadRequest, "Invalid job ID", err.Error()))
+		HandleError(c, NewLocalizedError(c, http.StatusBadRequest, i18n.ErrInvalidIDFormat, err.Error()))
 		return
 	}
 
 	// Retrieve SyncEngine from context
 	syncEngine, err := context.GetSyncEngine(c)
 	if err != nil {
-		HandleError(c, NewError(http.StatusInternalServerError, err.Error(), ""))
+		HandleError(c, NewLocalizedError(c, http.StatusInternalServerError, i18n.ErrGeneric, err.Error()))
 		return
 	}
 
@@ -33,7 +34,7 @@ func GetJobProgress(c *gin.Context) {
 	if !ok {
 		// If not running/found in memory, client should fallback to DB status
 		// HTTP 404 indicates "not currently active in memory"
-		HandleError(c, NewError(http.StatusNotFound, "Job not active", ""))
+		HandleError(c, NewLocalizedError(c, http.StatusNotFound, i18n.ErrJobNotActive, ""))
 		return
 	}
 
@@ -44,7 +45,7 @@ func GetJobProgress(c *gin.Context) {
 func ListJobs(c *gin.Context) {
 	service, err := context.GetJobService(c)
 	if err != nil {
-		HandleError(c, NewError(http.StatusInternalServerError, err.Error(), ""))
+		HandleError(c, NewLocalizedError(c, http.StatusInternalServerError, i18n.ErrGeneric, err.Error()))
 		return
 	}
 
@@ -93,20 +94,20 @@ func GetJob(c *gin.Context) {
 	idParam := c.Param("id")
 	jobID, err := uuid.Parse(idParam)
 	if err != nil {
-		HandleError(c, NewError(http.StatusBadRequest, "Invalid job ID", err.Error()))
+		HandleError(c, NewLocalizedError(c, http.StatusBadRequest, i18n.ErrInvalidIDFormat, err.Error()))
 		return
 	}
 
 	service, err := context.GetJobService(c)
 	if err != nil {
-		HandleError(c, NewError(http.StatusInternalServerError, err.Error(), ""))
+		HandleError(c, NewLocalizedError(c, http.StatusInternalServerError, i18n.ErrGeneric, err.Error()))
 		return
 	}
 
 	job, err := service.GetJobWithLogs(c.Request.Context(), jobID)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			HandleError(c, NewError(http.StatusNotFound, "Job not found", err.Error()))
+			HandleError(c, NewLocalizedError(c, http.StatusNotFound, i18n.ErrJobNotFound, err.Error()))
 		} else {
 			HandleError(c, err)
 		}

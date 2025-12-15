@@ -1,3 +1,4 @@
+import * as m from '@/paraglide/messages.js';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import {
@@ -10,23 +11,9 @@ import {
 import { TextField, TextFieldInput, TextFieldLabel } from '@/components/ui/text-field';
 import { SyncDirection, Task } from '@/lib/types';
 import { Component, JSXElement, Show } from 'solid-js';
+import { RichText } from '@/components/common/RichText';
 
-// Direction options
-const directionOptions = [
-  { value: 'upload', label: 'Upload (Local → Remote)' },
-  { value: 'download', label: 'Download (Remote → Local)' },
-  { value: 'bidirectional', label: 'Bidirectional (Sync Both)' },
-] as const;
-
-// Conflict resolution options (only applicable for bidirectional sync)
-const conflictResolutionOptions = [
-  { value: 'newer', label: 'Keep Newer' },
-  { value: 'local', label: 'Keep Local' },
-  { value: 'remote', label: 'Keep Remote' },
-  { value: 'both', label: 'Keep Both' },
-] as const;
-
-export type ConflictResolution = (typeof conflictResolutionOptions)[number]['value'];
+export type ConflictResolution = 'newer' | 'local' | 'remote' | 'both';
 
 // Form data type - subset of Task type
 export type TaskSettingsFormData = Pick<
@@ -42,7 +29,7 @@ export interface TaskSettingsFormProps {
 
 export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
   const conflictResolution = () =>
-    (props.value.options?.conflict_resolution as ConflictResolution) || 'newer';
+    (props.value.options?.conflict_resolution as ConflictResolution) ?? 'newer';
 
   const updateField = <K extends keyof TaskSettingsFormData>(
     field: K,
@@ -75,28 +62,32 @@ export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
     <div class="space-y-6">
       {/* Task Name */}
       <TextField>
-        <TextFieldLabel for="name">Task Name</TextFieldLabel>
+        <TextFieldLabel for="name">{m.form_taskName()}</TextFieldLabel>
         <TextFieldInput
           id="name"
           value={props.value.name}
           onInput={(e: InputEvent) =>
             updateField('name', (e.currentTarget as HTMLInputElement).value)
           }
-          placeholder="My Sync Task"
+          placeholder={m.form_taskNamePlaceholder()}
         />
       </TextField>
 
       {/* Direction */}
       <TextField>
-        <TextFieldLabel for="direction">Sync Direction</TextFieldLabel>
+        <TextFieldLabel for="direction">{m.form_syncDirection()}</TextFieldLabel>
         <Select
           value={props.value.direction}
           onChange={(value) => updateField('direction', value as SyncDirection)}
           options={['upload', 'download', 'bidirectional'] as const}
-          placeholder="Select direction"
+          placeholder={m.form_selectDirection()}
           itemComponent={(itemProps) => (
             <SelectItem item={itemProps.item}>
-              {directionOptions.find((o) => o.value === itemProps.item.rawValue)?.label}
+              {itemProps.item.rawValue === 'upload'
+                ? m.form_directionUpload()
+                : itemProps.item.rawValue === 'download'
+                  ? m.form_directionDownload()
+                  : m.form_directionBidirectional()}
             </SelectItem>
           )}
         >
@@ -104,7 +95,13 @@ export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
             <SelectValue>
               {(state) => {
                 const val = state.selectedOption();
-                return directionOptions.find((o) => o.value === val)?.label ?? 'Select direction';
+                return val === 'upload'
+                  ? m.form_directionUpload()
+                  : val === 'download'
+                    ? m.form_directionDownload()
+                    : val === 'bidirectional'
+                      ? m.form_directionBidirectional()
+                      : m.form_selectDirection();
               }}
             </SelectValue>
           </SelectTrigger>
@@ -114,26 +111,17 @@ export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
 
       {/* Schedule */}
       <TextField>
-        <TextFieldLabel for="schedule">Schedule (Cron Expression)</TextFieldLabel>
+        <TextFieldLabel for="schedule">{m.form_scheduleCron()}</TextFieldLabel>
         <TextFieldInput
           id="schedule"
           value={props.value.schedule ?? ''}
           onInput={(e: InputEvent) =>
             updateField('schedule', (e.currentTarget as HTMLInputElement).value)
           }
-          placeholder="e.g., 0 */6 * * * (every 6 hours)"
+          placeholder={m.form_scheduleExample()}
         />
         <p class="text-xs text-muted-foreground">
-          Leave empty to run manually only. Use{' '}
-          <a
-            href="https://crontab.guru"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="underline"
-          >
-            crontab.guru
-          </a>{' '}
-          for help.
+          <RichText text={m.form_scheduleHelp({ link: m.form_crontabGuru() })} />
         </p>
       </TextField>
 
@@ -146,7 +134,7 @@ export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
             onChange={(checked) => updateField('realtime', checked)}
           />
           <Label for="realtime" class="cursor-pointer">
-            Enable Real-time Sync (Watch for local changes)
+            {m.form_enableRealtime()}
           </Label>
         </div>
       </Show>
@@ -154,15 +142,21 @@ export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
       {/* Conflict Resolution (only for bidirectional sync) */}
       <Show when={props.value.direction === 'bidirectional'}>
         <TextField>
-          <TextFieldLabel for="conflictResolution">Conflict Resolution</TextFieldLabel>
+          <TextFieldLabel for="conflictResolution">{m.form_conflictResolution()}</TextFieldLabel>
           <Select
             value={conflictResolution()}
             onChange={(value) => updateConflictResolution(value as ConflictResolution)}
-            options={conflictResolutionOptions.map((o) => o.value)}
-            placeholder="Select conflict resolution"
+            options={['newer', 'local', 'remote', 'both'] as const}
+            placeholder={m.form_selectConflictResolution()}
             itemComponent={(itemProps) => (
               <SelectItem item={itemProps.item}>
-                {conflictResolutionOptions.find((o) => o.value === itemProps.item.rawValue)?.label}
+                {itemProps.item.rawValue === 'newer'
+                  ? m.form_keepNewer()
+                  : itemProps.item.rawValue === 'local'
+                    ? m.form_keepLocal()
+                    : itemProps.item.rawValue === 'remote'
+                      ? m.form_keepRemote()
+                      : m.form_keepBoth()}
               </SelectItem>
             )}
           >
@@ -170,18 +164,21 @@ export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
               <SelectValue>
                 {(state) => {
                   const val = state.selectedOption();
-                  return (
-                    conflictResolutionOptions.find((o) => o.value === val)?.label ??
-                    'Select conflict resolution'
-                  );
+                  return val === 'newer'
+                    ? m.form_keepNewer()
+                    : val === 'local'
+                      ? m.form_keepLocal()
+                      : val === 'remote'
+                        ? m.form_keepRemote()
+                        : val === 'both'
+                          ? m.form_keepBoth()
+                          : m.form_selectConflictResolution();
                 }}
               </SelectValue>
             </SelectTrigger>
             <SelectContent />
           </Select>
-          <p class="text-xs text-muted-foreground">
-            When both local and remote files are modified, choose which version to keep.
-          </p>
+          <p class="text-xs text-muted-foreground">{m.form_conflictHelp()}</p>
         </TextField>
       </Show>
 

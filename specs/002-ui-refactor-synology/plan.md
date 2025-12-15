@@ -12,7 +12,7 @@ The goal is to completely refactor the UI to mimic the Synology Cloud Sync user 
 **Language/Version**: Go (Latest Stable), TypeScript 5.9
 **Primary Dependencies**: Gin (Go), SolidJS (Frontend), Tailwind CSS, Solid-UI (Component Library), Rclone (Sync Engine)
 **Storage**: SQLite with Ent ORM
-**Testing**: Go standard testing (Backend), Vitest (Frontend)
+**Testing**: Go standard testing (Backend)
 **Target Platform**: Web Application (Linux/Docker host)
 **Project Type**: Web application
 **Performance Goals**: < 1.5s FCP, Instant navigation (< 100ms perceived), Optimistic UI updates
@@ -21,7 +21,7 @@ The goal is to completely refactor the UI to mimic the Synology Cloud Sync user 
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 - [x] **I. Rclone-First Architecture**: Feature relies entirely on rclone for syncing.
 - [x] **II. Web-First Interface**: This IS the web interface refactor.
@@ -76,7 +76,7 @@ web/
 
 ## Complexity Tracking
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| Solid-UI CLI | User Request / Consistency | Manual copying is error-prone and harder to update |
-| Modules-based folders | Scalability | Flat structure becomes unmanageable with many distinct domains (Connection, Task, Logs) |
+| Violation             | Why Needed                 | Simpler Alternative Rejected Because                                                    |
+| --------------------- | -------------------------- | --------------------------------------------------------------------------------------- |
+| Solid-UI CLI          | User Request / Consistency | Manual copying is error-prone and harder to update                                      |
+| Modules-based folders | Scalability                | Flat structure becomes unmanageable with many distinct domains (Connection, Task, Logs) |

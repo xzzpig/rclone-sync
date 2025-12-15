@@ -1,3 +1,4 @@
+import * as m from '@/paraglide/messages.js';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -57,14 +58,14 @@ export function EditTaskDialog(props: EditTaskDialogProps) {
         options: data.options,
       });
       showToast({
-        title: 'Task updated',
-        description: `Task "${data.name}" has been updated successfully.`,
+        title: m.toast_taskUpdated(),
+        description: m.toast_taskUpdatedDesc({ name: data.name }),
       });
       props.onOpenChange(false);
     } catch (error) {
       showToast({
-        title: 'Failed to update task',
-        description: error instanceof Error ? error.message : 'An unknown error occurred.',
+        title: m.toast_failedToUpdateTask(),
+        description: error instanceof Error ? error.message : m.error_unknownError(),
         variant: 'destructive',
       });
     } finally {
@@ -76,7 +77,7 @@ export function EditTaskDialog(props: EditTaskDialogProps) {
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent class="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Edit Sync Task</DialogTitle>
+          <DialogTitle>{m.wizard_editTask()}</DialogTitle>
         </DialogHeader>
         <div class="py-4">
           <TaskSettingsForm value={formData()} onChange={setFormData} />
@@ -87,10 +88,10 @@ export function EditTaskDialog(props: EditTaskDialogProps) {
             onClick={() => props.onOpenChange(false)}
             disabled={isSubmitting()}
           >
-            Cancel
+            {m.common_cancel()}
           </Button>
           <Button onClick={handleSave} disabled={isSubmitting()}>
-            {isSubmitting() ? 'Saving...' : 'Save Changes'}
+            {isSubmitting() ? m.wizard_saving() : m.wizard_saveChanges()}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,3 +1,4 @@
+import * as m from '@/paraglide/messages.js';
 import { Button } from '@/components/ui/button';
 import {
   Breadcrumb,
@@ -24,7 +25,7 @@ export interface FileBrowserProps {
   class?: string;
 }
 
-interface BreadcrumbItem {
+interface BreadcrumbItemData {
   name: string;
   path: string;
 }
@@ -79,12 +80,12 @@ export const FileBrowser: Component<FileBrowserProps> = (props) => {
     }
   };
 
-  const getBreadcrumbs = (): BreadcrumbItem[] => {
+  const getBreadcrumbs = (): BreadcrumbItemData[] => {
     let path = currentPath();
 
     // Handle null or undefined path
     if (!path) {
-      return [{ name: props.rootLabel ?? 'Root', path: '/' }];
+      return [{ name: props.rootLabel ?? m.file_browser_root(), path: '/' }];
     }
 
     // Normalize path - remove duplicate slashes
@@ -94,11 +95,11 @@ export const FileBrowser: Component<FileBrowserProps> = (props) => {
 
     const parts = path.split('/').filter(Boolean);
 
-    const breadcrumbs: BreadcrumbItem[] = [];
+    const breadcrumbs: BreadcrumbItemData[] = [];
     let accumulated = '';
 
     if (path.startsWith('/')) {
-      breadcrumbs.push({ name: props.rootLabel ?? 'Root', path: '/' });
+      breadcrumbs.push({ name: props.rootLabel ?? m.file_browser_root(), path: '/' });
     }
 
     for (const part of parts) {
@@ -148,7 +149,7 @@ export const FileBrowser: Component<FileBrowserProps> = (props) => {
           class="shrink-0"
           onClick={() => query.refetch()}
           disabled={query.isFetching}
-          title="Refresh"
+          title={m.common_refresh()}
         >
           <IconRefreshCw class={cn('w-4 h-4', query.isFetching && 'animate-spin')} />
         </Button>
@@ -158,7 +159,7 @@ export const FileBrowser: Component<FileBrowserProps> = (props) => {
       <div class="flex-1 overflow-y-auto">
         <Show when={query.isPending}>
           <div class="flex h-32 items-center justify-center">
-            <div class="text-sm text-muted-foreground">Loading...</div>
+            <div class="text-sm text-muted-foreground">{m.common_loading()}</div>
           </div>
         </Show>
 
@@ -169,7 +170,7 @@ export const FileBrowser: Component<FileBrowserProps> = (props) => {
                 ? (query.error.details ?? query.error.message)
                 : query.error instanceof Error
                   ? query.error.message
-                  : 'Failed to load directory'}
+                  : m.file_browser_load_error()}
             </div>
           </div>
         </Show>
@@ -196,7 +197,7 @@ export const FileBrowser: Component<FileBrowserProps> = (props) => {
 
             <Show when={(query.data?.length ?? 0) === 0}>
               <div class="px-4 py-8 text-center text-sm text-muted-foreground">
-                This directory is empty
+                {m.file_browser_empty()}
               </div>
             </Show>
           </div>
@@ -209,7 +210,7 @@ export const FileBrowser: Component<FileBrowserProps> = (props) => {
           <TextFieldInput
             value={inputPath()}
             onInput={(e: InputEvent) => setInputPath((e.currentTarget as HTMLInputElement).value)}
-            placeholder="Enter path (e.g., /home/user or /Documents)"
+            placeholder={m.file_browser_enter_path_placeholder()}
             class="h-9"
             onKeyPress={(e: KeyboardEvent) => {
               if (e.key === 'Enter') {
@@ -219,8 +220,8 @@ export const FileBrowser: Component<FileBrowserProps> = (props) => {
           />
         </TextField>
         <Button onClick={handleSelect} disabled={!inputPath().trim()} class="shrink-0">
-          <Show when={currentPath() === inputPath().trim()}>Select</Show>
-          <Show when={currentPath() !== inputPath().trim()}>Go</Show>
+          <Show when={currentPath() === inputPath().trim()}>{m.common_select()}</Show>
+          <Show when={currentPath() !== inputPath().trim()}>{m.common_go()}</Show>
         </Button>
       </div>
     </div>

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/solid-query';
 import { getConnections } from '@/api/connections';
 import { getTasks } from '@/api/tasks';
 import { getJobs } from '@/api/history';
+import * as m from '@/paraglide/messages.js';
 import IconLink2 from '~icons/lucide/link-2';
 import IconListTodo from '~icons/lucide/list-todo';
 import IconCheckCircle2 from '~icons/lucide/check-circle-2';
@@ -66,8 +67,8 @@ const WelcomeView: Component = () => {
       {/* <div class="max-w-7xl mx-auto space-y-6"> */}
       {/* Welcome Header */}
       <div class="rounded-lg bg-card p-6 shadow-sm">
-        <h1 class="text-3xl font-bold text-foreground">Welcome to Cloud Sync</h1>
-        <p class="mt-2 text-muted-foreground">Manage your cloud storage sync tasks</p>
+        <h1 class="text-3xl font-bold text-foreground">{m.welcome_title()}</h1>
+        <p class="mt-2 text-muted-foreground">{m.welcome_subtitle()}</p>
       </div>
 
       {/* Statistics Cards */}
@@ -85,28 +86,31 @@ const WelcomeView: Component = () => {
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatCard
             icon={<IconLink2 class="size-6" />}
-            title="Connections"
+            title={m.common_connections()}
             value={connectionsQuery.data?.length ?? 0}
             color="blue"
           />
           <StatCard
             icon={<IconListTodo class="size-6" />}
-            title="Tasks"
+            title={m.common_tasks()}
             value={tasksQuery.data?.length ?? 0}
             color="green"
           />
           <StatCard
             icon={<IconCheckCircle2 class="size-6" />}
-            title="Today's Syncs"
+            title={m.statCard_todaysSyncs()}
             value={todaySyncCount()}
-            description="Completed"
+            description={m.status_completed()}
             color="green"
           />
           <StatCard
             icon={<IconAlertCircle class="size-6" />}
-            title="Attention Needed"
+            title={m.statCard_attentionNeeded()}
             value={runningCount() + failedCount()}
-            description={`Running ${runningCount()} / Failed ${failedCount()}`}
+            description={m.welcome_runningAndFailed({
+              running: runningCount(),
+              failed: failedCount(),
+            })}
             color={failedCount() > 0 ? 'red' : 'orange'}
           />
         </div>

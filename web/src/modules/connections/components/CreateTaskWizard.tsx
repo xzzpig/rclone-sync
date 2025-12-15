@@ -1,3 +1,4 @@
+import * as m from '@/paraglide/messages.js';
 import { listLocalFiles, listRemoteFiles } from '@/api/files';
 import { FileBrowser } from '@/components/common/FileBrowser';
 import { Button } from '@/components/ui/button';
@@ -25,20 +26,6 @@ export interface CreateTaskWizardProps {
 }
 
 type WizardStep = 'paths' | 'settings';
-
-// Direction label helper
-const getDirectionLabel = (direction: string) => {
-  switch (direction) {
-    case 'upload':
-      return 'Upload (Local → Remote)';
-    case 'download':
-      return 'Download (Remote → Local)';
-    case 'bidirectional':
-      return 'Bidirectional (Both ways)';
-    default:
-      return direction;
-  }
-};
 
 export const CreateTaskWizard: Component<CreateTaskWizardProps> = (props) => {
   const [currentStep, setCurrentStep] = createSignal<WizardStep>('paths');
@@ -102,8 +89,8 @@ export const CreateTaskWizard: Component<CreateTaskWizardProps> = (props) => {
       handleClose();
     } catch (error) {
       showToast({
-        title: 'Failed to create task',
-        description: error instanceof Error ? error.message : 'An unknown error occurred.',
+        title: m.toast_failedToCreateTask(),
+        description: error instanceof Error ? error.message : m.error_unknownError(),
         variant: 'destructive',
       });
     } finally {
@@ -122,11 +109,11 @@ export const CreateTaskWizard: Component<CreateTaskWizardProps> = (props) => {
     <Dialog open={props.open} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent class="flex h-[80vh] max-w-4xl flex-col">
         <DialogHeader>
-          <DialogTitle>Create Sync Task</DialogTitle>
+          <DialogTitle>{m.wizard_createTask()}</DialogTitle>
           <DialogDescription>
             {currentStep() === 'paths'
-              ? 'Select the local and remote directories to sync'
-              : 'Configure sync settings and schedule'}
+              ? m.wizard_selectDirectories()
+              : m.wizard_configureSettings()}
           </DialogDescription>
         </DialogHeader>
 
@@ -136,15 +123,15 @@ export const CreateTaskWizard: Component<CreateTaskWizardProps> = (props) => {
               {/* Local Path Browser */}
               <div class="flex h-full min-h-0 flex-col rounded-lg border">
                 <div class="border-b bg-muted px-4 py-3">
-                  <h3 class="font-semibold">Local Directory</h3>
+                  <h3 class="font-semibold">{m.wizard_localDirectory()}</h3>
                   <p class="text-sm text-muted-foreground">
-                    {sourcePath() ?? 'No directory selected'}
+                    {sourcePath() ?? m.wizard_noDirectorySelected()}
                   </p>
                 </div>
                 <div class="min-h-0 flex-1">
                   <FileBrowser
                     initialPath="/"
-                    rootLabel="Root"
+                    rootLabel={m.file_browser_root()}
                     icon={IconHardDrive}
                     loadDirectory={(path) => listLocalFiles(path)}
                     onSelect={setSourcePath}
@@ -156,9 +143,9 @@ export const CreateTaskWizard: Component<CreateTaskWizardProps> = (props) => {
               {/* Remote Path Browser */}
               <div class="flex h-full min-h-0 flex-col rounded-lg border">
                 <div class="border-b bg-muted px-4 py-3">
-                  <h3 class="font-semibold">Remote Directory</h3>
+                  <h3 class="font-semibold">{m.wizard_remoteDirectory()}</h3>
                   <p class="text-sm text-muted-foreground">
-                    {remotePath() ?? 'No directory selected'}
+                    {remotePath() ?? m.wizard_noDirectorySelected()}
                   </p>
                 </div>
                 <div class="min-h-0 flex-1">
@@ -179,17 +166,21 @@ export const CreateTaskWizard: Component<CreateTaskWizardProps> = (props) => {
               <TaskSettingsForm value={formData()} onChange={setFormData}>
                 {/* Path Summary */}
                 <div class="space-y-2 rounded-lg bg-muted p-4">
-                  <h4 class="text-sm font-semibold">Task Summary</h4>
+                  <h4 class="text-sm font-semibold">{m.wizard_taskSummary()}</h4>
                   <div class="space-y-1 text-sm">
                     <div>
-                      <span class="text-muted-foreground">Local:</span> {sourcePath()}
+                      <span class="text-muted-foreground">{m.wizard_local()}:</span> {sourcePath()}
                     </div>
                     <div>
-                      <span class="text-muted-foreground">Remote:</span> {remotePath()}
+                      <span class="text-muted-foreground">{m.wizard_remote()}:</span> {remotePath()}
                     </div>
                     <div>
-                      <span class="text-muted-foreground">Direction:</span>{' '}
-                      {getDirectionLabel(formData().direction)}
+                      <span class="text-muted-foreground">{m.wizard_direction()}:</span>{' '}
+                      {formData().direction === 'upload'
+                        ? m.form_directionUpload()
+                        : formData().direction === 'download'
+                          ? m.form_directionDownload()
+                          : m.form_directionBidirectional()}
                     </div>
                   </div>
                 </div>
@@ -202,22 +193,22 @@ export const CreateTaskWizard: Component<CreateTaskWizardProps> = (props) => {
           <Show when={currentStep() === 'settings'}>
             <Button variant="outline" onClick={handleBack}>
               <IconChevronLeft class="mr-2 size-4" />
-              Back
+              {m.common_back()}
             </Button>
           </Show>
           <Button variant="outline" onClick={handleClose}>
-            Cancel
+            {m.common_cancel()}
           </Button>
           <Show
             when={currentStep() === 'paths'}
             fallback={
               <Button onClick={handleSubmit} disabled={submitting()}>
-                {submitting() ? 'Creating...' : 'Create Task'}
+                {submitting() ? m.wizard_creating() : m.task_create()}
               </Button>
             }
           >
             <Button onClick={handleNext} disabled={!canProceed()}>
-              Next
+              {m.common_next()}
               <IconChevronRight class="ml-2 size-4" />
             </Button>
           </Show>

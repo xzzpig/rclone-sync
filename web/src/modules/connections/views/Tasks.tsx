@@ -20,6 +20,7 @@ import {
 import { showToast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
 import { Task } from '@/lib/types';
+import * as m from '@/paraglide/messages.js';
 import { useTasks } from '@/store/tasks';
 import IconPlay from '~icons/lucide/play';
 import IconHistory from '~icons/lucide/history';
@@ -57,7 +58,7 @@ const PathDisplay = (props: { path: string; type: 'local' | 'remote'; class?: st
   return (
     <div class={cn('flex flex-col gap-0.5', props.class)}>
       <span class="hidden text-xs text-muted-foreground md:inline">
-        {props.type === 'local' ? 'Local' : 'Remote'}
+        {props.type === 'local' ? m.task_source() : m.task_destination()}
       </span>
       <span class="max-w-full truncate font-mono text-sm md:max-w-[400px]" title={props.path}>
         {props.path}
@@ -99,13 +100,13 @@ function Tasks() {
       try {
         await actions.runTask(task.id);
         showToast({
-          title: 'Task started',
-          description: `Task "${task.name}" has been started.`,
+          title: m.toast_taskStarted(),
+          description: m.toast_taskStartedDesc({ name: task.name }),
         });
       } catch (error) {
         showToast({
-          title: 'Failed to start task',
-          description: error instanceof Error ? error.message : 'An unknown error occurred.',
+          title: m.toast_failedToStartTask(),
+          description: error instanceof Error ? error.message : m.error_unknownError(),
           variant: 'destructive',
         });
       }
@@ -118,15 +119,15 @@ function Tasks() {
       try {
         await actions.deleteTask(task.id);
         showToast({
-          title: 'Task deleted',
-          description: `Task "${task.name}" has been deleted successfully.`,
+          title: m.toast_taskDeleted(),
+          description: m.toast_taskDeletedDesc({ name: task.name }),
         });
         setDeleteConfirmOpen(false);
         setSelectedTaskId(null);
       } catch (error) {
         showToast({
-          title: 'Failed to delete task',
-          description: error instanceof Error ? error.message : 'An unknown error occurred.',
+          title: m.toast_failedToDeleteTask(),
+          description: error instanceof Error ? error.message : m.error_unknownError(),
           variant: 'destructive',
         });
       }
@@ -157,64 +158,64 @@ function Tasks() {
   return (
     <>
       <ConnectionViewLayout
-        title="Tasks"
+        title={m.task_title()}
         actions={
           <>
             <div class="hidden text-sm text-muted-foreground md:block">
-              {selectedTask() ? '1 selected' : ''}
+              {selectedTask() ? m.task_selectedCount({ count: 1 }) : ''}
             </div>
             <Button
               disabled={!selectedTask()}
               variant="outline"
               size="sm"
               onClick={handleRunTask}
-              title="Run task"
-              aria-label="Run task"
+              title={m.task_syncNow()}
+              aria-label={m.task_syncNow()}
             >
               <IconPlay class="size-4 md:mr-2" />
-              <span class="hidden md:inline">Run</span>
+              <span class="hidden md:inline">{m.task_syncNow()}</span>
             </Button>
             <Button
               disabled={!selectedTask()}
               variant="outline"
               size="sm"
               onClick={handleHistory}
-              title="View history"
-              aria-label="View history"
+              title={m.history_title()}
+              aria-label={m.history_title()}
             >
               <IconHistory class="size-4 md:mr-2" />
-              <span class="hidden md:inline">History</span>
+              <span class="hidden md:inline">{m.history_title()}</span>
             </Button>
             <Button
               disabled={!selectedTask()}
               variant="outline"
               size="sm"
               onClick={handleEditTask}
-              title="Edit task"
-              aria-label="Edit task"
+              title={m.task_edit()}
+              aria-label={m.task_edit()}
             >
               <IconEdit class="size-4 md:mr-2" />
-              <span class="hidden md:inline">Edit</span>
+              <span class="hidden md:inline">{m.common_edit()}</span>
             </Button>
             <Button
               disabled={!selectedTask()}
               variant="destructive"
               size="sm"
               onClick={() => setDeleteConfirmOpen(true)}
-              title="Delete task"
-              aria-label="Delete task"
+              title={m.task_delete()}
+              aria-label={m.task_delete()}
             >
               <IconTrash2 class="size-4 md:mr-2" />
-              <span class="hidden md:inline">Delete</span>
+              <span class="hidden md:inline">{m.common_delete()}</span>
             </Button>
             <div class="mx-1 h-8 w-px bg-border" />
             <Button
               onClick={() => setCreateDialogOpen(true)}
               size="sm"
-              aria-label="Create new task"
+              aria-label={m.task_create()}
             >
               <IconCalendarPlus class="size-4 md:mr-2" />
-              <span class="hidden md:inline">Create Task</span>
+              <span class="hidden md:inline">{m.task_create()}</span>
             </Button>
           </>
         }
@@ -224,17 +225,21 @@ function Tasks() {
             when={filteredTasks().length > 0 || state.isLoading}
             fallback={
               <div class="flex h-24 items-center justify-center text-muted-foreground">
-                No tasks found.
+                {m.task_noTasks()}
               </div>
             }
           >
             <Table>
               <TableHeader class="sticky top-0 z-10 bg-card shadow-sm">
                 <TableRow>
-                  <TableHead class="whitespace-nowrap">Task Name</TableHead>
-                  <TableHead class="whitespace-nowrap">Sync Path</TableHead>
-                  <TableHead class="hidden whitespace-nowrap md:table-cell">Last Run</TableHead>
-                  <TableHead class="hidden whitespace-nowrap md:table-cell">Schedule</TableHead>
+                  <TableHead class="whitespace-nowrap">{m.form_taskName()}</TableHead>
+                  <TableHead class="whitespace-nowrap">{m.task_syncMode()}</TableHead>
+                  <TableHead class="hidden whitespace-nowrap md:table-cell">
+                    {m.task_lastSync()}
+                  </TableHead>
+                  <TableHead class="hidden whitespace-nowrap md:table-cell">
+                    {m.task_schedule()}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -283,14 +288,16 @@ function Tasks() {
                             </div>
                           </TableCell>
                           <TableCell class="hidden py-2 md:table-cell">
-                            {lastRun() ? new Date(lastRun()!).toLocaleString() : 'N/A'}
+                            {lastRun()
+                              ? new Date(lastRun()!).toLocaleString()
+                              : m.history_notApplicable()}
                           </TableCell>
                           <TableCell class="hidden py-2 md:table-cell">
                             <Show when={task.realtime}>
-                              <Badge variant="default">Real-time</Badge>
+                              <Badge variant="default">{m.task_scheduleRealtime()}</Badge>
                             </Show>
                             <Show when={!task.realtime && (!task.schedule || task.schedule === '')}>
-                              <Badge variant="secondary">Manual</Badge>
+                              <Badge variant="secondary">{m.task_scheduleManual()}</Badge>
                             </Show>
                             <Show when={!task.realtime && task.schedule && task.schedule !== ''}>
                               <span class="font-mono text-sm">{task.schedule}</span>
@@ -309,31 +316,26 @@ function Tasks() {
       <Dialog open={isDeleteConfirmOpen()} onOpenChange={setDeleteConfirmOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle id="delete-dialog-title">Delete Task</DialogTitle>
+            <DialogTitle id="delete-dialog-title">{m.task_delete()}</DialogTitle>
           </DialogHeader>
           <div id="delete-dialog-description">
-            <p>
-              Are you sure you want to delete the task <strong>"{selectedTask()?.name}"</strong>?
-            </p>
-            <p class="mt-2 text-sm text-gray-500">
-              This action cannot be undone. This will permanently delete the task and all its
-              history.
-            </p>
+            <p>{m.task_deleteConfirm()}</p>
+            <p class="mt-2 text-sm text-gray-500">{m.task_deleteWarning()}</p>
           </div>
           <DialogFooter>
             <Button
               variant="secondary"
               onClick={() => setDeleteConfirmOpen(false)}
-              aria-label="Cancel task deletion"
+              aria-label={m.common_cancel()}
             >
-              Cancel
+              {m.common_cancel()}
             </Button>
             <Button
               variant="destructive"
               onClick={handleDeleteTask}
-              aria-label={`Confirm deletion of task ${selectedTask()?.name}`}
+              aria-label={m.task_confirmDeletion({ name: selectedTask()?.name ?? '' })}
             >
-              Delete
+              {m.common_delete()}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -6,13 +6,27 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apicontext "github.com/xzzpig/rclone-sync/internal/api/context"
 	"github.com/xzzpig/rclone-sync/internal/core/errs"
+	"github.com/xzzpig/rclone-sync/internal/i18n"
 )
+
+func TestMain(m *testing.M) {
+	// Initialize i18n before running tests
+	if err := i18n.Init(); err != nil {
+		panic(fmt.Sprintf("Failed to initialize i18n: %v", err))
+	}
+
+	// Run tests
+	code := m.Run()
+	os.Exit(code)
+}
 
 func TestAppError_Error(t *testing.T) {
 	tests := []struct {
@@ -120,74 +134,76 @@ func TestHandleError(t *testing.T) {
 			err:            errs.ErrNotFound,
 			expectedStatus: http.StatusNotFound,
 			expectedCode:   http.StatusNotFound,
-			expectedMsg:    "Resource Not Found",
+			expectedMsg:    "Resource not found",
 		},
 		{
 			name:           "wrapped ErrNotFound",
 			err:            fmt.Errorf("task: %w", errs.ErrNotFound),
 			expectedStatus: http.StatusNotFound,
 			expectedCode:   http.StatusNotFound,
-			expectedMsg:    "Resource Not Found",
+			expectedMsg:    "Resource not found",
 		},
 		{
 			name:           "ErrAlreadyExists",
 			err:            errs.ErrAlreadyExists,
 			expectedStatus: http.StatusConflict,
 			expectedCode:   http.StatusConflict,
-			expectedMsg:    "Resource Already Exists",
+			expectedMsg:    "Resource already exists",
 		},
 		{
 			name:           "wrapped ErrAlreadyExists",
 			err:            fmt.Errorf("duplicate: %w", errs.ErrAlreadyExists),
 			expectedStatus: http.StatusConflict,
 			expectedCode:   http.StatusConflict,
-			expectedMsg:    "Resource Already Exists",
+			expectedMsg:    "Resource already exists",
 		},
 		{
 			name:           "ErrInvalidInput",
 			err:            errs.ErrInvalidInput,
 			expectedStatus: http.StatusBadRequest,
 			expectedCode:   http.StatusBadRequest,
-			expectedMsg:    "Invalid Input",
+			expectedMsg:    "Invalid input provided",
 		},
 		{
 			name:           "wrapped ErrInvalidInput",
 			err:            fmt.Errorf("validation failed: %w", errs.ErrInvalidInput),
 			expectedStatus: http.StatusBadRequest,
 			expectedCode:   http.StatusBadRequest,
-			expectedMsg:    "Invalid Input",
+			expectedMsg:    "Invalid input provided",
 		},
 		{
 			name:           "ErrUnauthorized",
 			err:            errs.ErrUnauthorized,
 			expectedStatus: http.StatusUnauthorized,
 			expectedCode:   http.StatusUnauthorized,
-			expectedMsg:    "Unauthorized",
+			expectedMsg:    "Unauthorized access",
 		},
 		{
 			name:           "wrapped ErrUnauthorized",
 			err:            fmt.Errorf("access denied: %w", errs.ErrUnauthorized),
 			expectedStatus: http.StatusUnauthorized,
 			expectedCode:   http.StatusUnauthorized,
-			expectedMsg:    "Unauthorized",
+			expectedMsg:    "Unauthorized access",
 		},
 		{
 			name:           "generic error",
 			err:            errors.New("something went wrong"),
 			expectedStatus: http.StatusInternalServerError,
 			expectedCode:   http.StatusInternalServerError,
-			expectedMsg:    "Internal Server Error",
+			expectedMsg:    "An error occurred",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			router := gin.New()
+			router.Use(apicontext.LocaleMiddleware())
 			router.GET("/test", func(c *gin.Context) {
 				HandleError(c, tt.err)
 			})
 
 			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			req.Header.Set("Accept-Language", "en")
 			resp := httptest.NewRecorder()
 
 			router.ServeHTTP(resp, req)
@@ -209,9 +225,11 @@ func TestNotFoundHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	router := gin.New()
+	router.Use(apicontext.LocaleMiddleware())
 	router.NoRoute(NotFoundHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/nonexistent", nil)
+	req.Header.Set("Accept-Language", "en")
 	resp := httptest.NewRecorder()
 
 	router.ServeHTTP(resp, req)
@@ -223,7 +241,7 @@ func TestNotFoundHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, http.StatusNotFound, appErr.Code)
-	assert.Equal(t, "Resource Not Found", appErr.Message)
+	assert.Equal(t, "Resource not found", appErr.Message)
 	assert.Empty(t, appErr.Details)
 }
 
@@ -231,11 +249,13 @@ func TestHandleError_JSONFormat(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	router := gin.New()
+	router.Use(apicontext.LocaleMiddleware())
 	router.GET("/test", func(c *gin.Context) {
 		HandleError(c, NewError(http.StatusBadRequest, "Test Message", "test details"))
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.Header.Set("Accept-Language", "en")
 	resp := httptest.NewRecorder()
 
 	router.ServeHTTP(resp, req)
@@ -254,11 +274,13 @@ func TestHandleError_AppErrorWithoutDetails(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	router := gin.New()
+	router.Use(apicontext.LocaleMiddleware())
 	router.GET("/test", func(c *gin.Context) {
 		HandleError(c, NewError(http.StatusNotFound, "Not Found", ""))
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.Header.Set("Accept-Language", "en")
 	resp := httptest.NewRecorder()
 
 	router.ServeHTTP(resp, req)

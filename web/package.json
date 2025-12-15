@@ -10,7 +10,8 @@
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "format": "prettier --write src",
-    "format:check": "prettier --check src"
+    "format:check": "prettier --check src",
+    "machine-translate": "inlang machine translate --project project.inlang"
   },
   "dependencies": {
     "@iconify-json/lucide": "^1.2.80",
@@ -21,13 +22,15 @@
     "axios": "^1.13.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "date-fns": "^4.1.0",
     "solid-js": "^1.9.10",
     "tailwind-merge": "^3.4.0",
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@inlang/cli": "^3.0.0",
+    "@inlang/paraglide-js": "2.7.0",
+    "@inlang/paraglide-vite": "^1.4.0",
     "@types/node": "^24.10.1",
     "@typescript-eslint/eslint-plugin": "^8.49.0",
     "@typescript-eslint/parser": "^8.49.0",

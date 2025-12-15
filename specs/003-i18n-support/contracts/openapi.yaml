@@ -1,0 +1,423 @@
+# OpenAPI Extension for i18n Support
+# Feature: 003-i18n-support
+# Date: 2025-12-14
+
+# This file documents the API localization contract for the i18n feature.
+# It extends the existing API specification with Accept-Language support.
+
+openapi: 3.0.3
+info:
+  title: Cloud Sync API - i18n Extension
+  version: 1.1.0
+  description: |
+    This specification documents the internationalization (i18n) extensions
+    to the Cloud Sync API. All endpoints support localized responses based
+    on the Accept-Language header.
+
+# Global parameters for all endpoints
+components:
+  parameters:
+    AcceptLanguage:
+      name: Accept-Language
+      in: header
+      required: false
+      description: |
+        Preferred language for API responses. Supported values:
+        - `en` - English (default)
+        - `zh-CN` - Simplified Chinese
+        
+        If not provided or unsupported, defaults to English.
+      schema:
+        type: string
+        enum:
+          - en
+          - zh-CN
+        default: en
+      example: zh-CN
+
+  schemas:
+    LocalizedError:
+      type: object
+      description: Localized error response
+      required:
+        - error
+        - code
+      properties:
+        error:
+          type: string
+          description: Localized error message
+          example: 任务未找到
+        code:
+          type: string
+          description: Error code for programmatic handling
+          example: TASK_NOT_FOUND
+        details:
+          type: string
+          description: Additional error details (optional)
+
+    LocalizedSuccess:
+      type: object
+      description: Localized success response
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          description: Localized success message
+          example: 创建成功
+
+    LocalizedStatus:
+      type: object
+      description: Localized status information
+      properties:
+        status:
+          type: string
+          description: Localized status text
+          example: 运行中
+        statusCode:
+          type: string
+          description: Status code for programmatic handling
+          enum:
+            - IDLE
+            - RUNNING
+            - COMPLETED
+            - FAILED
+            - CANCELLED
+
+# Example endpoint modifications
+paths:
+  /api/tasks:
+    get:
+      summary: List all tasks
+      description: Returns a list of sync tasks with localized status messages
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tasks:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        status:
+                          type: string
+                          description: Localized status text
+                          example: 运行中
+                        statusCode:
+                          type: string
+                          description: Status code for programmatic handling
+              examples:
+                chinese:
+                  summary: Chinese response
+                  value:
+                    tasks:
+                      - id: 1
+                        name: My Sync Task
+                        status: 运行中
+                        statusCode: RUNNING
+                english:
+                  summary: English response
+                  value:
+                    tasks:
+                      - id: 1
+                        name: My Sync Task
+                        status: Running
+                        statusCode: RUNNING
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocalizedError'
+              examples:
+                chinese:
+                  summary: Chinese error
+                  value:
+                    error: 数据库错误
+                    code: DATABASE_ERROR
+                english:
+                  summary: English error
+                  value:
+                    error: Database error
+                    code: DATABASE_ERROR
+
+    post:
+      summary: Create a new task
+      description: Creates a sync task and returns localized success message
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - source
+                - destination
+              properties:
+                name:
+                  type: string
+                source:
+                  type: string
+                destination:
+                  type: string
+      responses:
+        '201':
+          description: Task created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/LocalizedSuccess'
+                  - type: object
+                    properties:
+                      task:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                          name:
+                            type: string
+              examples:
+                chinese:
+                  summary: Chinese response
+                  value:
+                    message: 创建成功
+                    task:
+                      id: 1
+                      name: My Sync Task
+                english:
+                  summary: English response
+                  value:
+                    message: Created successfully
+                    task:
+                      id: 1
+                      name: My Sync Task
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocalizedError'
+              examples:
+                chinese:
+                  summary: Chinese error
+                  value:
+                    error: 验证失败
+                    code: VALIDATION_FAILED
+                    details: 名称不能为空
+
+  /api/tasks/{id}:
+    get:
+      summary: Get task by ID
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '404':
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocalizedError'
+              examples:
+                chinese:
+                  summary: Chinese error
+                  value:
+                    error: 任务未找到
+                    code: TASK_NOT_FOUND
+                english:
+                  summary: English error
+                  value:
+                    error: Task not found
+                    code: TASK_NOT_FOUND
+
+    delete:
+      summary: Delete a task
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Task deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocalizedSuccess'
+              examples:
+                chinese:
+                  summary: Chinese response
+                  value:
+                    message: 删除成功
+
+  /api/tasks/{id}/sync:
+    post:
+      summary: Start sync operation
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Sync started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocalizedSuccess'
+              examples:
+                chinese:
+                  summary: Chinese response
+                  value:
+                    message: 同步已开始
+        '409':
+          description: Sync already in progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocalizedError'
+              examples:
+                chinese:
+                  summary: Chinese error
+                  value:
+                    error: 同步正在进行中
+                    code: SYNC_IN_PROGRESS
+
+  /api/remotes:
+    get:
+      summary: List all remotes (connections)
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+      responses:
+        '200':
+          description: Successful response
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocalizedError'
+
+    post:
+      summary: Create a new remote
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+      responses:
+        '201':
+          description: Remote created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocalizedSuccess'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocalizedError'
+
+  /api/jobs/{id}:
+    get:
+      summary: Get job (sync history) by ID
+      parameters:
+        - $ref: '#/components/parameters/AcceptLanguage'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Job details with localized status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  status:
+                    type: string
+                    description: Localized status
+                  statusCode:
+                    type: string
+              examples:
+                chinese:
+                  summary: Chinese response
+                  value:
+                    id: 1
+                    status: 已完成
+                    statusCode: COMPLETED
+
+# Implementation Notes
+x-implementation-notes:
+  middleware:
+    description: |
+      Add LocaleMiddleware to parse Accept-Language header and set locale
+      in request context.
+    
+    code: |
+      func LocaleMiddleware() gin.HandlerFunc {
+          return func(c *gin.Context) {
+              lang := c.GetHeader("Accept-Language")
+              locale := i18n.ParseLocale(lang)
+              c.Set("locale", locale)
+              c.Next()
+          }
+      }
+
+  handler-usage:
+    description: |
+      In handlers, retrieve locale from context and use i18n.T() for messages.
+    
+    code: |
+      func (h *Handler) GetTask(c *gin.Context) {
+          locale := c.GetString("locale")
+          // ... 
+          if err != nil {
+              c.JSON(404, gin.H{
+                  "error": i18n.T(locale, i18n.ErrTaskNotFound),
+                  "code": "TASK_NOT_FOUND",
+              })
+          }
+      }
+
+  frontend-integration:
+    description: |
+      Frontend must set Accept-Language header on all API requests.
+    
+    code: |
+      // In web/src/lib/api.ts
+      import { useI18n } from '../i18n';
+      
+      const api = axios.create({
+          baseURL: '/api',
+      });
+      
+      api.interceptors.request.use((config) => {
+          const { locale } = useI18n();
+          config.headers['Accept-Language'] = locale();
+          return config;
+      });

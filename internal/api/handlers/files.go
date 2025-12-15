@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/xzzpig/rclone-sync/internal/i18n"
 	"github.com/xzzpig/rclone-sync/internal/rclone"
 )
 
@@ -24,7 +25,7 @@ type FileEntry struct {
 func ListLocalFiles(c *gin.Context) {
 	path := c.Query("path")
 	if path == "" {
-		HandleError(c, NewError(http.StatusBadRequest, "Missing required parameter", "path is required"))
+		HandleError(c, NewLocalizedError(c, http.StatusBadRequest, i18n.ErrMissingParameter, "path is required"))
 		return
 	}
 
@@ -32,7 +33,7 @@ func ListLocalFiles(c *gin.Context) {
 	info, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			HandleError(c, NewError(http.StatusBadRequest, "Path does not exist", err.Error()))
+			HandleError(c, NewLocalizedError(c, http.StatusBadRequest, i18n.ErrPathNotExist, err.Error()))
 			return
 		}
 		HandleError(c, err)
@@ -40,7 +41,7 @@ func ListLocalFiles(c *gin.Context) {
 	}
 
 	if !info.IsDir() {
-		HandleError(c, NewError(http.StatusBadRequest, "Path is not a directory", ""))
+		HandleError(c, NewLocalizedError(c, http.StatusBadRequest, i18n.ErrPathNotDirectory, ""))
 		return
 	}
 
@@ -92,13 +93,13 @@ func ListLocalFiles(c *gin.Context) {
 func ListRemoteFiles(c *gin.Context) {
 	remoteName := c.Param("name")
 	if remoteName == "" {
-		HandleError(c, NewError(http.StatusBadRequest, "Missing required parameter", "remote name is required"))
+		HandleError(c, NewLocalizedError(c, http.StatusBadRequest, i18n.ErrMissingParameter, "remote name is required"))
 		return
 	}
 
 	path := c.Query("path")
 	if path == "" {
-		HandleError(c, NewError(http.StatusBadRequest, "Missing required parameter", "path is required"))
+		HandleError(c, NewLocalizedError(c, http.StatusBadRequest, i18n.ErrMissingParameter, "path is required"))
 		return
 	}
 

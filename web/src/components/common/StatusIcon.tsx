@@ -1,3 +1,4 @@
+import * as m from '@/paraglide/messages.js';
 import { JobStatus, TaskStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Component, Match, Show, Switch } from 'solid-js';
@@ -23,32 +24,32 @@ const StatusIcon: Component<StatusIconProps> = (props) => {
     <Show when={shouldShow()}>
       <Switch>
         <Match when={props.status === 'running'}>
-          <HelpTooltip content="Running">
+          <HelpTooltip content={m.status_running()}>
             <IconRefresh class={cn('h-5 w-5 animate-spin text-blue-500', props.class)} />
           </HelpTooltip>
         </Match>
         <Match when={props.status === 'success'}>
-          <HelpTooltip content="Success">
+          <HelpTooltip content={m.common_success()}>
             <IconCheckCircle2 class={cn('h-5 w-5 text-green-500', props.class)} />
           </HelpTooltip>
         </Match>
         <Match when={props.status === 'failed'}>
-          <HelpTooltip content="Failed">
+          <HelpTooltip content={m.status_failed()}>
             <IconXCircle class={cn('h-5 w-5 text-red-500', props.class)} />
           </HelpTooltip>
         </Match>
         <Match when={props.status === 'pending'}>
-          <HelpTooltip content="Pending">
+          <HelpTooltip content={m.status_pending()}>
             <IconClock class={cn('h-5 w-5 text-yellow-500', props.class)} />
           </HelpTooltip>
         </Match>
         <Match when={props.status === 'canceled'}>
-          <HelpTooltip content="Canceled">
+          <HelpTooltip content={m.task_status_cancelled()}>
             <IconBan class={cn('h-5 w-5 text-gray-500', props.class)} />
           </HelpTooltip>
         </Match>
         <Match when={props.status === 'idle'}>
-          <HelpTooltip content="Idle">
+          <HelpTooltip content={m.status_idle()}>
             <IconPauseCircle class={cn('h-5 w-5 text-gray-400', props.class)} />
           </HelpTooltip>
         </Match>

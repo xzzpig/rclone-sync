@@ -1,3 +1,4 @@
+import * as m from '@/paraglide/messages.js';
 import { deleteConnection, getProviderOptions, getRemoteConfig } from '@/api/connections';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -52,8 +53,8 @@ const Settings: Component = () => {
     } catch (error) {
       console.error('Failed to delete connection:', error);
       showToast({
-        title: 'Error',
-        description: 'Failed to delete connection. Please try again.',
+        title: m.common_error(),
+        description: m.connection_failedToDelete(),
         variant: 'error',
       });
     } finally {
@@ -67,7 +68,7 @@ const Settings: Component = () => {
       <Card>
         <CardHeader>
           <Show when={!configQuery.isLoading} fallback={<Skeleton class="h-6 w-[180px]" />}>
-            <CardTitle>Connection Settings</CardTitle>
+            <CardTitle>{m.common_settings()}</CardTitle>
           </Show>
         </CardHeader>
         <CardContent>
@@ -81,8 +82,8 @@ const Settings: Component = () => {
             onBack={() => navigate('..')}
             onSave={() => {
               showToast({
-                title: 'Connection updated',
-                description: `Connection "${connectionName()}" has been updated successfully.`,
+                title: m.toast_taskUpdated(),
+                description: m.toast_taskUpdatedDesc({ name: connectionName() ?? '' }),
               });
             }}
           />
@@ -91,15 +92,12 @@ const Settings: Component = () => {
 
       <Card class="border-red-200">
         <CardHeader>
-          <CardTitle class="text-red-500">Danger Zone</CardTitle>
+          <CardTitle class="text-red-500">{m.connection_dangerZone()}</CardTitle>
         </CardHeader>
         <CardContent>
-          <p class="mb-4 text-sm text-muted-foreground">
-            Deleting this connection will remove the configuration properly. This action cannot be
-            undone.
-          </p>
+          <p class="mb-4 text-sm text-muted-foreground">{m.connection_deleteWarning()}</p>
           <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)}>
-            Delete Connection
+            {m.common_delete()}
           </Button>
         </CardContent>
       </Card>
@@ -107,18 +105,18 @@ const Settings: Component = () => {
       <Dialog open={isDeleteDialogOpen()} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Are you sure?</DialogTitle>
+            <DialogTitle>{m.connection_deleteConfirmTitle()}</DialogTitle>
             <DialogDescription>
-              This will permanently delete the connection "{connectionName()}".
+              {m.connection_deleteConfirmDesc({ name: connectionName() ?? '' })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
-              Cancel
+              {m.common_cancel()}
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={isDeleting()}>
               {isDeleting() ? <IconLoader2 class="mr-2 size-4 animate-spin" /> : null}
-              Delete
+              {m.common_delete()}
             </Button>
           </DialogFooter>
         </DialogContent>

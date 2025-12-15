@@ -1,3 +1,4 @@
+import * as m from '@/paraglide/messages.js';
 import { getProviderOptions, getProviders } from '@/api/connections';
 import {
   Dialog,
@@ -11,6 +12,7 @@ import { useQuery } from '@tanstack/solid-query';
 import { createSignal, Show } from 'solid-js';
 import { DynamicConfigForm } from './DynamicConfigForm';
 import { ProviderSelection } from './ProviderSelection';
+import { RichText } from '@/components/common/RichText';
 
 export const AddConnectionDialog = (props: { isOpen: boolean; onClose: () => void }) => {
   const [step, setStep] = createSignal(1);
@@ -48,12 +50,11 @@ export const AddConnectionDialog = (props: { isOpen: boolean; onClose: () => voi
     <Dialog open={props.isOpen} onOpenChange={handleClose}>
       <DialogContent class="flex max-h-[90vh] max-w-2xl flex-col overflow-y-auto">
         <DialogHeader>
-          <DialogTitle id="dialog-title">Add New Connection</DialogTitle>
+          <DialogTitle id="dialog-title">{m.wizard_addNewConnection()}</DialogTitle>
           <DialogDescription id="dialog-description">
-            <Show when={step() === 1}>Step 1 of 2: Select a cloud provider.</Show>
+            <Show when={step() === 1}>{m.wizard_step1Of2()}</Show>
             <Show when={step() === 2}>
-              Step 2 of 2: Configure your{' '}
-              <span class="font-bold text-primary">{selectedProvider()?.name}</span> connection.
+              <RichText text={m.wizard_step2Of2({ provider: selectedProvider()?.name ?? '' })} />
             </Show>
           </DialogDescription>
         </DialogHeader>

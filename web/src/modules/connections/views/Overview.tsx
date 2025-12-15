@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatBytes } from '@/lib/utils';
+import * as m from '@/paraglide/messages.js';
 import { useTasks } from '@/store/tasks';
 import { useParams } from '@solidjs/router';
 import { useQuery } from '@tanstack/solid-query';
@@ -26,10 +27,10 @@ const Overview: Component = () => {
 
   const statusLabel = () => {
     const s = status();
-    if (s === 'running') return 'Running';
-    if (s === 'success') return 'Healthy';
-    if (s === 'failed') return 'Failed';
-    return 'Idle';
+    if (s === 'running') return m.status_running();
+    if (s === 'success') return m.overview_healthy();
+    if (s === 'failed') return m.status_failed();
+    return m.status_idle();
   };
 
   // Calculate usage percentage
@@ -45,13 +46,15 @@ const Overview: Component = () => {
         {/* Status Card */}
         <Card>
           <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-sm font-medium">Current Status</CardTitle>
+            <CardTitle class="text-sm font-medium">{m.overview_currentStatus()}</CardTitle>
             <StatusIcon status={status()} class="size-6" />
           </CardHeader>
           <CardContent>
             <div class="text-2xl font-bold tracking-tight">{statusLabel()}</div>
             <p class="mt-1 text-xs text-muted-foreground">
-              {status() === 'running' ? 'Sync in progress...' : 'Last check completed'}
+              {status() === 'running'
+                ? m.overview_syncInProgress()
+                : m.overview_lastCheckCompleted()}
             </p>
           </CardContent>
         </Card>
@@ -60,7 +63,7 @@ const Overview: Component = () => {
         {/* TODO: Display more detailed quota information */}
         <Card class="col-span-1 lg:col-span-3">
           <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle class="text-sm font-medium">Storage Usage</CardTitle>
+            <CardTitle class="text-sm font-medium">{m.overview_storageUsage()}</CardTitle>
           </CardHeader>
           <CardContent>
             <Show
@@ -80,7 +83,7 @@ const Overview: Component = () => {
                   {formatBytes(quotaQuery.data?.used)}
                 </div>
                 <div class="mb-1 text-sm font-medium text-muted-foreground">
-                  of {formatBytes(quotaQuery.data?.total)} used
+                  {m.overview_of()} {formatBytes(quotaQuery.data?.total)} {m.overview_used()}
                 </div>
               </div>
               <Progress
@@ -91,7 +94,9 @@ const Overview: Component = () => {
               />
               <div class="mt-2 flex justify-between text-xs text-muted-foreground">
                 <span>{usagePercent().toFixed(1)}%</span>
-                <span>{formatBytes(quotaQuery.data?.total)} Total</span>
+                <span>
+                  {formatBytes(quotaQuery.data?.total)} {m.overview_total()}
+                </span>
               </div>
             </Show>
           </CardContent>

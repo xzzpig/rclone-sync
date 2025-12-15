@@ -1,9 +1,10 @@
 import StatusIcon from '@/components/common/StatusIcon';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Job } from '@/lib/types';
+import { formatRelativeTime } from '@/lib/date';
+import { type Job, type JobStatus } from '@/lib/types';
 import { formatBytes } from '@/lib/utils';
+import * as m from '@/paraglide/messages.js';
 import { useNavigate } from '@solidjs/router';
-import { formatDistanceToNow } from 'date-fns';
 import { Component, For, Show } from 'solid-js';
 import IconClock from '~icons/lucide/clock';
 
@@ -25,20 +26,18 @@ const RecentActivity: Component<RecentActivityProps> = (props) => {
     }
   };
 
-  const getStatusText = (status: string) => {
-    switch (status.toLowerCase()) {
+  const getStatusText = (status: JobStatus) => {
+    switch (status) {
       case 'success':
-      case 'finished':
-      case 'done':
-        return 'Success';
+        return m.status_completed();
       case 'failed':
-      case 'error':
-        return 'Failed';
+        return m.status_failed();
       case 'running':
-      case 'processing':
-        return 'Running';
-      case 'queued':
-        return 'Queued';
+        return m.status_running();
+      case 'canceled':
+        return m.task_status_cancelled();
+      case 'pending':
+        return m.status_idle();
       default:
         return status;
     }
@@ -47,7 +46,7 @@ const RecentActivity: Component<RecentActivityProps> = (props) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Recent Activity</CardTitle>
+        <CardTitle>{m.recentActivity_title()}</CardTitle>
       </CardHeader>
       <CardContent>
         <Show
@@ -55,7 +54,7 @@ const RecentActivity: Component<RecentActivityProps> = (props) => {
           fallback={
             <div class="py-8 text-center text-muted-foreground">
               <IconClock class="mx-auto mb-2 size-12 text-muted-foreground" />
-              <p>No recent activity</p>
+              <p>{m.recentActivity_noActivity()}</p>
             </div>
           }
         >
@@ -81,7 +80,7 @@ const RecentActivity: Component<RecentActivityProps> = (props) => {
                         </p>
                       </div>
                       <span class="whitespace-nowrap text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(job.start_time), { addSuffix: true })}
+                        {formatRelativeTime(job.start_time)}
                       </span>
                     </div>
                     <div class="mt-1 flex items-center gap-3 text-xs text-muted-foreground">

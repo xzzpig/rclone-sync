@@ -9,6 +9,7 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/task"
 	"github.com/xzzpig/rclone-sync/internal/core/services"
+	"github.com/xzzpig/rclone-sync/internal/i18n"
 	"github.com/xzzpig/rclone-sync/internal/utils"
 )
 
@@ -34,13 +35,13 @@ type CreateTaskRequest struct {
 func (h *TaskHandler) Create(c *gin.Context) {
 	var req CreateTaskRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		HandleError(c, NewError(http.StatusBadRequest, "Invalid request body", err.Error()))
+		HandleError(c, NewLocalizedError(c, http.StatusBadRequest, i18n.ErrInvalidRequestBody, err.Error()))
 		return
 	}
 
 	// Validate cron schedule if provided
 	if err := utils.ValidateCronSchedule(req.Schedule); err != nil {
-		HandleError(c, NewError(http.StatusBadRequest, "Invalid cron schedule format", err.Error()))
+		HandleError(c, NewLocalizedError(c, http.StatusBadRequest, i18n.ErrInvalidSchedule, err.Error()))
 		return
 	}
 
@@ -98,20 +99,20 @@ func (h *TaskHandler) Run(c *gin.Context) {
 	idParam := c.Param("id")
 	taskID, err := uuid.Parse(idParam)
 	if err != nil {
-		HandleError(c, NewError(http.StatusBadRequest, "Invalid task ID", err.Error()))
+		HandleError(c, NewLocalizedError(c, http.StatusBadRequest, i18n.ErrInvalidIDFormat, err.Error()))
 		return
 	}
 
 	task, err := h.service.GetTask(c.Request.Context(), taskID)
 	if err != nil {
-		HandleError(c, NewError(http.StatusNotFound, "Task not found", err.Error()))
+		HandleError(c, NewLocalizedError(c, http.StatusNotFound, i18n.ErrTaskNotFound, err.Error()))
 		return
 	}
 
 	// Retrieve TaskRunner from context
 	taskRunner, err := context.GetTaskRunner(c)
 	if err != nil {
-		HandleError(c, NewError(http.StatusInternalServerError, err.Error(), ""))
+		HandleError(c, NewLocalizedError(c, http.StatusInternalServerError, i18n.ErrGeneric, err.Error()))
 		return
 	}
 
@@ -124,13 +125,13 @@ func (h *TaskHandler) Get(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		HandleError(c, NewError(http.StatusBadRequest, "Invalid ID format", err.Error()))
+		HandleError(c, NewLocalizedError(c, http.StatusBadRequest, i18n.ErrInvalidIDFormat, err.Error()))
 		return
 	}
 
 	task, err := h.service.GetTaskWithJobs(c.Request.Context(), id)
 	if err != nil {
-		HandleError(c, NewError(http.StatusNotFound, "Task not found", err.Error()))
+		HandleError(c, NewLocalizedError(c, http.StatusNotFound, i18n.ErrTaskNotFound, err.Error()))
 		return
 	}
 
@@ -152,20 +153,20 @@ func (h *TaskHandler) Update(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		HandleError(c, NewError(http.StatusBadRequest, "Invalid ID format", err.Error()))
+		HandleError(c, NewLocalizedError(c, http.StatusBadRequest, i18n.ErrInvalidIDFormat, err.Error()))
 		return
 	}
 
 	// Get existing task
 	existingTask, err := h.service.GetTask(c.Request.Context(), id)
 	if err != nil {
-		HandleError(c, NewError(http.StatusNotFound, "Task not found", err.Error()))
+		HandleError(c, NewLocalizedError(c, http.StatusNotFound, i18n.ErrTaskNotFound, err.Error()))
 		return
 	}
 
 	var req UpdateTaskRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		HandleError(c, NewError(http.StatusBadRequest, "Invalid request body", err.Error()))
+		HandleError(c, NewLocalizedError(c, http.StatusBadRequest, i18n.ErrInvalidRequestBody, err.Error()))
 		return
 	}
 
@@ -200,7 +201,7 @@ func (h *TaskHandler) Update(c *gin.Context) {
 		schedule = *req.Schedule
 		// Validate cron schedule if provided
 		if err := utils.ValidateCronSchedule(schedule); err != nil {
-			HandleError(c, NewError(http.StatusBadRequest, "Invalid cron schedule format", err.Error()))
+			HandleError(c, NewLocalizedError(c, http.StatusBadRequest, i18n.ErrInvalidSchedule, err.Error()))
 			return
 		}
 	}
@@ -285,14 +286,14 @@ func (h *TaskHandler) Delete(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
+		HandleError(c, NewLocalizedError(c, http.StatusBadRequest, i18n.ErrInvalidIDFormat, ""))
 		return
 	}
 
 	// Get task before deleting to check if it has realtime enabled
 	task, err := h.service.GetTask(c.Request.Context(), id)
 	if err != nil {
-		HandleError(c, NewError(http.StatusNotFound, "Task not found", err.Error()))
+		HandleError(c, NewLocalizedError(c, http.StatusNotFound, i18n.ErrTaskNotFound, err.Error()))
 		return
 	}
 
@@ -317,7 +318,7 @@ func (h *TaskHandler) Delete(c *gin.Context) {
 	}
 
 	if err := h.service.DeleteTask(c.Request.Context(), id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		HandleError(c, NewLocalizedError(c, http.StatusInternalServerError, i18n.ErrGeneric, err.Error()))
 		return
 	}
 

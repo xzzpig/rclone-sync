@@ -1,10 +1,12 @@
-import { defineConfig } from 'vite'
-import solid from 'vite-plugin-solid'
-import Icons from 'unplugin-icons/vite'
-import path from 'path'
+import { paraglideVitePlugin as paraglide } from '@inlang/paraglide-js';
+import { defineConfig } from 'vite';
+import solid from 'vite-plugin-solid';
+import Icons from 'unplugin-icons/vite';
+import path from 'path';
 
 export default defineConfig({
   plugins: [
+    paraglide({ project: './project.inlang', outdir: './src/paraglide' }),
     solid(),
     Icons({
       compiler: 'solid',
@@ -13,7 +15,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      '@': path.resolve(__dirname, './src'),
     },
   },
   server: {
@@ -21,12 +23,12 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
-      }
-    }
+      },
+    },
   },
   build: {
     target: 'esnext',
     outDir: '../internal/ui/dist',
     emptyOutDir: true,
   },
-})
+});

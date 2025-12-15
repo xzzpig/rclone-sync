@@ -1,3 +1,4 @@
+import * as m from '@/paraglide/messages.js';
 import IntervalUpdated from '@/components/common/IntervalUpdated';
 import StatusIcon from '@/components/common/StatusIcon';
 import TableSkeleton from '@/components/common/TableSkeleton';
@@ -27,11 +28,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatBytes } from '@/lib/utils';
+import { formatDuration, formatRelativeTime } from '@/lib/date';
 import { useHistory } from '@/store/history';
 import { useTasks } from '@/store/tasks';
 import { useNavigate, useParams, useSearchParams } from '@solidjs/router';
-import { formatDistanceToNow } from 'date-fns';
-import { enUS } from 'date-fns/locale';
 import { Component, For, Show, createEffect, createMemo } from 'solid-js';
 import IconFileText from '~icons/lucide/file-text';
 import IconRefreshCw from '~icons/lucide/refresh-cw';
@@ -63,21 +63,11 @@ const History: Component = () => {
     setSearchParams({ task_id: taskId, page: '1' });
   };
 
-  const formatDuration = (start: string, end?: string, now: number = Date.now()) => {
+  const calculateDuration = (start: string, end?: string, now: number = Date.now()) => {
     const startTime = new Date(start);
     const endTime = end ? new Date(end) : new Date(now);
     const duration = endTime.getTime() - startTime.getTime();
-    const seconds = Math.floor(duration / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-
-    if (hours > 0) {
-      return `${hours}h ${minutes % 60}m`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${seconds % 60}s`;
-    } else {
-      return `${seconds}s`;
-    }
+    return formatDuration(duration);
   };
 
   // Filter tasks by current connection
@@ -118,7 +108,7 @@ const History: Component = () => {
 
   return (
     <ConnectionViewLayout
-      title="Sync History"
+      title={m.history_title()}
       actions={
         <>
           <Button
@@ -133,11 +123,11 @@ const History: Component = () => {
             value={selectedTaskId() ?? ''}
             onChange={(value) => setSelectedTaskId(value ?? undefined)}
             options={['', ...(filteredTasks().map((t) => t.id) ?? [])]}
-            placeholder="Filter Task"
+            placeholder={m.task_filters()}
             itemComponent={(props) => (
               <SelectItem item={props.item}>
                 {props.item.rawValue === ''
-                  ? 'All Tasks'
+                  ? m.task_noTasks()
                   : (taskNameMap().get(props.item.rawValue as string) ?? props.item.rawValue)}
               </SelectItem>
             )}
@@ -147,8 +137,8 @@ const History: Component = () => {
                 {(state) => {
                   const selectedId = state.selectedOption() as string;
                   return selectedId === ''
-                    ? 'All Tasks'
-                    : (taskNameMap().get(selectedId) ?? 'Select Task');
+                    ? m.task_noTasks()
+                    : (taskNameMap().get(selectedId) ?? m.task_selectDestination());
                 }}
               </SelectValue>
             </SelectTrigger>
@@ -161,7 +151,7 @@ const History: Component = () => {
         when={historyState.jobs.length > 0 || historyState.isLoadingJobs}
         fallback={
           <div class="flex flex-1 items-center justify-center text-muted-foreground">
-            No execution history
+            {m.history_noExecutionHistory()}
           </div>
         }
       >
@@ -169,13 +159,19 @@ const History: Component = () => {
           <Table>
             <TableHeader class="sticky top-0 z-10 bg-card shadow-sm">
               <TableRow>
-                <TableHead class="w-[200px] whitespace-nowrap">Task</TableHead>
-                <TableHead class="w-[100px] whitespace-nowrap">Trigger</TableHead>
-                <TableHead class="w-[150px] whitespace-nowrap">Started</TableHead>
-                <TableHead class="w-[100px] whitespace-nowrap">Duration</TableHead>
-                <TableHead class="w-[100px] whitespace-nowrap">Files</TableHead>
-                <TableHead class="w-[100px] whitespace-nowrap">Data</TableHead>
-                <TableHead class="w-[100px] whitespace-nowrap text-right">Actions</TableHead>
+                <TableHead class="w-[200px] whitespace-nowrap">{m.history_tableTask()}</TableHead>
+                <TableHead class="w-[100px] whitespace-nowrap">
+                  {m.history_tableTrigger()}
+                </TableHead>
+                <TableHead class="w-[150px] whitespace-nowrap">
+                  {m.history_tableStarted()}
+                </TableHead>
+                <TableHead class="w-[100px] whitespace-nowrap">{m.common_duration()}</TableHead>
+                <TableHead class="w-[100px] whitespace-nowrap">{m.common_files()}</TableHead>
+                <TableHead class="w-[100px] whitespace-nowrap">{m.common_data()}</TableHead>
+                <TableHead class="w-[100px] whitespace-nowrap text-right">
+                  {m.common_actions()}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -192,9 +188,9 @@ const History: Component = () => {
                           <StatusIcon status={job.status} class="inline-block" />
                           <div
                             class="max-w-[200px] truncate"
-                            title={task ? task.name : 'Unknown Task'}
+                            title={task ? task.name : m.error_taskNotFound()}
                           >
-                            {task ? task.name : 'Unknown Task'}
+                            {task ? task.name : m.error_taskNotFound()}
                           </div>
                         </TableCell>
                         <TableCell class="py-2 align-top">
@@ -202,18 +198,13 @@ const History: Component = () => {
                         </TableCell>
                         <TableCell class="whitespace-nowrap py-2 align-top">
                           <IntervalUpdated when={true} interval={60 * 1000}>
-                            {() =>
-                              formatDistanceToNow(new Date(job.start_time), {
-                                addSuffix: true,
-                                locale: enUS,
-                              })
-                            }
+                            {() => formatRelativeTime(job.start_time)}
                           </IntervalUpdated>
                         </TableCell>
                         <TableCell class="whitespace-nowrap py-2 align-top">
                           <IntervalUpdated when={job.status === 'running'}>
                             {(now) =>
-                              formatDuration(
+                              calculateDuration(
                                 job.start_time,
                                 job.status === 'running' ? undefined : job.end_time,
                                 now
@@ -222,7 +213,9 @@ const History: Component = () => {
                           </IntervalUpdated>
                         </TableCell>
                         <TableCell class="py-2 align-top">
-                          {job.status === 'running' ? 'N/A' : (job.files_transferred ?? 0)}
+                          {job.status === 'running'
+                            ? m.history_notApplicable()
+                            : (job.files_transferred ?? 0)}
                         </TableCell>
                         <TableCell class="whitespace-nowrap py-2 align-top">
                           {formatBytes(job.bytes_transferred)}

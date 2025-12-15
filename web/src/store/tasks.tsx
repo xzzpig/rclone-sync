@@ -1,3 +1,4 @@
+import * as m from '@/paraglide/messages.js';
 import { createTask, deleteTask, getTasks, runTask, updateTask } from '@/api/tasks';
 import { extractErrorMessage } from '@/lib/api';
 import { SSEClient } from '@/lib/sse';
@@ -149,7 +150,7 @@ export const TaskProvider: ParentComponent = (props) => {
       } catch (err: unknown) {
         console.error('Failed to create task:', err);
         // Use ApiError if available, otherwise extract from error
-        const errorMessage = extractErrorMessage(err) ?? 'Unknown error';
+        const errorMessage = extractErrorMessage(err) ?? m.error_unknownError();
         throw new Error(errorMessage);
       }
     },
@@ -161,7 +162,7 @@ export const TaskProvider: ParentComponent = (props) => {
       } catch (err: unknown) {
         console.error('Failed to update task:', err);
         // Use ApiError if available, otherwise extract from error
-        const errorMessage = extractErrorMessage(err) ?? 'Unknown error';
+        const errorMessage = extractErrorMessage(err) ?? m.error_unknownError();
         throw new Error(errorMessage);
       }
     },
@@ -189,7 +190,7 @@ export const TaskProvider: ParentComponent = (props) => {
 export const useTasks = () => {
   const context = useContext(TaskContext);
   if (!context) {
-    throw new Error('useTasks must be used within a TaskProvider');
+    throw new Error(m.error_hookMissingProvider({ hook: 'useTasks', provider: 'TaskProvider' }));
   }
   return context;
 };

@@ -21,6 +21,7 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/scheduler"
 	"github.com/xzzpig/rclone-sync/internal/core/services"
 	"github.com/xzzpig/rclone-sync/internal/core/watcher"
+	"github.com/xzzpig/rclone-sync/internal/i18n"
 	"github.com/xzzpig/rclone-sync/internal/rclone"
 
 	"github.com/spf13/cobra"
@@ -37,6 +38,12 @@ var serveCmd = &cobra.Command{
 		// Initialize Logger first
 		logger.InitLogger(logger.Environment(config.Cfg.App.Environment), logger.LogLevel(config.Cfg.Log.Level))
 		logger.L.Info("Starting cloud-sync server...")
+
+		// Initialize i18n
+		if err := i18n.Init(); err != nil {
+			logger.L.Fatal("Failed to initialize i18n", zap.Error(err))
+		}
+		logger.L.Info("i18n initialized successfully")
 
 		// Initialize rclone config
 		rclone.InitConfig(config.Cfg.Rclone.ConfigPath)

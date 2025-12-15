@@ -1,3 +1,4 @@
+import * as m from '@/paraglide/messages.js';
 import { createConnection, testConnection } from '@/api/connections';
 import { HelpTooltip } from '@/components/common/HelpTooltip';
 import { Button } from '@/components/ui/button';
@@ -122,10 +123,10 @@ export const DynamicConfigForm = (props: {
     setErrors('testResult', undefined);
     try {
       await testConnection(props.provider, { ...formState, type: props.provider });
-      setErrors('testResult', { message: 'Connection successful!', type: 'success' });
+      setErrors('testResult', { message: m.connection_testSuccess(), type: 'success' });
     } catch (err: unknown) {
       setErrors('testResult', {
-        message: extractErrorMessage(err) ?? 'Connection failed.',
+        message: extractErrorMessage(err) ?? m.error_connectionFailed(),
         details: extractErrorDetails(err),
         type: 'error',
       });
@@ -137,7 +138,7 @@ export const DynamicConfigForm = (props: {
   const handleSave = async () => {
     const name = formState['name']; // Assuming a 'name' field exists
     if (!name) {
-      setErrors('name', { message: 'Connection name is required.', type: 'error' });
+      setErrors('name', { message: m.connection_nameRequired(), type: 'error' });
       return;
     }
     try {
@@ -146,7 +147,7 @@ export const DynamicConfigForm = (props: {
       props.onSave();
     } catch (err: unknown) {
       setErrors('saveResult', {
-        message: extractErrorMessage(err) ?? 'Failed to save connection.',
+        message: extractErrorMessage(err) ?? m.connection_saveError(),
         details: extractErrorDetails(err),
         type: 'error',
       });
@@ -162,7 +163,7 @@ export const DynamicConfigForm = (props: {
           required
           disabled={props.isEditing}
         >
-          <TextFieldLabel for="connection-name">Connection Name</TextFieldLabel>
+          <TextFieldLabel for="connection-name">{m.connection_connectionName()}</TextFieldLabel>
           <TextFieldInput
             id="connection-name"
             aria-required="true"
@@ -201,7 +202,7 @@ export const DynamicConfigForm = (props: {
               variant="link"
               class="group flex w-full items-center justify-between p-0"
             >
-              <span>Advanced Options</span>
+              <span>{m.connection_advancedOptions()}</span>
               <IconChevronDown class="size-4 transition-transform duration-200 group-data-[expanded]:rotate-180" />
             </CollapsibleTrigger>
             <CollapsibleContent class="space-y-2 pt-2">
@@ -225,7 +226,7 @@ export const DynamicConfigForm = (props: {
               onClick={props.onBack}
               aria-label="Go back to provider selection"
             >
-              Back
+              {m.common_back()}
             </Button>
           </Show>
           <div class="flex items-center gap-2">
@@ -250,7 +251,7 @@ export const DynamicConfigForm = (props: {
               disabled={isTesting()}
               aria-label={isTesting() ? 'Testing connection...' : 'Test connection configuration'}
             >
-              {isTesting() ? 'Testing...' : 'Test Connection'}
+              {isTesting() ? m.connection_testing() : m.connection_testConnection()}
             </Button>
             <Button
               onClick={handleSave}
@@ -258,7 +259,7 @@ export const DynamicConfigForm = (props: {
                 props.isEditing ? 'Update connection configuration' : 'Create new connection'
               }
             >
-              {props.isEditing ? 'Update' : 'Create Connection'}
+              {props.isEditing ? m.connection_update() : m.connection_createConnection()}
             </Button>
           </div>
         </div>

@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/xzzpig/rclone-sync/internal/api/context"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
+	"github.com/xzzpig/rclone-sync/internal/i18n"
 )
 
 type LogHandler struct {
@@ -19,14 +20,14 @@ type LogHandler struct {
 func ListLogs(c *gin.Context) {
 	service, err := context.GetJobService(c)
 	if err != nil {
-		HandleError(c, NewError(http.StatusInternalServerError, err.Error(), ""))
+		HandleError(c, NewLocalizedError(c, http.StatusInternalServerError, i18n.ErrGeneric, err.Error()))
 		return
 	}
 
 	// remote_name is required
 	remoteName := c.Query("remote_name")
 	if remoteName == "" {
-		HandleError(c, NewError(http.StatusBadRequest, "remote_name is required", ""))
+		HandleError(c, NewLocalizedError(c, http.StatusBadRequest, i18n.ErrMissingParameter, ""))
 		return
 	}
 

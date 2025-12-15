@@ -6,7 +6,9 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	apicontext "github.com/xzzpig/rclone-sync/internal/api/context"
 	"github.com/xzzpig/rclone-sync/internal/core/errs"
+	"github.com/xzzpig/rclone-sync/internal/i18n"
 )
 
 // AppError represents a structured error response
@@ -30,8 +32,23 @@ func NewError(code int, message string, details string) *AppError {
 	}
 }
 
+// NewLocalizedError creates a new AppError with localized message
+// msgKey is the i18n message key, details can be error string for debugging
+func NewLocalizedError(c *gin.Context, code int, msgKey string, details string) *AppError {
+	localizer := apicontext.GetLocalizer(c)
+	return &AppError{
+		Code:    code,
+		Message: i18n.T(localizer, msgKey),
+		Details: details,
+	}
+}
+
 // HandleError processes errors and sends a JSON response
+// Note: I18nError types are handled by I18nErrorMiddleware
 func HandleError(c *gin.Context, err error) {
+	// Get localizer for translations
+	localizer := apicontext.GetLocalizer(c)
+
 	if appErr, ok := err.(*AppError); ok {
 		c.JSON(appErr.Code, appErr)
 		return
@@ -41,7 +58,7 @@ func HandleError(c *gin.Context, err error) {
 	if errors.Is(err, errs.ErrNotFound) {
 		c.JSON(http.StatusNotFound, &AppError{
 			Code:    http.StatusNotFound,
-			Message: "Resource Not Found",
+			Message: i18n.T(localizer, i18n.ErrNotFound),
 			Details: err.Error(),
 		})
 		return
@@ -49,7 +66,7 @@ func HandleError(c *gin.Context, err error) {
 	if errors.Is(err, errs.ErrAlreadyExists) {
 		c.JSON(http.StatusConflict, &AppError{
 			Code:    http.StatusConflict,
-			Message: "Resource Already Exists",
+			Message: i18n.T(localizer, i18n.ErrAlreadyExists),
 			Details: err.Error(),
 		})
 		return
@@ -57,7 +74,7 @@ func HandleError(c *gin.Context, err error) {
 	if errors.Is(err, errs.ErrInvalidInput) {
 		c.JSON(http.StatusBadRequest, &AppError{
 			Code:    http.StatusBadRequest,
-			Message: "Invalid Input",
+			Message: i18n.T(localizer, i18n.ErrInvalidInput),
 			Details: err.Error(),
 		})
 		return
@@ -65,7 +82,7 @@ func HandleError(c *gin.Context, err error) {
 	if errors.Is(err, errs.ErrUnauthorized) {
 		c.JSON(http.StatusUnauthorized, &AppError{
 			Code:    http.StatusUnauthorized,
-			Message: "Unauthorized",
+			Message: i18n.T(localizer, i18n.ErrUnauthorized),
 			Details: err.Error(),
 		})
 		return
@@ -73,15 +90,16 @@ func HandleError(c *gin.Context, err error) {
 
 	c.JSON(http.StatusInternalServerError, &AppError{
 		Code:    http.StatusInternalServerError,
-		Message: "Internal Server Error",
+		Message: i18n.T(localizer, i18n.ErrGeneric),
 		Details: err.Error(),
 	})
 }
 
 // NotFoundHandler handles 404 errors
 func NotFoundHandler(c *gin.Context) {
+	localizer := apicontext.GetLocalizer(c)
 	c.JSON(http.StatusNotFound, &AppError{
 		Code:    http.StatusNotFound,
-		Message: "Resource Not Found",
+		Message: i18n.T(localizer, i18n.ErrNotFound),
 	})
 }

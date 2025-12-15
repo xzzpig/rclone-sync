@@ -28,7 +28,7 @@ func TestLogAPI_ListLogs_MissingRemoteName(t *testing.T) {
 	err = json.NewDecoder(resp.Body).Decode(&appErr)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusBadRequest, appErr.Code)
-	assert.Contains(t, appErr.Message, "remote_name")
+	assert.Contains(t, appErr.Message, "Missing required parameter")
 }
 
 func TestLogAPI_ListLogs_Success(t *testing.T) {

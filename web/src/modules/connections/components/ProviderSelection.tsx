@@ -1,3 +1,4 @@
+import * as m from '@/paraglide/messages.js';
 import { TextField, TextFieldInput } from '@/components/ui/text-field';
 import type { RcloneProvider } from '@/lib/types';
 import { createMemo, createSignal, For, Show } from 'solid-js';
@@ -31,7 +32,7 @@ export const ProviderSelection = (props: ProviderSelectionProps) => {
           />
           <TextFieldInput
             type="search"
-            placeholder="Search providers..."
+            placeholder={m.provider_searchPlaceholder()}
             class="pl-9"
             aria-label="Search cloud providers"
           />
@@ -45,7 +46,7 @@ export const ProviderSelection = (props: ProviderSelectionProps) => {
               <button
                 class="flex h-auto min-h-20 flex-col items-start justify-start rounded-lg border border-border p-3 text-left outline-none ring-offset-background transition-all hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring"
                 onClick={() => props.onSelect(provider)}
-                aria-label={`Select ${provider.name} cloud provider`}
+                aria-label={m.provider_selectProvider({ provider: provider.name })}
               >
                 <span class="mb-1 text-sm font-medium">{provider.name}</span>
                 <span
@@ -59,7 +60,7 @@ export const ProviderSelection = (props: ProviderSelectionProps) => {
           </For>
           <Show when={filteredProviders().length === 0}>
             <div class="col-span-full py-8 text-center text-muted-foreground">
-              No providers found.
+              {m.provider_noProvidersFound()}
             </div>
           </Show>
         </div>

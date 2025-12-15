@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/xzzpig/rclone-sync/internal/api/sse"
+	"github.com/xzzpig/rclone-sync/internal/i18n"
 )
 
 type SSEHandler struct {
@@ -67,7 +68,7 @@ func GetGlobalEvents(c *gin.Context) {
 func GetConnectionEvents(c *gin.Context) {
 	connectionName := c.Param("name")
 	if connectionName == "" {
-		HandleError(c, NewError(http.StatusBadRequest, "Connection name required", ""))
+		HandleError(c, NewLocalizedError(c, http.StatusBadRequest, i18n.ErrMissingParameter, ""))
 		return
 	}
 

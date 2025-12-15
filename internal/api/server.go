@@ -33,10 +33,12 @@ func SetupRouter(syncEngine *rclone.SyncEngine, taskRunner *runner.Runner, jobSe
 	r.Use(ginLogger(logger.L))
 	r.Use(gin.Recovery())
 	r.Use(context.Middleware(syncEngine, taskRunner, jobService, watcher, scheduler))
+	r.Use(context.LocaleMiddleware())    // Parse Accept-Language header
+	r.Use(context.I18nErrorMiddleware()) // Handle I18nError responses
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"}, // Adjust for production
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "Accept-Language"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,

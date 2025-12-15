@@ -1,3 +1,5 @@
+import * as m from '@/paraglide/messages.js';
+import { getLocale } from '@/paraglide/runtime';
 import axios, { AxiosError } from 'axios';
 
 // Custom error class with structured error information
@@ -37,7 +39,7 @@ export function extractErrorMessage(err: unknown): string {
   } else if (err instanceof Error) {
     return err.message;
   }
-  return 'An unknown error occurred';
+  return m.error_unknownError();
 }
 
 // Extract error details from API response
@@ -54,6 +56,19 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Request interceptor to add Accept-Language header
+api.interceptors.request.use(
+  (config) => {
+    // Add Accept-Language header based on current locale
+    const locale = getLocale();
+    config.headers['Accept-Language'] = locale;
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 // Response interceptor for error handling
 api.interceptors.response.use(

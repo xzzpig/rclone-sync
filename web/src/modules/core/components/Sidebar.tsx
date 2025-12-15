@@ -1,9 +1,11 @@
 import { getConnections } from '@/api/connections';
+import LanguageSwitcher from '@/components/common/LanguageSwitcher';
 import ModeToggle from '@/components/common/ModeToggle';
 import { Button } from '@/components/ui/button';
 import { ListSkeleton } from '@/components/ui/skeletons';
 import { AddConnectionDialog } from '@/modules/connections/components/AddConnectionDialog';
 import { ConnectionSidebarItem } from '@/modules/connections/components/ConnectionSidebarItem';
+import * as m from '@/paraglide/messages.js';
 import { useTasks } from '@/store/tasks';
 import { A } from '@solidjs/router';
 import { useQuery } from '@tanstack/solid-query';
@@ -29,7 +31,7 @@ const Sidebar: Component = () => {
           <div class="flex size-8 items-center justify-center rounded-lg bg-primary text-lg font-bold text-primary-foreground">
             C
           </div>
-          <h1 class="text-lg font-bold tracking-tight">Cloud Sync</h1>
+          <h1 class="text-lg font-bold tracking-tight">{m.app_title()}</h1>
         </div>
 
         <div class="space-y-1">
@@ -39,7 +41,7 @@ const Sidebar: Component = () => {
             class="group flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
           >
             <IconLayoutGrid class="mr-3 size-4" />
-            Overview
+            {m.common_overview()}
           </A>
         </div>
       </div>
@@ -47,14 +49,14 @@ const Sidebar: Component = () => {
       <div class="flex-1 overflow-y-auto px-4 py-2">
         <div class="mb-2 flex items-center justify-between p-2">
           <h2 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Connections
+            {m.common_connections()}
           </h2>
           <Button
             variant="ghost"
             size="sm"
             class="size-6 p-0 hover:bg-muted"
             onClick={() => setIsDialogOpen(true)}
-            title="Add Connection"
+            title={m.connection_addNew()}
           >
             <IconPlus class="size-4" />
           </Button>
@@ -71,14 +73,14 @@ const Sidebar: Component = () => {
               fallback={
                 <div class="rounded-lg border-2 border-dashed border-muted-foreground/20 px-2 py-8 text-center">
                   <IconCloud class="mx-auto mb-2 size-8 text-muted-foreground/40" />
-                  <p class="text-xs text-muted-foreground">No connections</p>
+                  <p class="text-xs text-muted-foreground">{m.sidebar_noConnections()}</p>
                   <Button
                     variant="link"
                     size="sm"
                     onClick={() => setIsDialogOpen(true)}
                     class="mt-1 h-auto py-0 text-xs"
                   >
-                    Add one now
+                    {m.sidebar_addOneNow()}
                   </Button>
                 </div>
               }
@@ -100,12 +102,13 @@ const Sidebar: Component = () => {
             A
           </div>
           <div class="min-w-0 flex-1">
-            <p class="truncate text-xs font-medium">Admin User</p>
-            <p class="truncate text-[10px] text-muted-foreground">Pro Edition</p>
+            <p class="truncate text-xs font-medium">{m.sidebar_adminUser()}</p>
+            <p class="truncate text-[10px] text-muted-foreground">{m.sidebar_proEdition()}</p>
           </div>
           <div class="flex shrink-0 items-center gap-1">
+            <LanguageSwitcher />
             <ModeToggle />
-            <Button variant="ghost" size="icon" as={A} href="/settings" title="Settings">
+            <Button variant="ghost" size="icon" as={A} href="/settings" title={m.common_settings()}>
               <IconSettings class="size-[1.2rem]" />
             </Button>
           </div>

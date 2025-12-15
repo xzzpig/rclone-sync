@@ -1,3 +1,4 @@
+import * as m from '@/paraglide/messages.js';
 import { createStore } from 'solid-js/store';
 import { createContext, useContext, ParentComponent } from 'solid-js';
 import { getJobs } from '@/api/history';
@@ -112,7 +113,9 @@ export const HistoryProvider: ParentComponent = (props) => {
 export const useHistory = () => {
   const context = useContext(HistoryContext);
   if (!context) {
-    throw new Error('useHistory must be used within a HistoryProvider');
+    throw new Error(
+      m.error_hookMissingProvider({ hook: 'useHistory', provider: 'HistoryProvider' })
+    );
   }
   return context;
 };

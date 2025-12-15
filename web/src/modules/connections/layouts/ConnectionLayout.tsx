@@ -1,3 +1,4 @@
+import * as m from '@/paraglide/messages.js';
 import { Tabs, TabsIndicator, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useLocation, useNavigate } from '@solidjs/router';
 import { ParentComponent } from 'solid-js';
@@ -25,11 +26,11 @@ const ConnectionLayout: ParentComponent = (props) => {
         >
           <TabsList>
             <TabsIndicator />
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="tasks">Tasks</TabsTrigger>
-            <TabsTrigger value="history">History</TabsTrigger>
-            <TabsTrigger value="log">Log</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
+            <TabsTrigger value="overview">{m.common_overview()}</TabsTrigger>
+            <TabsTrigger value="tasks">{m.common_tasks()}</TabsTrigger>
+            <TabsTrigger value="history">{m.nav_history()}</TabsTrigger>
+            <TabsTrigger value="log">{m.common_logs()}</TabsTrigger>
+            <TabsTrigger value="settings">{m.common_settings()}</TabsTrigger>
           </TabsList>
         </Tabs>
       </header>

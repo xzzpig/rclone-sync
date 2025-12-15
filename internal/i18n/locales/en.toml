@@ -1,0 +1,110 @@
+# English translations
+
+# Error messages
+[error_generic]
+other = "An error occurred"
+
+[error_not_found]
+other = "Resource not found"
+
+[error_already_exists]
+other = "Resource already exists"
+
+[error_unauthorized]
+other = "Unauthorized access"
+
+[error_validation_failed]
+other = "Validation failed"
+
+[error_connection_failed]
+other = "Connection failed: {{.Reason}}"
+
+[error_sync_failed]
+other = "Sync operation failed"
+
+[error_task_not_found]
+other = "Task not found"
+
+[error_connection_not_found]
+other = "Connection not found"
+
+[error_invalid_input]
+other = "Invalid input provided"
+
+[error_invalid_schedule]
+other = "Invalid schedule format"
+
+[error_invalid_id_format]
+other = "Invalid ID format"
+
+[error_database_error]
+other = "Database error"
+
+[error_missing_parameter]
+other = "Missing required parameter"
+
+[error_invalid_request_body]
+other = "Invalid request body"
+
+[error_path_not_exist]
+other = "Path does not exist"
+
+[error_path_not_directory]
+other = "Path is not a directory"
+
+[error_remote_not_found]
+other = "Remote not found"
+
+[error_job_not_active]
+other = "Job not active"
+
+[error_job_not_found]
+other = "Job not found"
+
+[error_provider_not_found]
+other = "Provider not found"
+
+[error_connection_test_failed]
+other = "Connection test failed"
+
+[error_failed_to_list_remotes]
+other = "Failed to list remotes"
+
+[error_failed_to_create_remote]
+other = "Failed to create remote"
+
+[error_failed_to_get_quota]
+other = "Failed to get remote quota"
+
+# Status messages
+[status_syncing]
+other = "Syncing"
+
+[status_syncing_files]
+one = "Syncing {{.Count}} file"
+other = "Syncing {{.Count}} files"
+
+[status_completed]
+other = "Completed"
+
+[status_failed]
+other = "Failed"
+
+[status_idle]
+other = "Idle"
+
+[status_cancelled]
+other = "Cancelled"
+
+# Success messages
+[success_created]
+other = "Created successfully"
+
+[success_updated]
+other = "Updated successfully"
+
+[success_deleted]
+other = "Deleted successfully"
+
+[success_sync_started]
+other = "Sync started"

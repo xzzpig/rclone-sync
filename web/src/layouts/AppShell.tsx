@@ -1,3 +1,4 @@
+import * as m from '@/paraglide/messages.js';
 import { useIsMobile } from '@/lib/media-query';
 import MobileHeader from '@/modules/core/components/MobileHeader';
 import Sidebar from '@/modules/core/components/Sidebar';
@@ -34,7 +35,7 @@ const AppShell: ParentComponent = (props) => {
     const parts = location.pathname.split('/').filter(Boolean);
     // Expected pattern: parts[0] is 'connections', parts[1] is name, parts[2] is subpage
     if (parts[0] === 'overview') {
-      return 'Overview';
+      return m.common_overview();
     }
     if (parts[0] === 'connections' && parts[1]) {
       // Connection Overview: "my-nas"

@@ -12,14 +12,17 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/ent/task"
 	"github.com/xzzpig/rclone-sync/internal/core/errs"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
+	"github.com/xzzpig/rclone-sync/internal/core/ports"
 	"go.uber.org/zap"
 )
 
+// JobService provides operations for managing jobs and job logs.
 type JobService struct {
 	client *ent.Client
 	logger *zap.Logger
 }
 
+// NewJobService creates a new JobService instance.
 func NewJobService(client *ent.Client) *JobService {
 	return &JobService{
 		client: client,
@@ -28,8 +31,8 @@ func NewJobService(client *ent.Client) *JobService {
 }
 
 // CreateJob creates a new job for a task.
-func (s *JobService) CreateJob(ctx context.Context, taskID uuid.UUID, trigger string) (*ent.Job, error) {
-	s.logger.Info("Creating new job", zap.String("task_id", taskID.String()), zap.String("trigger", trigger))
+func (s *JobService) CreateJob(ctx context.Context, taskID uuid.UUID, trigger job.Trigger) (*ent.Job, error) {
+	s.logger.Info("Creating new job", zap.String("task_id", taskID.String()), zap.Stringer("trigger", trigger))
 	j, err := s.client.Job.Create().
 		SetTaskID(taskID).
 		SetTrigger(job.Trigger(trigger)).
@@ -133,7 +136,7 @@ func (s *JobService) ResetStuckJobs(ctx context.Context) error {
 	s.logger.Info("Checking for stuck running jobs...")
 	count, err := s.client.Job.Update().
 		Where(job.StatusEQ(job.StatusRunning)).
-		SetStatus(job.StatusFailed).
+		SetStatus(job.StatusCancelled).
 		SetErrors("System crash or unexpected shutdown").
 		SetEndTime(time.Now()).
 		Save(ctx)
@@ -175,23 +178,23 @@ func (s *JobService) GetLastJobByTaskID(ctx context.Context, taskID uuid.UUID) (
 	return j, nil
 }
 
-func (s *JobService) buildJobQuery(taskID *uuid.UUID, remoteName string) *ent.JobQuery {
+func (s *JobService) buildJobQuery(taskID *uuid.UUID, connectionID *uuid.UUID) *ent.JobQuery {
 	query := s.client.Job.Query()
 
 	if taskID != nil {
 		query.Where(job.HasTaskWith(task.ID(*taskID)))
 	}
 
-	if remoteName != "" {
-		query.Where(job.HasTaskWith(task.RemoteName(remoteName)))
+	if connectionID != nil {
+		query.Where(job.HasTaskWith(task.ConnectionIDEQ(*connectionID)))
 	}
 
 	return query
 }
 
-// ListJobs retrieves jobs with optional filtering (taskID, remoteName) and pagination.
-func (s *JobService) ListJobs(ctx context.Context, taskID *uuid.UUID, remoteName string, limit, offset int) ([]*ent.Job, error) {
-	query := s.buildJobQuery(taskID, remoteName)
+// ListJobs retrieves jobs with optional filtering (taskID, connectionID) and pagination.
+func (s *JobService) ListJobs(ctx context.Context, taskID *uuid.UUID, connectionID *uuid.UUID, limit, offset int) ([]*ent.Job, error) {
+	query := s.buildJobQuery(taskID, connectionID)
 	jobs, err := query.
 		Order(ent.Desc(job.FieldStartTime)).
 		Limit(limit).
@@ -206,8 +209,8 @@ func (s *JobService) ListJobs(ctx context.Context, taskID *uuid.UUID, remoteName
 }
 
 // CountJobs returns the total count of jobs with optional filtering.
-func (s *JobService) CountJobs(ctx context.Context, taskID *uuid.UUID, remoteName string) (int, error) {
-	query := s.buildJobQuery(taskID, remoteName)
+func (s *JobService) CountJobs(ctx context.Context, taskID *uuid.UUID, connectionID *uuid.UUID) (int, error) {
+	query := s.buildJobQuery(taskID, connectionID)
 	count, err := query.Count(ctx)
 	if err != nil {
 		return 0, errors.Join(errs.ErrSystem, err)
@@ -233,12 +236,12 @@ func (s *JobService) GetJobWithLogs(ctx context.Context, jobID uuid.UUID) (*ent.
 	return j, nil
 }
 
-func (s *JobService) buildJobLogQuery(remoteName string, taskID *uuid.UUID, jobID *uuid.UUID, level string) *ent.JobLogQuery {
+func (s *JobService) buildJobLogQuery(connectionID *uuid.UUID, taskID *uuid.UUID, jobID *uuid.UUID, level string) *ent.JobLogQuery {
 	query := s.client.JobLog.Query()
 
-	// Filter by remote_name through job -> task relationship
-	if remoteName != "" {
-		query.Where(joblog.HasJobWith(job.HasTaskWith(task.RemoteName(remoteName))))
+	// Filter by connection_id through job -> task relationship
+	if connectionID != nil {
+		query.Where(joblog.HasJobWith(job.HasTaskWith(task.ConnectionIDEQ(*connectionID))))
 	}
 
 	// Optional: filter by task_id
@@ -260,10 +263,9 @@ func (s *JobService) buildJobLogQuery(remoteName string, taskID *uuid.UUID, jobI
 }
 
 // ListJobLogs retrieves job logs with flexible filtering.
-// Required: remoteName
-// Optional: taskID, jobID, level
-func (s *JobService) ListJobLogs(ctx context.Context, remoteName string, taskID *uuid.UUID, jobID *uuid.UUID, level string, limit, offset int) ([]*ent.JobLog, error) {
-	query := s.buildJobLogQuery(remoteName, taskID, jobID, level)
+// Optional: connectionID, taskID, jobID, level
+func (s *JobService) ListJobLogs(ctx context.Context, connectionID *uuid.UUID, taskID *uuid.UUID, jobID *uuid.UUID, level string, limit, offset int) ([]*ent.JobLog, error) {
+	query := s.buildJobLogQuery(connectionID, taskID, jobID, level)
 	logs, err := query.
 		Order(ent.Desc(joblog.FieldTime)).
 		Limit(limit).
@@ -276,11 +278,13 @@ func (s *JobService) ListJobLogs(ctx context.Context, remoteName string, taskID 
 }
 
 // CountJobLogs returns the total count of job logs with flexible filtering.
-func (s *JobService) CountJobLogs(ctx context.Context, remoteName string, taskID *uuid.UUID, jobID *uuid.UUID, level string) (int, error) {
-	query := s.buildJobLogQuery(remoteName, taskID, jobID, level)
+func (s *JobService) CountJobLogs(ctx context.Context, connectionID *uuid.UUID, taskID *uuid.UUID, jobID *uuid.UUID, level string) (int, error) {
+	query := s.buildJobLogQuery(connectionID, taskID, jobID, level)
 	count, err := query.Count(ctx)
 	if err != nil {
 		return 0, errors.Join(errs.ErrSystem, err)
 	}
 	return count, nil
 }
+
+var _ ports.JobService = (*JobService)(nil)

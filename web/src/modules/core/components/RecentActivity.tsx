@@ -17,12 +17,12 @@ const RecentActivity: Component<RecentActivityProps> = (props) => {
 
   const handleJobClick = (job: Job) => {
     const taskId = job.edges?.task?.id;
-    const remoteName = job.edges?.task?.remote_name;
+    const connectionId = job.edges?.task?.connection_id;
     const jobId = job.id;
 
-    if (remoteName && taskId && jobId) {
+    if (connectionId && taskId && jobId) {
       // Navigate to Log page with task and job pre-selected
-      navigate(`/connections/${remoteName}/log?task_id=${taskId}&job_id=${jobId}`);
+      navigate(`/connections/${connectionId}/log?task_id=${taskId}&job_id=${jobId}`);
     }
   };
 
@@ -76,7 +76,7 @@ const RecentActivity: Component<RecentActivityProps> = (props) => {
                           {job.edges?.task?.name ?? 'Unnamed Task'}
                         </p>
                         <p class="text-sm text-muted-foreground">
-                          {job.edges?.task?.remote_name ?? 'Unknown Connection'}
+                          {job.edges?.task?.edges?.connection?.name ?? 'Unknown Connection'}
                         </p>
                       </div>
                       <span class="whitespace-nowrap text-xs text-muted-foreground">

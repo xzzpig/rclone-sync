@@ -20,56 +20,56 @@ type JobLogDelete struct {
 }
 
 // Where appends a list predicates to the JobLogDelete builder.
-func (jld *JobLogDelete) Where(ps ...predicate.JobLog) *JobLogDelete {
-	jld.mutation.Where(ps...)
-	return jld
+func (_d *JobLogDelete) Where(ps ...predicate.JobLog) *JobLogDelete {
+	_d.mutation.Where(ps...)
+	return _d
 }
 
 // Exec executes the deletion query and returns how many vertices were deleted.
-func (jld *JobLogDelete) Exec(ctx context.Context) (int, error) {
-	return withHooks(ctx, jld.sqlExec, jld.mutation, jld.hooks)
+func (_d *JobLogDelete) Exec(ctx context.Context) (int, error) {
+	return withHooks(ctx, _d.sqlExec, _d.mutation, _d.hooks)
 }
 
 // ExecX is like Exec, but panics if an error occurs.
-func (jld *JobLogDelete) ExecX(ctx context.Context) int {
-	n, err := jld.Exec(ctx)
+func (_d *JobLogDelete) ExecX(ctx context.Context) int {
+	n, err := _d.Exec(ctx)
 	if err != nil {
 		panic(err)
 	}
 	return n
 }
 
-func (jld *JobLogDelete) sqlExec(ctx context.Context) (int, error) {
+func (_d *JobLogDelete) sqlExec(ctx context.Context) (int, error) {
 	_spec := sqlgraph.NewDeleteSpec(joblog.Table, sqlgraph.NewFieldSpec(joblog.FieldID, field.TypeInt))
-	if ps := jld.mutation.predicates; len(ps) > 0 {
+	if ps := _d.mutation.predicates; len(ps) > 0 {
 		_spec.Predicate = func(selector *sql.Selector) {
 			for i := range ps {
 				ps[i](selector)
 			}
 		}
 	}
-	affected, err := sqlgraph.DeleteNodes(ctx, jld.driver, _spec)
+	affected, err := sqlgraph.DeleteNodes(ctx, _d.driver, _spec)
 	if err != nil && sqlgraph.IsConstraintError(err) {
 		err = &ConstraintError{msg: err.Error(), wrap: err}
 	}
-	jld.mutation.done = true
+	_d.mutation.done = true
 	return affected, err
 }
 
 // JobLogDeleteOne is the builder for deleting a single JobLog entity.
 type JobLogDeleteOne struct {
-	jld *JobLogDelete
+	_d *JobLogDelete
 }
 
 // Where appends a list predicates to the JobLogDelete builder.
-func (jldo *JobLogDeleteOne) Where(ps ...predicate.JobLog) *JobLogDeleteOne {
-	jldo.jld.mutation.Where(ps...)
-	return jldo
+func (_d *JobLogDeleteOne) Where(ps ...predicate.JobLog) *JobLogDeleteOne {
+	_d._d.mutation.Where(ps...)
+	return _d
 }
 
 // Exec executes the deletion query.
-func (jldo *JobLogDeleteOne) Exec(ctx context.Context) error {
-	n, err := jldo.jld.Exec(ctx)
+func (_d *JobLogDeleteOne) Exec(ctx context.Context) error {
+	n, err := _d._d.Exec(ctx)
 	switch {
 	case err != nil:
 		return err
@@ -81,8 +81,8 @@ func (jldo *JobLogDeleteOne) Exec(ctx context.Context) error {
 }
 
 // ExecX is like Exec, but panics if an error occurs.
-func (jldo *JobLogDeleteOne) ExecX(ctx context.Context) {
-	if err := jldo.Exec(ctx); err != nil {
+func (_d *JobLogDeleteOne) ExecX(ctx context.Context) {
+	if err := _d.Exec(ctx); err != nil {
 		panic(err)
 	}
 }

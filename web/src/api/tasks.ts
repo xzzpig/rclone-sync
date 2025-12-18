@@ -1,7 +1,7 @@
 import api from '@/lib/api';
 import { Task } from '@/lib/types';
 
-export const getTasks = async (params?: { remote_name?: string }) => {
+export const getTasks = async (params?: { connection_id?: string }) => {
   const response = await api.get<Task[]>('/tasks', { params });
   return response.data;
 };

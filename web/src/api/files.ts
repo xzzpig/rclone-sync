@@ -10,8 +10,8 @@ export const listLocalFiles = async (path: string, blacklist?: string[]) => {
   return response.data;
 };
 
-export const listRemoteFiles = async (remoteName: string, path: string) => {
+export const listRemoteFiles = async (connectionId: string, path: string) => {
   const params = new URLSearchParams({ path });
-  const response = await api.get<FileEntry[]>(`/files/remote/${remoteName}?${params}`);
+  const response = await api.get<FileEntry[]>(`/files/remote/${connectionId}?${params}`);
   return response.data;
 };

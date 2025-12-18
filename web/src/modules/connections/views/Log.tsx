@@ -39,7 +39,7 @@ import IconRefreshCw from '~icons/lucide/refresh-cw';
 import ConnectionViewLayout from '../layouts/ConnectionViewLayout';
 
 const Log: Component = () => {
-  const params = useParams<{ connectionName: string }>();
+  const params = useParams<{ connectionId: string }>();
   const [searchParams, setSearchParams] = useSearchParams<{
     job_id?: string;
     task_id?: string;
@@ -57,7 +57,7 @@ const Log: Component = () => {
 
   // Load tasks on mount
   onMount(() => {
-    taskActions.loadTasks(params.connectionName);
+    taskActions.loadTasks(params.connectionId);
   });
 
   // Load jobs when task is selected
@@ -65,7 +65,7 @@ const Log: Component = () => {
     const taskId = selectedTaskId();
     if (taskId) {
       historyActions.loadJobs({
-        remote_name: params.connectionName,
+        connection_id: params.connectionId,
         task_id: taskId,
       });
     }
@@ -79,7 +79,7 @@ const Log: Component = () => {
     const page = currentPage();
 
     historyActions.loadLogs({
-      remote_name: params.connectionName,
+      connection_id: params.connectionId,
       task_id: taskId,
       job_id: jobId,
       level: level === 'all' ? undefined : level,
@@ -112,7 +112,7 @@ const Log: Component = () => {
   const handleRefresh = () => {
     setSearchParams({ page: '1' });
     historyActions.loadLogs({
-      remote_name: params.connectionName,
+      connection_id: params.connectionId,
       task_id: selectedTaskId(),
       job_id: selectedJobId(),
       level: levelFilter() === 'all' ? undefined : levelFilter(),
@@ -130,7 +130,7 @@ const Log: Component = () => {
 
   // Filter tasks by current connection
   const filteredTasks = createMemo(() => {
-    return taskState.tasks.filter((t) => t.remote_name === params.connectionName);
+    return taskState.tasks.filter((t) => t.connection_id === params.connectionId);
   });
 
   const getLevelIcon = (level: string) => {

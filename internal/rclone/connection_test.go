@@ -67,12 +67,11 @@ func TestListRemoteDir(t *testing.T) {
 
 	// Create a local remote pointing to tempDir
 	remoteName := "test-list-dir"
-	err := rclone.CreateRemote(remoteName, map[string]string{
+	err := createRemote(remoteName, map[string]string{
 		"type": "local",
 	})
 	require.NoError(t, err)
-	defer rclone.DeleteRemote(remoteName)
-
+	defer deleteRemote(remoteName)
 	ctx := context.Background()
 
 	// List root directory
@@ -111,12 +110,11 @@ func TestListRemoteDir_InvalidPath(t *testing.T) {
 
 	// Create a memory remote
 	remoteName := "test-invalid-path"
-	err := rclone.CreateRemote(remoteName, map[string]string{
+	err := createRemote(remoteName, map[string]string{
 		"type": "memory",
 	})
 	require.NoError(t, err)
-	defer rclone.DeleteRemote(remoteName)
-
+	defer deleteRemote(remoteName)
 	ctx := context.Background()
 
 	// Memory backend returns error for non-existent paths

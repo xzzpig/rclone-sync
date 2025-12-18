@@ -1,3 +1,4 @@
+// Package config provides configuration management for the application.
 package config
 
 import (
@@ -9,6 +10,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Config represents the application configuration structure.
 type Config struct {
 	Server struct {
 		Port int    `mapstructure:"port"`
@@ -27,10 +29,15 @@ type Config struct {
 		DataDir     string `mapstructure:"data_dir"`
 		Environment string `mapstructure:"environment"`
 	} `mapstructure:"app"`
+	Security struct {
+		EncryptionKey string `mapstructure:"encryption_key"`
+	} `mapstructure:"security"`
 }
 
+// Cfg is the global configuration instance.
 var Cfg Config
 
+// InitConfig initializes the application configuration from file and environment variables.
 func InitConfig(cfgFile string) {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
@@ -47,13 +54,12 @@ func InitConfig(cfgFile string) {
 	setDefaults()
 
 	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			// Config file not found; ignore error if desired
-			// fmt.Println("Config file not found, using defaults")
-		} else {
+		// Only exit if it's not a "config file not found" error
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			fmt.Println("Error reading config file:", err)
 			os.Exit(1)
 		}
+		// Config file not found is acceptable; continue with defaults
 	}
 
 	if err := viper.Unmarshal(&Cfg); err != nil {
@@ -70,10 +76,12 @@ func setDefaults() {
 	viper.SetDefault("log.level", "info")
 	viper.SetDefault("app.data_dir", "./app_data")
 	viper.SetDefault("app.environment", "production")
+	viper.SetDefault("security.encryption_key", "")
 }
 
+// BindFlags binds command-line flags to configuration values.
 func BindFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().String("config", "", "config file (default is ./config.toml)")
 	cmd.PersistentFlags().Int("port", 8080, "Port to run the server on")
-	viper.BindPFlag("server.port", cmd.PersistentFlags().Lookup("port"))
+	_ = viper.BindPFlag("server.port", cmd.PersistentFlags().Lookup("port"))
 }

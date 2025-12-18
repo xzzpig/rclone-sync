@@ -24,6 +24,7 @@ type FileWatcher interface {
 	Errors() chan error
 }
 
+// Watcher monitors file system changes for realtime sync tasks.
 type Watcher struct {
 	recWatcher FileWatcher
 	taskSvc    ports.TaskService
@@ -35,6 +36,7 @@ type Watcher struct {
 	running    bool
 }
 
+// NewWatcher creates a new Watcher instance.
 func NewWatcher(taskSvc ports.TaskService, runner ports.Runner) (*Watcher, error) {
 	recWatcher, err := NewRecursiveWatcher()
 	if err != nil {
@@ -88,7 +90,7 @@ func (w *Watcher) Stop() {
 		return
 	}
 	w.logger.Info("Stopping file watcher")
-	w.recWatcher.Close()
+	_ = w.recWatcher.Close()
 	w.recWatcher = nil
 	w.running = false
 }
@@ -115,6 +117,7 @@ func (w *Watcher) loadWatchTasks() {
 	w.logger.Info("Finished loading realtime tasks", zap.Int("count", len(w.watchMap)))
 }
 
+// AddTask adds a task to be watched for file system changes.
 func (w *Watcher) AddTask(task *ent.Task) error {
 	if !task.Realtime {
 		return nil
@@ -124,12 +127,10 @@ func (w *Watcher) AddTask(task *ent.Task) error {
 	return w.addWatch(task)
 }
 
+// RemoveTask removes a task from the watcher.
 func (w *Watcher) RemoveTask(task *ent.Task) error {
-	if !task.Realtime {
-		// Even if not realtime now, it might have been before?
-		// We probably need to check if we are watching it.
-		// For now assume caller knows current state or check watchMap
-	}
+	// Note: Even if task.Realtime is false now, it might have been true before.
+	// We always try to remove it from the watchMap in case it was previously watched.
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.removeWatch(task.ID.String())
@@ -156,7 +157,7 @@ func (w *Watcher) addWatch(task *ent.Task) error {
 
 func (w *Watcher) removeWatch(taskID string) {
 	if path, ok := w.watchMap[taskID]; ok {
-		w.recWatcher.Remove(path)
+		_ = w.recWatcher.Remove(path)
 		delete(w.watchMap, taskID)
 		w.logger.Info("Removed path from watcher", zap.String("task_id", taskID), zap.String("path", path))
 	}
@@ -227,12 +228,14 @@ func (w *Watcher) triggerSync(taskID string) {
 			return
 		}
 
-		task, err := w.taskSvc.GetTask(ctx, id)
+		task, err := w.taskSvc.GetTaskWithConnection(ctx, id)
 		if err != nil {
 			w.logger.Error("Failed to get task for sync", zap.String("task_id", taskID), zap.Error(err))
 			return
 		}
 
-		w.runner.StartTask(task, "realtime")
+		_ = w.runner.StartTask(task, "realtime")
 	})
 }
+
+var _ ports.Watcher = (*Watcher)(nil)

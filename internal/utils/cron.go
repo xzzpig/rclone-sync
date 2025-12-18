@@ -1,4 +1,5 @@
-package utils
+// Package utils provides utility functions for the application.
+package utils //nolint:revive // utils is a meaningful package name for utility functions
 
 import (
 	"github.com/robfig/cron/v3"

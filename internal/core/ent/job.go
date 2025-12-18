@@ -95,7 +95,7 @@ func (*Job) scanValues(columns []string) ([]any, error) {
 
 // assignValues assigns the values that were returned from sql.Rows (after scanning)
 // to the Job fields.
-func (j *Job) assignValues(columns []string, values []any) error {
+func (_m *Job) assignValues(columns []string, values []any) error {
 	if m, n := len(values), len(columns); m < n {
 		return fmt.Errorf("mismatch number of scan values: %d != %d", m, n)
 	}
@@ -105,59 +105,59 @@ func (j *Job) assignValues(columns []string, values []any) error {
 			if value, ok := values[i].(*uuid.UUID); !ok {
 				return fmt.Errorf("unexpected type %T for field id", values[i])
 			} else if value != nil {
-				j.ID = *value
+				_m.ID = *value
 			}
 		case job.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
 			} else if value.Valid {
-				j.Status = job.Status(value.String)
+				_m.Status = job.Status(value.String)
 			}
 		case job.FieldTrigger:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field trigger", values[i])
 			} else if value.Valid {
-				j.Trigger = job.Trigger(value.String)
+				_m.Trigger = job.Trigger(value.String)
 			}
 		case job.FieldStartTime:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field start_time", values[i])
 			} else if value.Valid {
-				j.StartTime = value.Time
+				_m.StartTime = value.Time
 			}
 		case job.FieldEndTime:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field end_time", values[i])
 			} else if value.Valid {
-				j.EndTime = value.Time
+				_m.EndTime = value.Time
 			}
 		case job.FieldFilesTransferred:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field files_transferred", values[i])
 			} else if value.Valid {
-				j.FilesTransferred = int(value.Int64)
+				_m.FilesTransferred = int(value.Int64)
 			}
 		case job.FieldBytesTransferred:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field bytes_transferred", values[i])
 			} else if value.Valid {
-				j.BytesTransferred = value.Int64
+				_m.BytesTransferred = value.Int64
 			}
 		case job.FieldErrors:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field errors", values[i])
 			} else if value.Valid {
-				j.Errors = value.String
+				_m.Errors = value.String
 			}
 		case job.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
 				return fmt.Errorf("unexpected type %T for field task_jobs", values[i])
 			} else if value.Valid {
-				j.task_jobs = new(uuid.UUID)
-				*j.task_jobs = *value.S.(*uuid.UUID)
+				_m.task_jobs = new(uuid.UUID)
+				*_m.task_jobs = *value.S.(*uuid.UUID)
 			}
 		default:
-			j.selectValues.Set(columns[i], values[i])
+			_m.selectValues.Set(columns[i], values[i])
 		}
 	}
 	return nil
@@ -165,63 +165,63 @@ func (j *Job) assignValues(columns []string, values []any) error {
 
 // Value returns the ent.Value that was dynamically selected and assigned to the Job.
 // This includes values selected through modifiers, order, etc.
-func (j *Job) Value(name string) (ent.Value, error) {
-	return j.selectValues.Get(name)
+func (_m *Job) Value(name string) (ent.Value, error) {
+	return _m.selectValues.Get(name)
 }
 
 // QueryTask queries the "task" edge of the Job entity.
-func (j *Job) QueryTask() *TaskQuery {
-	return NewJobClient(j.config).QueryTask(j)
+func (_m *Job) QueryTask() *TaskQuery {
+	return NewJobClient(_m.config).QueryTask(_m)
 }
 
 // QueryLogs queries the "logs" edge of the Job entity.
-func (j *Job) QueryLogs() *JobLogQuery {
-	return NewJobClient(j.config).QueryLogs(j)
+func (_m *Job) QueryLogs() *JobLogQuery {
+	return NewJobClient(_m.config).QueryLogs(_m)
 }
 
 // Update returns a builder for updating this Job.
 // Note that you need to call Job.Unwrap() before calling this method if this Job
 // was returned from a transaction, and the transaction was committed or rolled back.
-func (j *Job) Update() *JobUpdateOne {
-	return NewJobClient(j.config).UpdateOne(j)
+func (_m *Job) Update() *JobUpdateOne {
+	return NewJobClient(_m.config).UpdateOne(_m)
 }
 
 // Unwrap unwraps the Job entity that was returned from a transaction after it was closed,
 // so that all future queries will be executed through the driver which created the transaction.
-func (j *Job) Unwrap() *Job {
-	_tx, ok := j.config.driver.(*txDriver)
+func (_m *Job) Unwrap() *Job {
+	_tx, ok := _m.config.driver.(*txDriver)
 	if !ok {
 		panic("ent: Job is not a transactional entity")
 	}
-	j.config.driver = _tx.drv
-	return j
+	_m.config.driver = _tx.drv
+	return _m
 }
 
 // String implements the fmt.Stringer.
-func (j *Job) String() string {
+func (_m *Job) String() string {
 	var builder strings.Builder
 	builder.WriteString("Job(")
-	builder.WriteString(fmt.Sprintf("id=%v, ", j.ID))
+	builder.WriteString(fmt.Sprintf("id=%v, ", _m.ID))
 	builder.WriteString("status=")
-	builder.WriteString(fmt.Sprintf("%v", j.Status))
+	builder.WriteString(fmt.Sprintf("%v", _m.Status))
 	builder.WriteString(", ")
 	builder.WriteString("trigger=")
-	builder.WriteString(fmt.Sprintf("%v", j.Trigger))
+	builder.WriteString(fmt.Sprintf("%v", _m.Trigger))
 	builder.WriteString(", ")
 	builder.WriteString("start_time=")
-	builder.WriteString(j.StartTime.Format(time.ANSIC))
+	builder.WriteString(_m.StartTime.Format(time.ANSIC))
 	builder.WriteString(", ")
 	builder.WriteString("end_time=")
-	builder.WriteString(j.EndTime.Format(time.ANSIC))
+	builder.WriteString(_m.EndTime.Format(time.ANSIC))
 	builder.WriteString(", ")
 	builder.WriteString("files_transferred=")
-	builder.WriteString(fmt.Sprintf("%v", j.FilesTransferred))
+	builder.WriteString(fmt.Sprintf("%v", _m.FilesTransferred))
 	builder.WriteString(", ")
 	builder.WriteString("bytes_transferred=")
-	builder.WriteString(fmt.Sprintf("%v", j.BytesTransferred))
+	builder.WriteString(fmt.Sprintf("%v", _m.BytesTransferred))
 	builder.WriteString(", ")
 	builder.WriteString("errors=")
-	builder.WriteString(j.Errors)
+	builder.WriteString(_m.Errors)
 	builder.WriteByte(')')
 	return builder.String()
 }

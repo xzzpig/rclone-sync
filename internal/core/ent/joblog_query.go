@@ -32,44 +32,44 @@ type JobLogQuery struct {
 }
 
 // Where adds a new predicate for the JobLogQuery builder.
-func (jlq *JobLogQuery) Where(ps ...predicate.JobLog) *JobLogQuery {
-	jlq.predicates = append(jlq.predicates, ps...)
-	return jlq
+func (_q *JobLogQuery) Where(ps ...predicate.JobLog) *JobLogQuery {
+	_q.predicates = append(_q.predicates, ps...)
+	return _q
 }
 
 // Limit the number of records to be returned by this query.
-func (jlq *JobLogQuery) Limit(limit int) *JobLogQuery {
-	jlq.ctx.Limit = &limit
-	return jlq
+func (_q *JobLogQuery) Limit(limit int) *JobLogQuery {
+	_q.ctx.Limit = &limit
+	return _q
 }
 
 // Offset to start from.
-func (jlq *JobLogQuery) Offset(offset int) *JobLogQuery {
-	jlq.ctx.Offset = &offset
-	return jlq
+func (_q *JobLogQuery) Offset(offset int) *JobLogQuery {
+	_q.ctx.Offset = &offset
+	return _q
 }
 
 // Unique configures the query builder to filter duplicate records on query.
 // By default, unique is set to true, and can be disabled using this method.
-func (jlq *JobLogQuery) Unique(unique bool) *JobLogQuery {
-	jlq.ctx.Unique = &unique
-	return jlq
+func (_q *JobLogQuery) Unique(unique bool) *JobLogQuery {
+	_q.ctx.Unique = &unique
+	return _q
 }
 
 // Order specifies how the records should be ordered.
-func (jlq *JobLogQuery) Order(o ...joblog.OrderOption) *JobLogQuery {
-	jlq.order = append(jlq.order, o...)
-	return jlq
+func (_q *JobLogQuery) Order(o ...joblog.OrderOption) *JobLogQuery {
+	_q.order = append(_q.order, o...)
+	return _q
 }
 
 // QueryJob chains the current query on the "job" edge.
-func (jlq *JobLogQuery) QueryJob() *JobQuery {
-	query := (&JobClient{config: jlq.config}).Query()
+func (_q *JobLogQuery) QueryJob() *JobQuery {
+	query := (&JobClient{config: _q.config}).Query()
 	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
-		if err := jlq.prepareQuery(ctx); err != nil {
+		if err := _q.prepareQuery(ctx); err != nil {
 			return nil, err
 		}
-		selector := jlq.sqlQuery(ctx)
+		selector := _q.sqlQuery(ctx)
 		if err := selector.Err(); err != nil {
 			return nil, err
 		}
@@ -78,7 +78,7 @@ func (jlq *JobLogQuery) QueryJob() *JobQuery {
 			sqlgraph.To(job.Table, job.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, joblog.JobTable, joblog.JobColumn),
 		)
-		fromU = sqlgraph.SetNeighbors(jlq.driver.Dialect(), step)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
 	}
 	return query
@@ -86,8 +86,8 @@ func (jlq *JobLogQuery) QueryJob() *JobQuery {
 
 // First returns the first JobLog entity from the query.
 // Returns a *NotFoundError when no JobLog was found.
-func (jlq *JobLogQuery) First(ctx context.Context) (*JobLog, error) {
-	nodes, err := jlq.Limit(1).All(setContextOp(ctx, jlq.ctx, ent.OpQueryFirst))
+func (_q *JobLogQuery) First(ctx context.Context) (*JobLog, error) {
+	nodes, err := _q.Limit(1).All(setContextOp(ctx, _q.ctx, ent.OpQueryFirst))
 	if err != nil {
 		return nil, err
 	}
@@ -98,8 +98,8 @@ func (jlq *JobLogQuery) First(ctx context.Context) (*JobLog, error) {
 }
 
 // FirstX is like First, but panics if an error occurs.
-func (jlq *JobLogQuery) FirstX(ctx context.Context) *JobLog {
-	node, err := jlq.First(ctx)
+func (_q *JobLogQuery) FirstX(ctx context.Context) *JobLog {
+	node, err := _q.First(ctx)
 	if err != nil && !IsNotFound(err) {
 		panic(err)
 	}
@@ -108,9 +108,9 @@ func (jlq *JobLogQuery) FirstX(ctx context.Context) *JobLog {
 
 // FirstID returns the first JobLog ID from the query.
 // Returns a *NotFoundError when no JobLog ID was found.
-func (jlq *JobLogQuery) FirstID(ctx context.Context) (id int, err error) {
+func (_q *JobLogQuery) FirstID(ctx context.Context) (id int, err error) {
 	var ids []int
-	if ids, err = jlq.Limit(1).IDs(setContextOp(ctx, jlq.ctx, ent.OpQueryFirstID)); err != nil {
+	if ids, err = _q.Limit(1).IDs(setContextOp(ctx, _q.ctx, ent.OpQueryFirstID)); err != nil {
 		return
 	}
 	if len(ids) == 0 {
@@ -121,8 +121,8 @@ func (jlq *JobLogQuery) FirstID(ctx context.Context) (id int, err error) {
 }
 
 // FirstIDX is like FirstID, but panics if an error occurs.
-func (jlq *JobLogQuery) FirstIDX(ctx context.Context) int {
-	id, err := jlq.FirstID(ctx)
+func (_q *JobLogQuery) FirstIDX(ctx context.Context) int {
+	id, err := _q.FirstID(ctx)
 	if err != nil && !IsNotFound(err) {
 		panic(err)
 	}
@@ -132,8 +132,8 @@ func (jlq *JobLogQuery) FirstIDX(ctx context.Context) int {
 // Only returns a single JobLog entity found by the query, ensuring it only returns one.
 // Returns a *NotSingularError when more than one JobLog entity is found.
 // Returns a *NotFoundError when no JobLog entities are found.
-func (jlq *JobLogQuery) Only(ctx context.Context) (*JobLog, error) {
-	nodes, err := jlq.Limit(2).All(setContextOp(ctx, jlq.ctx, ent.OpQueryOnly))
+func (_q *JobLogQuery) Only(ctx context.Context) (*JobLog, error) {
+	nodes, err := _q.Limit(2).All(setContextOp(ctx, _q.ctx, ent.OpQueryOnly))
 	if err != nil {
 		return nil, err
 	}
@@ -148,8 +148,8 @@ func (jlq *JobLogQuery) Only(ctx context.Context) (*JobLog, error) {
 }
 
 // OnlyX is like Only, but panics if an error occurs.
-func (jlq *JobLogQuery) OnlyX(ctx context.Context) *JobLog {
-	node, err := jlq.Only(ctx)
+func (_q *JobLogQuery) OnlyX(ctx context.Context) *JobLog {
+	node, err := _q.Only(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -159,9 +159,9 @@ func (jlq *JobLogQuery) OnlyX(ctx context.Context) *JobLog {
 // OnlyID is like Only, but returns the only JobLog ID in the query.
 // Returns a *NotSingularError when more than one JobLog ID is found.
 // Returns a *NotFoundError when no entities are found.
-func (jlq *JobLogQuery) OnlyID(ctx context.Context) (id int, err error) {
+func (_q *JobLogQuery) OnlyID(ctx context.Context) (id int, err error) {
 	var ids []int
-	if ids, err = jlq.Limit(2).IDs(setContextOp(ctx, jlq.ctx, ent.OpQueryOnlyID)); err != nil {
+	if ids, err = _q.Limit(2).IDs(setContextOp(ctx, _q.ctx, ent.OpQueryOnlyID)); err != nil {
 		return
 	}
 	switch len(ids) {
@@ -176,8 +176,8 @@ func (jlq *JobLogQuery) OnlyID(ctx context.Context) (id int, err error) {
 }
 
 // OnlyIDX is like OnlyID, but panics if an error occurs.
-func (jlq *JobLogQuery) OnlyIDX(ctx context.Context) int {
-	id, err := jlq.OnlyID(ctx)
+func (_q *JobLogQuery) OnlyIDX(ctx context.Context) int {
+	id, err := _q.OnlyID(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -185,18 +185,18 @@ func (jlq *JobLogQuery) OnlyIDX(ctx context.Context) int {
 }
 
 // All executes the query and returns a list of JobLogs.
-func (jlq *JobLogQuery) All(ctx context.Context) ([]*JobLog, error) {
-	ctx = setContextOp(ctx, jlq.ctx, ent.OpQueryAll)
-	if err := jlq.prepareQuery(ctx); err != nil {
+func (_q *JobLogQuery) All(ctx context.Context) ([]*JobLog, error) {
+	ctx = setContextOp(ctx, _q.ctx, ent.OpQueryAll)
+	if err := _q.prepareQuery(ctx); err != nil {
 		return nil, err
 	}
 	qr := querierAll[[]*JobLog, *JobLogQuery]()
-	return withInterceptors[[]*JobLog](ctx, jlq, qr, jlq.inters)
+	return withInterceptors[[]*JobLog](ctx, _q, qr, _q.inters)
 }
 
 // AllX is like All, but panics if an error occurs.
-func (jlq *JobLogQuery) AllX(ctx context.Context) []*JobLog {
-	nodes, err := jlq.All(ctx)
+func (_q *JobLogQuery) AllX(ctx context.Context) []*JobLog {
+	nodes, err := _q.All(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -204,20 +204,20 @@ func (jlq *JobLogQuery) AllX(ctx context.Context) []*JobLog {
 }
 
 // IDs executes the query and returns a list of JobLog IDs.
-func (jlq *JobLogQuery) IDs(ctx context.Context) (ids []int, err error) {
-	if jlq.ctx.Unique == nil && jlq.path != nil {
-		jlq.Unique(true)
+func (_q *JobLogQuery) IDs(ctx context.Context) (ids []int, err error) {
+	if _q.ctx.Unique == nil && _q.path != nil {
+		_q.Unique(true)
 	}
-	ctx = setContextOp(ctx, jlq.ctx, ent.OpQueryIDs)
-	if err = jlq.Select(joblog.FieldID).Scan(ctx, &ids); err != nil {
+	ctx = setContextOp(ctx, _q.ctx, ent.OpQueryIDs)
+	if err = _q.Select(joblog.FieldID).Scan(ctx, &ids); err != nil {
 		return nil, err
 	}
 	return ids, nil
 }
 
 // IDsX is like IDs, but panics if an error occurs.
-func (jlq *JobLogQuery) IDsX(ctx context.Context) []int {
-	ids, err := jlq.IDs(ctx)
+func (_q *JobLogQuery) IDsX(ctx context.Context) []int {
+	ids, err := _q.IDs(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -225,17 +225,17 @@ func (jlq *JobLogQuery) IDsX(ctx context.Context) []int {
 }
 
 // Count returns the count of the given query.
-func (jlq *JobLogQuery) Count(ctx context.Context) (int, error) {
-	ctx = setContextOp(ctx, jlq.ctx, ent.OpQueryCount)
-	if err := jlq.prepareQuery(ctx); err != nil {
+func (_q *JobLogQuery) Count(ctx context.Context) (int, error) {
+	ctx = setContextOp(ctx, _q.ctx, ent.OpQueryCount)
+	if err := _q.prepareQuery(ctx); err != nil {
 		return 0, err
 	}
-	return withInterceptors[int](ctx, jlq, querierCount[*JobLogQuery](), jlq.inters)
+	return withInterceptors[int](ctx, _q, querierCount[*JobLogQuery](), _q.inters)
 }
 
 // CountX is like Count, but panics if an error occurs.
-func (jlq *JobLogQuery) CountX(ctx context.Context) int {
-	count, err := jlq.Count(ctx)
+func (_q *JobLogQuery) CountX(ctx context.Context) int {
+	count, err := _q.Count(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -243,9 +243,9 @@ func (jlq *JobLogQuery) CountX(ctx context.Context) int {
 }
 
 // Exist returns true if the query has elements in the graph.
-func (jlq *JobLogQuery) Exist(ctx context.Context) (bool, error) {
-	ctx = setContextOp(ctx, jlq.ctx, ent.OpQueryExist)
-	switch _, err := jlq.FirstID(ctx); {
+func (_q *JobLogQuery) Exist(ctx context.Context) (bool, error) {
+	ctx = setContextOp(ctx, _q.ctx, ent.OpQueryExist)
+	switch _, err := _q.FirstID(ctx); {
 	case IsNotFound(err):
 		return false, nil
 	case err != nil:
@@ -256,8 +256,8 @@ func (jlq *JobLogQuery) Exist(ctx context.Context) (bool, error) {
 }
 
 // ExistX is like Exist, but panics if an error occurs.
-func (jlq *JobLogQuery) ExistX(ctx context.Context) bool {
-	exist, err := jlq.Exist(ctx)
+func (_q *JobLogQuery) ExistX(ctx context.Context) bool {
+	exist, err := _q.Exist(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -266,32 +266,32 @@ func (jlq *JobLogQuery) ExistX(ctx context.Context) bool {
 
 // Clone returns a duplicate of the JobLogQuery builder, including all associated steps. It can be
 // used to prepare common query builders and use them differently after the clone is made.
-func (jlq *JobLogQuery) Clone() *JobLogQuery {
-	if jlq == nil {
+func (_q *JobLogQuery) Clone() *JobLogQuery {
+	if _q == nil {
 		return nil
 	}
 	return &JobLogQuery{
-		config:     jlq.config,
-		ctx:        jlq.ctx.Clone(),
-		order:      append([]joblog.OrderOption{}, jlq.order...),
-		inters:     append([]Interceptor{}, jlq.inters...),
-		predicates: append([]predicate.JobLog{}, jlq.predicates...),
-		withJob:    jlq.withJob.Clone(),
+		config:     _q.config,
+		ctx:        _q.ctx.Clone(),
+		order:      append([]joblog.OrderOption{}, _q.order...),
+		inters:     append([]Interceptor{}, _q.inters...),
+		predicates: append([]predicate.JobLog{}, _q.predicates...),
+		withJob:    _q.withJob.Clone(),
 		// clone intermediate query.
-		sql:  jlq.sql.Clone(),
-		path: jlq.path,
+		sql:  _q.sql.Clone(),
+		path: _q.path,
 	}
 }
 
 // WithJob tells the query-builder to eager-load the nodes that are connected to
 // the "job" edge. The optional arguments are used to configure the query builder of the edge.
-func (jlq *JobLogQuery) WithJob(opts ...func(*JobQuery)) *JobLogQuery {
-	query := (&JobClient{config: jlq.config}).Query()
+func (_q *JobLogQuery) WithJob(opts ...func(*JobQuery)) *JobLogQuery {
+	query := (&JobClient{config: _q.config}).Query()
 	for _, opt := range opts {
 		opt(query)
 	}
-	jlq.withJob = query
-	return jlq
+	_q.withJob = query
+	return _q
 }
 
 // GroupBy is used to group vertices by one or more fields/columns.
@@ -308,10 +308,10 @@ func (jlq *JobLogQuery) WithJob(opts ...func(*JobQuery)) *JobLogQuery {
 //		GroupBy(joblog.FieldLevel).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
-func (jlq *JobLogQuery) GroupBy(field string, fields ...string) *JobLogGroupBy {
-	jlq.ctx.Fields = append([]string{field}, fields...)
-	grbuild := &JobLogGroupBy{build: jlq}
-	grbuild.flds = &jlq.ctx.Fields
+func (_q *JobLogQuery) GroupBy(field string, fields ...string) *JobLogGroupBy {
+	_q.ctx.Fields = append([]string{field}, fields...)
+	grbuild := &JobLogGroupBy{build: _q}
+	grbuild.flds = &_q.ctx.Fields
 	grbuild.label = joblog.Label
 	grbuild.scan = grbuild.Scan
 	return grbuild
@@ -329,55 +329,55 @@ func (jlq *JobLogQuery) GroupBy(field string, fields ...string) *JobLogGroupBy {
 //	client.JobLog.Query().
 //		Select(joblog.FieldLevel).
 //		Scan(ctx, &v)
-func (jlq *JobLogQuery) Select(fields ...string) *JobLogSelect {
-	jlq.ctx.Fields = append(jlq.ctx.Fields, fields...)
-	sbuild := &JobLogSelect{JobLogQuery: jlq}
+func (_q *JobLogQuery) Select(fields ...string) *JobLogSelect {
+	_q.ctx.Fields = append(_q.ctx.Fields, fields...)
+	sbuild := &JobLogSelect{JobLogQuery: _q}
 	sbuild.label = joblog.Label
-	sbuild.flds, sbuild.scan = &jlq.ctx.Fields, sbuild.Scan
+	sbuild.flds, sbuild.scan = &_q.ctx.Fields, sbuild.Scan
 	return sbuild
 }
 
 // Aggregate returns a JobLogSelect configured with the given aggregations.
-func (jlq *JobLogQuery) Aggregate(fns ...AggregateFunc) *JobLogSelect {
-	return jlq.Select().Aggregate(fns...)
+func (_q *JobLogQuery) Aggregate(fns ...AggregateFunc) *JobLogSelect {
+	return _q.Select().Aggregate(fns...)
 }
 
-func (jlq *JobLogQuery) prepareQuery(ctx context.Context) error {
-	for _, inter := range jlq.inters {
+func (_q *JobLogQuery) prepareQuery(ctx context.Context) error {
+	for _, inter := range _q.inters {
 		if inter == nil {
 			return fmt.Errorf("ent: uninitialized interceptor (forgotten import ent/runtime?)")
 		}
 		if trv, ok := inter.(Traverser); ok {
-			if err := trv.Traverse(ctx, jlq); err != nil {
+			if err := trv.Traverse(ctx, _q); err != nil {
 				return err
 			}
 		}
 	}
-	for _, f := range jlq.ctx.Fields {
+	for _, f := range _q.ctx.Fields {
 		if !joblog.ValidColumn(f) {
 			return &ValidationError{Name: f, err: fmt.Errorf("ent: invalid field %q for query", f)}
 		}
 	}
-	if jlq.path != nil {
-		prev, err := jlq.path(ctx)
+	if _q.path != nil {
+		prev, err := _q.path(ctx)
 		if err != nil {
 			return err
 		}
-		jlq.sql = prev
+		_q.sql = prev
 	}
 	return nil
 }
 
-func (jlq *JobLogQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*JobLog, error) {
+func (_q *JobLogQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*JobLog, error) {
 	var (
 		nodes       = []*JobLog{}
-		withFKs     = jlq.withFKs
-		_spec       = jlq.querySpec()
+		withFKs     = _q.withFKs
+		_spec       = _q.querySpec()
 		loadedTypes = [1]bool{
-			jlq.withJob != nil,
+			_q.withJob != nil,
 		}
 	)
-	if jlq.withJob != nil {
+	if _q.withJob != nil {
 		withFKs = true
 	}
 	if withFKs {
@@ -387,7 +387,7 @@ func (jlq *JobLogQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*JobL
 		return (*JobLog).scanValues(nil, columns)
 	}
 	_spec.Assign = func(columns []string, values []any) error {
-		node := &JobLog{config: jlq.config}
+		node := &JobLog{config: _q.config}
 		nodes = append(nodes, node)
 		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
@@ -395,14 +395,14 @@ func (jlq *JobLogQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*JobL
 	for i := range hooks {
 		hooks[i](ctx, _spec)
 	}
-	if err := sqlgraph.QueryNodes(ctx, jlq.driver, _spec); err != nil {
+	if err := sqlgraph.QueryNodes(ctx, _q.driver, _spec); err != nil {
 		return nil, err
 	}
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
-	if query := jlq.withJob; query != nil {
-		if err := jlq.loadJob(ctx, query, nodes, nil,
+	if query := _q.withJob; query != nil {
+		if err := _q.loadJob(ctx, query, nodes, nil,
 			func(n *JobLog, e *Job) { n.Edges.Job = e }); err != nil {
 			return nil, err
 		}
@@ -410,7 +410,7 @@ func (jlq *JobLogQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*JobL
 	return nodes, nil
 }
 
-func (jlq *JobLogQuery) loadJob(ctx context.Context, query *JobQuery, nodes []*JobLog, init func(*JobLog), assign func(*JobLog, *Job)) error {
+func (_q *JobLogQuery) loadJob(ctx context.Context, query *JobQuery, nodes []*JobLog, init func(*JobLog), assign func(*JobLog, *Job)) error {
 	ids := make([]uuid.UUID, 0, len(nodes))
 	nodeids := make(map[uuid.UUID][]*JobLog)
 	for i := range nodes {
@@ -443,24 +443,24 @@ func (jlq *JobLogQuery) loadJob(ctx context.Context, query *JobQuery, nodes []*J
 	return nil
 }
 
-func (jlq *JobLogQuery) sqlCount(ctx context.Context) (int, error) {
-	_spec := jlq.querySpec()
-	_spec.Node.Columns = jlq.ctx.Fields
-	if len(jlq.ctx.Fields) > 0 {
-		_spec.Unique = jlq.ctx.Unique != nil && *jlq.ctx.Unique
+func (_q *JobLogQuery) sqlCount(ctx context.Context) (int, error) {
+	_spec := _q.querySpec()
+	_spec.Node.Columns = _q.ctx.Fields
+	if len(_q.ctx.Fields) > 0 {
+		_spec.Unique = _q.ctx.Unique != nil && *_q.ctx.Unique
 	}
-	return sqlgraph.CountNodes(ctx, jlq.driver, _spec)
+	return sqlgraph.CountNodes(ctx, _q.driver, _spec)
 }
 
-func (jlq *JobLogQuery) querySpec() *sqlgraph.QuerySpec {
+func (_q *JobLogQuery) querySpec() *sqlgraph.QuerySpec {
 	_spec := sqlgraph.NewQuerySpec(joblog.Table, joblog.Columns, sqlgraph.NewFieldSpec(joblog.FieldID, field.TypeInt))
-	_spec.From = jlq.sql
-	if unique := jlq.ctx.Unique; unique != nil {
+	_spec.From = _q.sql
+	if unique := _q.ctx.Unique; unique != nil {
 		_spec.Unique = *unique
-	} else if jlq.path != nil {
+	} else if _q.path != nil {
 		_spec.Unique = true
 	}
-	if fields := jlq.ctx.Fields; len(fields) > 0 {
+	if fields := _q.ctx.Fields; len(fields) > 0 {
 		_spec.Node.Columns = make([]string, 0, len(fields))
 		_spec.Node.Columns = append(_spec.Node.Columns, joblog.FieldID)
 		for i := range fields {
@@ -469,20 +469,20 @@ func (jlq *JobLogQuery) querySpec() *sqlgraph.QuerySpec {
 			}
 		}
 	}
-	if ps := jlq.predicates; len(ps) > 0 {
+	if ps := _q.predicates; len(ps) > 0 {
 		_spec.Predicate = func(selector *sql.Selector) {
 			for i := range ps {
 				ps[i](selector)
 			}
 		}
 	}
-	if limit := jlq.ctx.Limit; limit != nil {
+	if limit := _q.ctx.Limit; limit != nil {
 		_spec.Limit = *limit
 	}
-	if offset := jlq.ctx.Offset; offset != nil {
+	if offset := _q.ctx.Offset; offset != nil {
 		_spec.Offset = *offset
 	}
-	if ps := jlq.order; len(ps) > 0 {
+	if ps := _q.order; len(ps) > 0 {
 		_spec.Order = func(selector *sql.Selector) {
 			for i := range ps {
 				ps[i](selector)
@@ -492,33 +492,33 @@ func (jlq *JobLogQuery) querySpec() *sqlgraph.QuerySpec {
 	return _spec
 }
 
-func (jlq *JobLogQuery) sqlQuery(ctx context.Context) *sql.Selector {
-	builder := sql.Dialect(jlq.driver.Dialect())
+func (_q *JobLogQuery) sqlQuery(ctx context.Context) *sql.Selector {
+	builder := sql.Dialect(_q.driver.Dialect())
 	t1 := builder.Table(joblog.Table)
-	columns := jlq.ctx.Fields
+	columns := _q.ctx.Fields
 	if len(columns) == 0 {
 		columns = joblog.Columns
 	}
 	selector := builder.Select(t1.Columns(columns...)...).From(t1)
-	if jlq.sql != nil {
-		selector = jlq.sql
+	if _q.sql != nil {
+		selector = _q.sql
 		selector.Select(selector.Columns(columns...)...)
 	}
-	if jlq.ctx.Unique != nil && *jlq.ctx.Unique {
+	if _q.ctx.Unique != nil && *_q.ctx.Unique {
 		selector.Distinct()
 	}
-	for _, p := range jlq.predicates {
+	for _, p := range _q.predicates {
 		p(selector)
 	}
-	for _, p := range jlq.order {
+	for _, p := range _q.order {
 		p(selector)
 	}
-	if offset := jlq.ctx.Offset; offset != nil {
+	if offset := _q.ctx.Offset; offset != nil {
 		// limit is mandatory for offset clause. We start
 		// with default value, and override it below if needed.
 		selector.Offset(*offset).Limit(math.MaxInt32)
 	}
-	if limit := jlq.ctx.Limit; limit != nil {
+	if limit := _q.ctx.Limit; limit != nil {
 		selector.Limit(*limit)
 	}
 	return selector
@@ -531,41 +531,41 @@ type JobLogGroupBy struct {
 }
 
 // Aggregate adds the given aggregation functions to the group-by query.
-func (jlgb *JobLogGroupBy) Aggregate(fns ...AggregateFunc) *JobLogGroupBy {
-	jlgb.fns = append(jlgb.fns, fns...)
-	return jlgb
+func (_g *JobLogGroupBy) Aggregate(fns ...AggregateFunc) *JobLogGroupBy {
+	_g.fns = append(_g.fns, fns...)
+	return _g
 }
 
 // Scan applies the selector query and scans the result into the given value.
-func (jlgb *JobLogGroupBy) Scan(ctx context.Context, v any) error {
-	ctx = setContextOp(ctx, jlgb.build.ctx, ent.OpQueryGroupBy)
-	if err := jlgb.build.prepareQuery(ctx); err != nil {
+func (_g *JobLogGroupBy) Scan(ctx context.Context, v any) error {
+	ctx = setContextOp(ctx, _g.build.ctx, ent.OpQueryGroupBy)
+	if err := _g.build.prepareQuery(ctx); err != nil {
 		return err
 	}
-	return scanWithInterceptors[*JobLogQuery, *JobLogGroupBy](ctx, jlgb.build, jlgb, jlgb.build.inters, v)
+	return scanWithInterceptors[*JobLogQuery, *JobLogGroupBy](ctx, _g.build, _g, _g.build.inters, v)
 }
 
-func (jlgb *JobLogGroupBy) sqlScan(ctx context.Context, root *JobLogQuery, v any) error {
+func (_g *JobLogGroupBy) sqlScan(ctx context.Context, root *JobLogQuery, v any) error {
 	selector := root.sqlQuery(ctx).Select()
-	aggregation := make([]string, 0, len(jlgb.fns))
-	for _, fn := range jlgb.fns {
+	aggregation := make([]string, 0, len(_g.fns))
+	for _, fn := range _g.fns {
 		aggregation = append(aggregation, fn(selector))
 	}
 	if len(selector.SelectedColumns()) == 0 {
-		columns := make([]string, 0, len(*jlgb.flds)+len(jlgb.fns))
-		for _, f := range *jlgb.flds {
+		columns := make([]string, 0, len(*_g.flds)+len(_g.fns))
+		for _, f := range *_g.flds {
 			columns = append(columns, selector.C(f))
 		}
 		columns = append(columns, aggregation...)
 		selector.Select(columns...)
 	}
-	selector.GroupBy(selector.Columns(*jlgb.flds...)...)
+	selector.GroupBy(selector.Columns(*_g.flds...)...)
 	if err := selector.Err(); err != nil {
 		return err
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := jlgb.build.driver.Query(ctx, query, args, rows); err != nil {
+	if err := _g.build.driver.Query(ctx, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()
@@ -579,27 +579,27 @@ type JobLogSelect struct {
 }
 
 // Aggregate adds the given aggregation functions to the selector query.
-func (jls *JobLogSelect) Aggregate(fns ...AggregateFunc) *JobLogSelect {
-	jls.fns = append(jls.fns, fns...)
-	return jls
+func (_s *JobLogSelect) Aggregate(fns ...AggregateFunc) *JobLogSelect {
+	_s.fns = append(_s.fns, fns...)
+	return _s
 }
 
 // Scan applies the selector query and scans the result into the given value.
-func (jls *JobLogSelect) Scan(ctx context.Context, v any) error {
-	ctx = setContextOp(ctx, jls.ctx, ent.OpQuerySelect)
-	if err := jls.prepareQuery(ctx); err != nil {
+func (_s *JobLogSelect) Scan(ctx context.Context, v any) error {
+	ctx = setContextOp(ctx, _s.ctx, ent.OpQuerySelect)
+	if err := _s.prepareQuery(ctx); err != nil {
 		return err
 	}
-	return scanWithInterceptors[*JobLogQuery, *JobLogSelect](ctx, jls.JobLogQuery, jls, jls.inters, v)
+	return scanWithInterceptors[*JobLogQuery, *JobLogSelect](ctx, _s.JobLogQuery, _s, _s.inters, v)
 }
 
-func (jls *JobLogSelect) sqlScan(ctx context.Context, root *JobLogQuery, v any) error {
+func (_s *JobLogSelect) sqlScan(ctx context.Context, root *JobLogQuery, v any) error {
 	selector := root.sqlQuery(ctx)
-	aggregation := make([]string, 0, len(jls.fns))
-	for _, fn := range jls.fns {
+	aggregation := make([]string, 0, len(_s.fns))
+	for _, fn := range _s.fns {
 		aggregation = append(aggregation, fn(selector))
 	}
-	switch n := len(*jls.selector.flds); {
+	switch n := len(*_s.selector.flds); {
 	case n == 0 && len(aggregation) > 0:
 		selector.Select(aggregation...)
 	case n != 0 && len(aggregation) > 0:
@@ -607,7 +607,7 @@ func (jls *JobLogSelect) sqlScan(ctx context.Context, root *JobLogQuery, v any) 
 	}
 	rows := &sql.Rows{}
 	query, args := selector.Query()
-	if err := jls.driver.Query(ctx, query, args, rows); err != nil {
+	if err := _s.driver.Query(ctx, query, args, rows); err != nil {
 		return err
 	}
 	defer rows.Close()

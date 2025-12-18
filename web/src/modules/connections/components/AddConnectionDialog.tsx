@@ -1,5 +1,5 @@
 import * as m from '@/paraglide/messages.js';
-import { getProviderOptions, getProviders } from '@/api/connections';
+import { createConnection, getProviderOptions, getProviders } from '@/api/connections';
 import {
   Dialog,
   DialogContent,
@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { RcloneProvider } from '@/lib/types';
-import { useQuery } from '@tanstack/solid-query';
+import { useQuery, useQueryClient } from '@tanstack/solid-query';
 import { createSignal, Show } from 'solid-js';
 import { DynamicConfigForm } from './DynamicConfigForm';
 import { ProviderSelection } from './ProviderSelection';
@@ -17,6 +17,7 @@ import { RichText } from '@/components/common/RichText';
 export const AddConnectionDialog = (props: { isOpen: boolean; onClose: () => void }) => {
   const [step, setStep] = createSignal(1);
   const [selectedProvider, setSelectedProvider] = createSignal<RcloneProvider | null>(null);
+  const queryClient = useQueryClient();
 
   const providersQuery = useQuery(() => ({
     queryKey: ['providers'],
@@ -38,6 +39,14 @@ export const AddConnectionDialog = (props: { isOpen: boolean; onClose: () => voi
   const handleBack = () => {
     setStep(1);
     setSelectedProvider(null);
+  };
+
+  const handleSave = async (name: string | undefined, config: Record<string, string>) => {
+    if (!name) {
+      throw new Error('Connection name is required');
+    }
+    await createConnection(name, selectedProvider()!.name, config);
+    await queryClient.invalidateQueries({ queryKey: ['connections'] });
   };
 
   const handleClose = () => {
@@ -73,7 +82,7 @@ export const AddConnectionDialog = (props: { isOpen: boolean; onClose: () => voi
               options={optionsQuery.data ?? []}
               provider={selectedProvider()!.name}
               onBack={handleBack}
-              onSave={handleClose}
+              onSave={handleSave}
             />
           </div>
         </Show>

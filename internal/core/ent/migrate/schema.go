@@ -8,6 +8,33 @@ import (
 )
 
 var (
+	// ConnectionsColumns holds the columns for the "connections" table.
+	ConnectionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "name", Type: field.TypeString, Unique: true},
+		{Name: "type", Type: field.TypeString},
+		{Name: "encrypted_config", Type: field.TypeBytes},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// ConnectionsTable holds the schema information for the "connections" table.
+	ConnectionsTable = &schema.Table{
+		Name:       "connections",
+		Columns:    ConnectionsColumns,
+		PrimaryKey: []*schema.Column{ConnectionsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "connection_name",
+				Unique:  true,
+				Columns: []*schema.Column{ConnectionsColumns[1]},
+			},
+			{
+				Name:    "connection_type",
+				Unique:  false,
+				Columns: []*schema.Column{ConnectionsColumns[2]},
+			},
+		},
+	}
 	// JobsColumns holds the columns for the "jobs" table.
 	JobsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -63,7 +90,6 @@ var (
 		{Name: "id", Type: field.TypeUUID},
 		{Name: "name", Type: field.TypeString},
 		{Name: "source_path", Type: field.TypeString},
-		{Name: "remote_name", Type: field.TypeString},
 		{Name: "remote_path", Type: field.TypeString},
 		{Name: "direction", Type: field.TypeEnum, Enums: []string{"upload", "download", "bidirectional"}, Default: "bidirectional"},
 		{Name: "schedule", Type: field.TypeString, Nullable: true},
@@ -71,15 +97,25 @@ var (
 		{Name: "options", Type: field.TypeJSON, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "connection_id", Type: field.TypeUUID, Nullable: true},
 	}
 	// TasksTable holds the schema information for the "tasks" table.
 	TasksTable = &schema.Table{
 		Name:       "tasks",
 		Columns:    TasksColumns,
 		PrimaryKey: []*schema.Column{TasksColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "tasks_connections_tasks",
+				Columns:    []*schema.Column{TasksColumns[10]},
+				RefColumns: []*schema.Column{ConnectionsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
 	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
+		ConnectionsTable,
 		JobsTable,
 		JobLogsTable,
 		TasksTable,
@@ -89,4 +125,5 @@ var (
 func init() {
 	JobsTable.ForeignKeys[0].RefTable = TasksTable
 	JobLogsTable.ForeignKeys[0].RefTable = JobsTable
+	TasksTable.ForeignKeys[0].RefTable = ConnectionsTable
 }

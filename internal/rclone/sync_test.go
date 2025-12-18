@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
+	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 )
 
@@ -30,7 +31,7 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func (m *MockJobService) CreateJob(ctx context.Context, taskID uuid.UUID, trigger string) (*ent.Job, error) {
+func (m *MockJobService) CreateJob(ctx context.Context, taskID uuid.UUID, trigger job.Trigger) (*ent.Job, error) {
 	args := m.Called(ctx, taskID, trigger)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -83,8 +84,8 @@ func (m *MockJobService) GetLastJobByTaskID(ctx context.Context, taskID uuid.UUI
 	return args.Get(0).(*ent.Job), args.Error(1)
 }
 
-func (m *MockJobService) ListJobs(ctx context.Context, taskID *uuid.UUID, remoteName string, limit, offset int) ([]*ent.Job, error) {
-	args := m.Called(ctx, taskID, remoteName, limit, offset)
+func (m *MockJobService) ListJobs(ctx context.Context, taskID *uuid.UUID, connectionID *uuid.UUID, limit, offset int) ([]*ent.Job, error) {
+	args := m.Called(ctx, taskID, connectionID, limit, offset)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -99,21 +100,21 @@ func (m *MockJobService) GetJobWithLogs(ctx context.Context, jobID uuid.UUID) (*
 	return args.Get(0).(*ent.Job), args.Error(1)
 }
 
-func (m *MockJobService) CountJobs(ctx context.Context, taskID *uuid.UUID, remoteName string) (int, error) {
-	args := m.Called(ctx, taskID, remoteName)
+func (m *MockJobService) CountJobs(ctx context.Context, taskID *uuid.UUID, connectionID *uuid.UUID) (int, error) {
+	args := m.Called(ctx, taskID, connectionID)
 	return args.Int(0), args.Error(1)
 }
 
-func (m *MockJobService) ListJobLogs(ctx context.Context, remoteName string, taskID *uuid.UUID, jobID *uuid.UUID, level string, limit, offset int) ([]*ent.JobLog, error) {
-	args := m.Called(ctx, remoteName, taskID, jobID, level, limit, offset)
+func (m *MockJobService) ListJobLogs(ctx context.Context, connectionID *uuid.UUID, taskID *uuid.UUID, jobID *uuid.UUID, level string, limit, offset int) ([]*ent.JobLog, error) {
+	args := m.Called(ctx, connectionID, taskID, jobID, level, limit, offset)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]*ent.JobLog), args.Error(1)
 }
 
-func (m *MockJobService) CountJobLogs(ctx context.Context, remoteName string, taskID *uuid.UUID, jobID *uuid.UUID, level string) (int, error) {
-	args := m.Called(ctx, remoteName, taskID, jobID, level)
+func (m *MockJobService) CountJobLogs(ctx context.Context, connectionID *uuid.UUID, taskID *uuid.UUID, jobID *uuid.UUID, level string) (int, error) {
+	args := m.Called(ctx, connectionID, taskID, jobID, level)
 	return args.Int(0), args.Error(1)
 }
 

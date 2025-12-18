@@ -13,11 +13,11 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 )
 
-func TestLogAPI_ListLogs_MissingRemoteName(t *testing.T) {
+func TestLogAPI_ListLogs_MissingConnectionId(t *testing.T) {
 	ts := setupTestServer(t)
 	defer ts.Cleanup()
 
-	// Request without remote_name should return 400
+	// Request without connection_id should return 400
 	resp, err := http.Get(ts.Server.URL + "/api/logs")
 	require.NoError(t, err)
 	defer resp.Body.Close()
@@ -37,8 +37,11 @@ func TestLogAPI_ListLogs_Success(t *testing.T) {
 
 	ctx := context.Background()
 
+	// Create test connection
+	connID := createTestConnection(t, ts, "test-conn")
+
 	// Create a task and job for testing
-	task, err := ts.TaskService.CreateTask(ctx, "Log Test Task", "/src", "testremote", "/dst", "upload", "", false, nil)
+	task, err := ts.TaskService.CreateTask(ctx, "Log Test Task", "/src", connID, "/dst", "upload", "", false, nil)
 	require.NoError(t, err)
 
 	job, err := ts.JobService.CreateJob(ctx, task.ID, "manual")
@@ -51,8 +54,8 @@ func TestLogAPI_ListLogs_Success(t *testing.T) {
 	_, err = ts.JobService.AddJobLog(ctx, job.ID, "error", "error", "", 0)
 	require.NoError(t, err)
 
-	// List logs with remote_name
-	resp, err := http.Get(ts.Server.URL + "/api/logs?remote_name=testremote")
+	// List logs with connection_id
+	resp, err := http.Get(ts.Server.URL + "/api/logs?connection_id=" + connID.String() + "")
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -72,11 +75,14 @@ func TestLogAPI_ListLogs_WithTaskID(t *testing.T) {
 
 	ctx := context.Background()
 
+	// Create test connection
+	connID := createTestConnection(t, ts, "test-conn")
+
 	// Create two tasks
-	task1, err := ts.TaskService.CreateTask(ctx, "Task 1", "/src1", "testremote", "/dst1", "upload", "", false, nil)
+	task1, err := ts.TaskService.CreateTask(ctx, "Task 1", "/src1", connID, "/dst1", "upload", "", false, nil)
 	require.NoError(t, err)
 
-	task2, err := ts.TaskService.CreateTask(ctx, "Task 2", "/src2", "testremote", "/dst2", "upload", "", false, nil)
+	task2, err := ts.TaskService.CreateTask(ctx, "Task 2", "/src2", connID, "/dst2", "upload", "", false, nil)
 	require.NoError(t, err)
 
 	job1, err := ts.JobService.CreateJob(ctx, task1.ID, "manual")
@@ -93,7 +99,7 @@ func TestLogAPI_ListLogs_WithTaskID(t *testing.T) {
 	require.NoError(t, err)
 
 	// Filter by task1 ID
-	url := fmt.Sprintf("%s/api/logs?remote_name=testremote&task_id=%s", ts.Server.URL, task1.ID.String())
+	url := fmt.Sprintf("%s/api/logs?connection_id="+connID.String()+"&task_id=%s", ts.Server.URL, task1.ID.String())
 	resp, err := http.Get(url)
 	require.NoError(t, err)
 	defer resp.Body.Close()
@@ -114,7 +120,10 @@ func TestLogAPI_ListLogs_WithJobID(t *testing.T) {
 
 	ctx := context.Background()
 
-	task, err := ts.TaskService.CreateTask(ctx, "Task", "/src", "testremote", "/dst", "upload", "", false, nil)
+	// Create test connection
+	connID := createTestConnection(t, ts, "test-conn")
+
+	task, err := ts.TaskService.CreateTask(ctx, "Task", "/src", connID, "/dst", "upload", "", false, nil)
 	require.NoError(t, err)
 
 	job1, err := ts.JobService.CreateJob(ctx, task.ID, "manual")
@@ -131,7 +140,7 @@ func TestLogAPI_ListLogs_WithJobID(t *testing.T) {
 	require.NoError(t, err)
 
 	// Filter by job1 ID
-	url := fmt.Sprintf("%s/api/logs?remote_name=testremote&job_id=%s", ts.Server.URL, job1.ID.String())
+	url := fmt.Sprintf("%s/api/logs?connection_id="+connID.String()+"&job_id=%s", ts.Server.URL, job1.ID.String())
 	resp, err := http.Get(url)
 	require.NoError(t, err)
 	defer resp.Body.Close()
@@ -152,7 +161,10 @@ func TestLogAPI_ListLogs_WithLevel(t *testing.T) {
 
 	ctx := context.Background()
 
-	task, err := ts.TaskService.CreateTask(ctx, "Task", "/src", "testremote", "/dst", "upload", "", false, nil)
+	// Create test connection
+	connID := createTestConnection(t, ts, "test-conn")
+
+	task, err := ts.TaskService.CreateTask(ctx, "Task", "/src", connID, "/dst", "upload", "", false, nil)
 	require.NoError(t, err)
 
 	job, err := ts.JobService.CreateJob(ctx, task.ID, "manual")
@@ -169,7 +181,7 @@ func TestLogAPI_ListLogs_WithLevel(t *testing.T) {
 	require.NoError(t, err)
 
 	// Filter by error level
-	url := fmt.Sprintf("%s/api/logs?remote_name=testremote&level=error", ts.Server.URL)
+	url := fmt.Sprintf("%s/api/logs?connection_id="+connID.String()+"&level=error", ts.Server.URL)
 	resp, err := http.Get(url)
 	require.NoError(t, err)
 	defer resp.Body.Close()
@@ -191,7 +203,10 @@ func TestLogAPI_ListLogs_WithPagination(t *testing.T) {
 
 	ctx := context.Background()
 
-	task, err := ts.TaskService.CreateTask(ctx, "Task", "/src", "testremote", "/dst", "upload", "", false, nil)
+	// Create test connection
+	connID := createTestConnection(t, ts, "test-conn")
+
+	task, err := ts.TaskService.CreateTask(ctx, "Task", "/src", connID, "/dst", "upload", "", false, nil)
 	require.NoError(t, err)
 
 	job, err := ts.JobService.CreateJob(ctx, task.ID, "manual")
@@ -204,7 +219,7 @@ func TestLogAPI_ListLogs_WithPagination(t *testing.T) {
 	}
 
 	// Request first page with limit=5
-	resp, err := http.Get(ts.Server.URL + "/api/logs?remote_name=testremote&limit=5&offset=0")
+	resp, err := http.Get(ts.Server.URL + "/api/logs?connection_id=" + connID.String() + "&limit=5&offset=0")
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -218,7 +233,7 @@ func TestLogAPI_ListLogs_WithPagination(t *testing.T) {
 	assert.Len(t, page1.Data, 5)
 
 	// Request second page with offset=5
-	resp, err = http.Get(ts.Server.URL + "/api/logs?remote_name=testremote&limit=5&offset=5")
+	resp, err = http.Get(ts.Server.URL + "/api/logs?connection_id=" + connID.String() + "&limit=5&offset=5")
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -241,7 +256,10 @@ func TestLogAPI_ListLogs_InvalidTaskID(t *testing.T) {
 
 	ctx := context.Background()
 
-	task, err := ts.TaskService.CreateTask(ctx, "Task", "/src", "testremote", "/dst", "upload", "", false, nil)
+	// Create test connection
+	connID := createTestConnection(t, ts, "test-conn")
+
+	task, err := ts.TaskService.CreateTask(ctx, "Task", "/src", connID, "/dst", "upload", "", false, nil)
 	require.NoError(t, err)
 
 	job, err := ts.JobService.CreateJob(ctx, task.ID, "manual")
@@ -251,7 +269,7 @@ func TestLogAPI_ListLogs_InvalidTaskID(t *testing.T) {
 	require.NoError(t, err)
 
 	// Invalid UUID should be ignored, query should still succeed
-	url := fmt.Sprintf("%s/api/logs?remote_name=testremote&task_id=invalid-uuid", ts.Server.URL)
+	url := fmt.Sprintf("%s/api/logs?connection_id="+connID.String()+"&task_id=invalid-uuid", ts.Server.URL)
 	resp, err := http.Get(url)
 	require.NoError(t, err)
 	defer resp.Body.Close()
@@ -272,7 +290,10 @@ func TestLogAPI_ListLogs_InvalidJobID(t *testing.T) {
 
 	ctx := context.Background()
 
-	task, err := ts.TaskService.CreateTask(ctx, "Task", "/src", "testremote", "/dst", "upload", "", false, nil)
+	// Create test connection
+	connID := createTestConnection(t, ts, "test-conn")
+
+	task, err := ts.TaskService.CreateTask(ctx, "Task", "/src", connID, "/dst", "upload", "", false, nil)
 	require.NoError(t, err)
 
 	job, err := ts.JobService.CreateJob(ctx, task.ID, "manual")
@@ -282,7 +303,7 @@ func TestLogAPI_ListLogs_InvalidJobID(t *testing.T) {
 	require.NoError(t, err)
 
 	// Invalid UUID should be ignored, query should still succeed
-	url := fmt.Sprintf("%s/api/logs?remote_name=testremote&job_id=not-a-uuid", ts.Server.URL)
+	url := fmt.Sprintf("%s/api/logs?connection_id="+connID.String()+"&job_id=not-a-uuid", ts.Server.URL)
 	resp, err := http.Get(url)
 	require.NoError(t, err)
 	defer resp.Body.Close()
@@ -301,8 +322,9 @@ func TestLogAPI_ListLogs_NoResults(t *testing.T) {
 	ts := setupTestServer(t)
 	defer ts.Cleanup()
 
-	// Query with remote_name that has no logs
-	resp, err := http.Get(ts.Server.URL + "/api/logs?remote_name=nonexistent")
+	connIDNonexistent := createTestConnection(t, ts, "nonexistent-conn")
+	// Query with connection_id that has no logs
+	resp, err := http.Get(ts.Server.URL + "/api/logs?connection_id=" + connIDNonexistent.String() + "")
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -322,7 +344,10 @@ func TestLogAPI_ListLogs_DefaultPagination(t *testing.T) {
 
 	ctx := context.Background()
 
-	task, err := ts.TaskService.CreateTask(ctx, "Task", "/src", "testremote", "/dst", "upload", "", false, nil)
+	// Create test connection
+	connID := createTestConnection(t, ts, "test-conn")
+
+	task, err := ts.TaskService.CreateTask(ctx, "Task", "/src", connID, "/dst", "upload", "", false, nil)
 	require.NoError(t, err)
 
 	job, err := ts.JobService.CreateJob(ctx, task.ID, "manual")
@@ -335,7 +360,7 @@ func TestLogAPI_ListLogs_DefaultPagination(t *testing.T) {
 	}
 
 	// Request without pagination parameters (should use defaults)
-	resp, err := http.Get(ts.Server.URL + "/api/logs?remote_name=testremote")
+	resp, err := http.Get(ts.Server.URL + "/api/logs?connection_id=" + connID.String() + "")
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -355,7 +380,10 @@ func TestLogAPI_ListLogs_CombinedFilters(t *testing.T) {
 
 	ctx := context.Background()
 
-	task, err := ts.TaskService.CreateTask(ctx, "Task", "/src", "testremote", "/dst", "upload", "", false, nil)
+	// Create test connection
+	connID := createTestConnection(t, ts, "test-conn")
+
+	task, err := ts.TaskService.CreateTask(ctx, "Task", "/src", connID, "/dst", "upload", "", false, nil)
 	require.NoError(t, err)
 
 	job, err := ts.JobService.CreateJob(ctx, task.ID, "manual")
@@ -369,7 +397,7 @@ func TestLogAPI_ListLogs_CombinedFilters(t *testing.T) {
 	require.NoError(t, err)
 
 	// Filter by task_id, job_id, and level
-	url := fmt.Sprintf("%s/api/logs?remote_name=testremote&task_id=%s&job_id=%s&level=error",
+	url := fmt.Sprintf("%s/api/logs?connection_id="+connID.String()+"&task_id=%s&job_id=%s&level=error",
 		ts.Server.URL, task.ID.String(), job.ID.String())
 	resp, err := http.Get(url)
 	require.NoError(t, err)
@@ -392,11 +420,16 @@ func TestLogAPI_ListLogs_MultipleRemotes(t *testing.T) {
 
 	ctx := context.Background()
 
+	// Create test connection
+	connID1 := createTestConnection(t, ts, "test-conn1")
+	connID2 := createTestConnection(t, ts, "test-conn2")
+
 	// Create tasks for different remotes
-	task1, err := ts.TaskService.CreateTask(ctx, "Task 1", "/src1", "remote1", "/dst1", "upload", "", false, nil)
+
+	task1, err := ts.TaskService.CreateTask(ctx, "Task 1", "/src1", connID1, "/dst1", "upload", "", false, nil)
 	require.NoError(t, err)
 
-	task2, err := ts.TaskService.CreateTask(ctx, "Task 2", "/src2", "remote2", "/dst2", "upload", "", false, nil)
+	task2, err := ts.TaskService.CreateTask(ctx, "Task 2", "/src2", connID2, "/dst2", "upload", "", false, nil)
 	require.NoError(t, err)
 
 	job1, err := ts.JobService.CreateJob(ctx, task1.ID, "manual")
@@ -412,7 +445,7 @@ func TestLogAPI_ListLogs_MultipleRemotes(t *testing.T) {
 	require.NoError(t, err)
 
 	// Query for remote1 only
-	resp, err := http.Get(ts.Server.URL + "/api/logs?remote_name=remote1")
+	resp, err := http.Get(ts.Server.URL + "/api/logs?connection_id=" + connID1.String() + "")
 	require.NoError(t, err)
 	defer resp.Body.Close()
 

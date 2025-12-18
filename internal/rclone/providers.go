@@ -5,6 +5,7 @@ import (
 	"github.com/rclone/rclone/fs"
 )
 
+// Provider represents an rclone storage provider with its configuration options.
 type Provider struct {
 	Name        string      `json:"name"`
 	Description string      `json:"description"`

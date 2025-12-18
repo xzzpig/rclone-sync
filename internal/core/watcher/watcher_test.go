@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
+	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 	"go.uber.org/zap"
 )
@@ -22,8 +23,8 @@ type MockRunner struct {
 
 func (m *MockRunner) Start() { m.Called() }
 func (m *MockRunner) Stop()  { m.Called() }
-func (m *MockRunner) StartTask(task *ent.Task, trigger string) error {
-	args := m.Called(task, trigger)
+func (m *MockRunner) StartTask(task *ent.Task, trigger job.Trigger) error {
+	args := m.Called(task, string(trigger))
 	return args.Error(0)
 }
 func (m *MockRunner) StopTask(taskID uuid.UUID) error {
@@ -41,6 +42,14 @@ type MockTaskService struct {
 }
 
 func (m *MockTaskService) GetTask(ctx context.Context, id uuid.UUID) (*ent.Task, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*ent.Task), args.Error(1)
+}
+
+func (m *MockTaskService) GetTaskWithConnection(ctx context.Context, id uuid.UUID) (*ent.Task, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -82,8 +91,8 @@ func TestWatcher_Debounce(t *testing.T) {
 		SourcePath: tempDir,
 	}
 
-	// Watcher will call GetTask when the debounce timer fires.
-	mockTaskSvc.On("GetTask", mock.Anything, task.ID).Return(task, nil)
+	// Watcher will call GetTaskWithConnection when the debounce timer fires.
+	mockTaskSvc.On("GetTaskWithConnection", mock.Anything, task.ID).Return(task, nil)
 	// We expect StartTask to be called only once.
 	mockRunner.On("StartTask", task, "realtime").Return(nil).Once()
 

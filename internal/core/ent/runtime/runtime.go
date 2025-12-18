@@ -5,6 +5,6 @@ package runtime
 // The schema-stitching logic is generated in github.com/xzzpig/rclone-sync/internal/core/ent/runtime.go
 
 const (
-	Version = "0.14.3"                                              // Version of ent codegen.
-	Sum     = "sha256-rKGzYOdNaSbFyHIuytuppYjpiTz1/tcvXel1SjtwEhA=" // Sum of ent codegen.
+	Version = "v0.14.5"                                         // Version of ent codegen.
+	Sum     = "h1:Rj2WOYJtCkWyFo6a+5wB3EfBRP0rnx1fMk6gGA0UUe4=" // Sum of ent codegen.
 )

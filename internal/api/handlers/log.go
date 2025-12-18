@@ -11,12 +11,12 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/i18n"
 )
 
+// LogHandler handles log-related HTTP requests.
 type LogHandler struct {
 }
 
 // ListLogs returns job logs with flexible filtering
-// Required: remote_name (enforced by connection context)
-// Optional: task_id, job_id, level
+// Optional: connection_id, task_id, job_id, level
 func ListLogs(c *gin.Context) {
 	service, err := context.GetJobService(c)
 	if err != nil {
@@ -24,9 +24,16 @@ func ListLogs(c *gin.Context) {
 		return
 	}
 
-	// remote_name is required
-	remoteName := c.Query("remote_name")
-	if remoteName == "" {
+	// Parse optional connection_id filter
+	var connectionID *uuid.UUID
+	if connIDStr := c.Query("connection_id"); connIDStr != "" {
+		parsed, err := uuid.Parse(connIDStr)
+		if err != nil {
+			HandleError(c, NewLocalizedError(c, http.StatusBadRequest, i18n.ErrInvalidIDFormat, "invalid connection_id format"))
+			return
+		}
+		connectionID = &parsed
+	} else {
 		HandleError(c, NewLocalizedError(c, http.StatusBadRequest, i18n.ErrMissingParameter, ""))
 		return
 	}
@@ -54,19 +61,19 @@ func ListLogs(c *gin.Context) {
 	limit := 100
 	offset := 0
 	if l := c.Query("limit"); l != "" {
-		fmt.Sscanf(l, "%d", &limit)
+		_, _ = fmt.Sscanf(l, "%d", &limit)
 	}
 	if o := c.Query("offset"); o != "" {
-		fmt.Sscanf(o, "%d", &offset)
+		_, _ = fmt.Sscanf(o, "%d", &offset)
 	}
 
-	total, err := service.CountJobLogs(c.Request.Context(), remoteName, taskID, jobID, level)
+	total, err := service.CountJobLogs(c.Request.Context(), connectionID, taskID, jobID, level)
 	if err != nil {
 		HandleError(c, err)
 		return
 	}
 
-	logs, err := service.ListJobLogs(c.Request.Context(), remoteName, taskID, jobID, level, limit, offset)
+	logs, err := service.ListJobLogs(c.Request.Context(), connectionID, taskID, jobID, level, limit, offset)
 	if err != nil {
 		HandleError(c, err)
 		return

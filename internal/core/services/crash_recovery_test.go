@@ -8,6 +8,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
@@ -31,11 +32,20 @@ func TestCrashRecovery_ResetStuckJobs(t *testing.T) {
 	jobSvc := services.NewJobService(client)
 	taskSvc := services.NewTaskService(client)
 
+	// Create a test connection
+	encryptor, err := crypto.NewEncryptor("test-secret-key-32-bytes-long!!")
+	require.NoError(t, err)
+	connSvc := services.NewConnectionService(client, encryptor)
+	testConn, err := connSvc.CreateConnection(ctx, "test-local", "local", map[string]string{
+		"type": "local",
+	})
+	require.NoError(t, err)
+
 	// 2. Setup Prerequisites: Create a Task
 	task, err := taskSvc.CreateTask(ctx,
 		"Crash Test Task",
 		"/tmp/source",
-		"my-remote",
+		testConn.ID,
 		"/remote/dest",
 		"upload",
 		"",
@@ -84,7 +94,7 @@ func TestCrashRecovery_ResetStuckJobs(t *testing.T) {
 	// Check Job 1 (Was Running -> Now Failed)
 	updatedRunningJob, err := client.Job.Get(ctx, runningJob.ID)
 	require.NoError(t, err)
-	assert.Equal(t, job.StatusFailed, updatedRunningJob.Status, "Stuck running job should be marked as FAILED")
+	assert.Equal(t, job.StatusCancelled, updatedRunningJob.Status, "Stuck running job should be marked as Cancelled")
 	assert.Contains(t, updatedRunningJob.Errors, "System crash", "Error message should indicate crash recovery")
 	assert.NotNil(t, updatedRunningJob.EndTime, "EndTime should satisfy constraint")
 

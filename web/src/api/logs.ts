@@ -2,7 +2,7 @@ import api from '@/lib/api';
 import { JobLog, PaginatedResponse } from '@/lib/types';
 
 export interface LogsParams {
-  remote_name: string;
+  connection_id: string;
   task_id?: string;
   job_id?: string;
   level?: string;

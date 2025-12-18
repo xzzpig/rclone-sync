@@ -6,10 +6,20 @@ run:
 
 linters:
   enable:
-    - gofmt
-    - govet
     - errcheck
-    - staticcheck
-    - gosimple
+    - govet
     - ineffassign
+    - staticcheck
     - unused
+    - revive
+    - dupl
+    - nilerr
+    - gocritic
+    - gosec
+    - loggercheck
+    - perfsprint
+    - err113
+
+formatters:
+  enable:
+    - gofmt

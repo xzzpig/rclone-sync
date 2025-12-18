@@ -78,7 +78,7 @@ func (*JobLog) scanValues(columns []string) ([]any, error) {
 
 // assignValues assigns the values that were returned from sql.Rows (after scanning)
 // to the JobLog fields.
-func (jl *JobLog) assignValues(columns []string, values []any) error {
+func (_m *JobLog) assignValues(columns []string, values []any) error {
 	if m, n := len(values), len(columns); m < n {
 		return fmt.Errorf("mismatch number of scan values: %d != %d", m, n)
 	}
@@ -89,46 +89,46 @@ func (jl *JobLog) assignValues(columns []string, values []any) error {
 			if !ok {
 				return fmt.Errorf("unexpected type %T for field id", value)
 			}
-			jl.ID = int(value.Int64)
+			_m.ID = int(value.Int64)
 		case joblog.FieldLevel:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field level", values[i])
 			} else if value.Valid {
-				jl.Level = joblog.Level(value.String)
+				_m.Level = joblog.Level(value.String)
 			}
 		case joblog.FieldTime:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field time", values[i])
 			} else if value.Valid {
-				jl.Time = value.Time
+				_m.Time = value.Time
 			}
 		case joblog.FieldPath:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field path", values[i])
 			} else if value.Valid {
-				jl.Path = value.String
+				_m.Path = value.String
 			}
 		case joblog.FieldWhat:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field what", values[i])
 			} else if value.Valid {
-				jl.What = joblog.What(value.String)
+				_m.What = joblog.What(value.String)
 			}
 		case joblog.FieldSize:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field size", values[i])
 			} else if value.Valid {
-				jl.Size = value.Int64
+				_m.Size = value.Int64
 			}
 		case joblog.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
 				return fmt.Errorf("unexpected type %T for field job_logs", values[i])
 			} else if value.Valid {
-				jl.job_logs = new(uuid.UUID)
-				*jl.job_logs = *value.S.(*uuid.UUID)
+				_m.job_logs = new(uuid.UUID)
+				*_m.job_logs = *value.S.(*uuid.UUID)
 			}
 		default:
-			jl.selectValues.Set(columns[i], values[i])
+			_m.selectValues.Set(columns[i], values[i])
 		}
 	}
 	return nil
@@ -136,52 +136,52 @@ func (jl *JobLog) assignValues(columns []string, values []any) error {
 
 // Value returns the ent.Value that was dynamically selected and assigned to the JobLog.
 // This includes values selected through modifiers, order, etc.
-func (jl *JobLog) Value(name string) (ent.Value, error) {
-	return jl.selectValues.Get(name)
+func (_m *JobLog) Value(name string) (ent.Value, error) {
+	return _m.selectValues.Get(name)
 }
 
 // QueryJob queries the "job" edge of the JobLog entity.
-func (jl *JobLog) QueryJob() *JobQuery {
-	return NewJobLogClient(jl.config).QueryJob(jl)
+func (_m *JobLog) QueryJob() *JobQuery {
+	return NewJobLogClient(_m.config).QueryJob(_m)
 }
 
 // Update returns a builder for updating this JobLog.
 // Note that you need to call JobLog.Unwrap() before calling this method if this JobLog
 // was returned from a transaction, and the transaction was committed or rolled back.
-func (jl *JobLog) Update() *JobLogUpdateOne {
-	return NewJobLogClient(jl.config).UpdateOne(jl)
+func (_m *JobLog) Update() *JobLogUpdateOne {
+	return NewJobLogClient(_m.config).UpdateOne(_m)
 }
 
 // Unwrap unwraps the JobLog entity that was returned from a transaction after it was closed,
 // so that all future queries will be executed through the driver which created the transaction.
-func (jl *JobLog) Unwrap() *JobLog {
-	_tx, ok := jl.config.driver.(*txDriver)
+func (_m *JobLog) Unwrap() *JobLog {
+	_tx, ok := _m.config.driver.(*txDriver)
 	if !ok {
 		panic("ent: JobLog is not a transactional entity")
 	}
-	jl.config.driver = _tx.drv
-	return jl
+	_m.config.driver = _tx.drv
+	return _m
 }
 
 // String implements the fmt.Stringer.
-func (jl *JobLog) String() string {
+func (_m *JobLog) String() string {
 	var builder strings.Builder
 	builder.WriteString("JobLog(")
-	builder.WriteString(fmt.Sprintf("id=%v, ", jl.ID))
+	builder.WriteString(fmt.Sprintf("id=%v, ", _m.ID))
 	builder.WriteString("level=")
-	builder.WriteString(fmt.Sprintf("%v", jl.Level))
+	builder.WriteString(fmt.Sprintf("%v", _m.Level))
 	builder.WriteString(", ")
 	builder.WriteString("time=")
-	builder.WriteString(jl.Time.Format(time.ANSIC))
+	builder.WriteString(_m.Time.Format(time.ANSIC))
 	builder.WriteString(", ")
 	builder.WriteString("path=")
-	builder.WriteString(jl.Path)
+	builder.WriteString(_m.Path)
 	builder.WriteString(", ")
 	builder.WriteString("what=")
-	builder.WriteString(fmt.Sprintf("%v", jl.What))
+	builder.WriteString(fmt.Sprintf("%v", _m.What))
 	builder.WriteString(", ")
 	builder.WriteString("size=")
-	builder.WriteString(fmt.Sprintf("%v", jl.Size))
+	builder.WriteString(fmt.Sprintf("%v", _m.Size))
 	builder.WriteByte(')')
 	return builder.String()
 }

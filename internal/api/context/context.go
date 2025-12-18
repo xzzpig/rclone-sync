@@ -1,9 +1,9 @@
+// Package context provides request context utilities for the API.
 package context
 
 import (
-	"errors"
-
 	"github.com/gin-gonic/gin"
+	"github.com/xzzpig/rclone-sync/internal/core/errs"
 	"github.com/xzzpig/rclone-sync/internal/core/ports"
 	"github.com/xzzpig/rclone-sync/internal/rclone"
 )
@@ -12,7 +12,7 @@ func getContextValue[T any](c *gin.Context, key string) (T, error) {
 	var zero T
 	val, exists := c.Get(key)
 	if !exists {
-		return zero, errors.New(key + " not initialized")
+		return zero, errs.ConstError(key + " not initialized")
 	}
 	return val.(T), nil
 }

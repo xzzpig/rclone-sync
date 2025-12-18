@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/xzzpig/rclone-sync/internal/core/db/schema"
+	"github.com/xzzpig/rclone-sync/internal/core/ent/connection"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/joblog"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/task"
@@ -16,6 +17,30 @@ import (
 // (default values, validators, hooks and policies) and stitches it
 // to their package variables.
 func init() {
+	connectionFields := schema.Connection{}.Fields()
+	_ = connectionFields
+	// connectionDescName is the schema descriptor for name field.
+	connectionDescName := connectionFields[1].Descriptor()
+	// connection.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	connection.NameValidator = connectionDescName.Validators[0].(func(string) error)
+	// connectionDescType is the schema descriptor for type field.
+	connectionDescType := connectionFields[2].Descriptor()
+	// connection.TypeValidator is a validator for the "type" field. It is called by the builders before save.
+	connection.TypeValidator = connectionDescType.Validators[0].(func(string) error)
+	// connectionDescCreatedAt is the schema descriptor for created_at field.
+	connectionDescCreatedAt := connectionFields[4].Descriptor()
+	// connection.DefaultCreatedAt holds the default value on creation for the created_at field.
+	connection.DefaultCreatedAt = connectionDescCreatedAt.Default.(func() time.Time)
+	// connectionDescUpdatedAt is the schema descriptor for updated_at field.
+	connectionDescUpdatedAt := connectionFields[5].Descriptor()
+	// connection.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	connection.DefaultUpdatedAt = connectionDescUpdatedAt.Default.(func() time.Time)
+	// connection.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	connection.UpdateDefaultUpdatedAt = connectionDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// connectionDescID is the schema descriptor for id field.
+	connectionDescID := connectionFields[0].Descriptor()
+	// connection.DefaultID holds the default value on creation for the id field.
+	connection.DefaultID = connectionDescID.Default.(func() uuid.UUID)
 	jobFields := schema.Job{}.Fields()
 	_ = jobFields
 	// jobDescStartTime is the schema descriptor for start_time field.
@@ -50,10 +75,6 @@ func init() {
 	taskDescSourcePath := taskFields[2].Descriptor()
 	// task.SourcePathValidator is a validator for the "source_path" field. It is called by the builders before save.
 	task.SourcePathValidator = taskDescSourcePath.Validators[0].(func(string) error)
-	// taskDescRemoteName is the schema descriptor for remote_name field.
-	taskDescRemoteName := taskFields[3].Descriptor()
-	// task.RemoteNameValidator is a validator for the "remote_name" field. It is called by the builders before save.
-	task.RemoteNameValidator = taskDescRemoteName.Validators[0].(func(string) error)
 	// taskDescRemotePath is the schema descriptor for remote_path field.
 	taskDescRemotePath := taskFields[4].Descriptor()
 	// task.RemotePathValidator is a validator for the "remote_path" field. It is called by the builders before save.

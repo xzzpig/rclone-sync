@@ -1,6 +1,11 @@
+// Package api provides HTTP API routes and server setup.
 package api
 
 import (
+	"log"
+
+	"github.com/xzzpig/rclone-sync/internal/core/config"
+	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/db"
 	"github.com/xzzpig/rclone-sync/internal/core/services"
 
@@ -9,11 +14,26 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// RegisterAPIRoutes registers all API routes to the given router group.
 func RegisterAPIRoutes(router *gin.RouterGroup) {
 	// Initialize Services and Handlers
 	client := db.Client
+
+	// Initialize encryptor
+	encryptor, err := crypto.NewEncryptor(config.Cfg.Security.EncryptionKey)
+	if err != nil {
+		log.Fatalf("Failed to initialize encryptor: %v", err)
+	}
+
+	// Initialize services
 	taskService := services.NewTaskService(client)
+	connService := services.NewConnectionService(client, encryptor)
+
+	// Initialize handlers
 	taskHandler := handlers.NewTaskHandler(taskService)
+	connHandler := handlers.NewConnectionHandler(connService)
+	importHandler := handlers.NewImportHandler(connService)
+	filesHandler := handlers.NewFilesHandler(connService)
 
 	// Global SSE events endpoint
 	router.GET("/events", handlers.GetGlobalEvents)
@@ -32,23 +52,25 @@ func RegisterAPIRoutes(router *gin.RouterGroup) {
 		logs.GET("", handlers.ListLogs)
 	}
 
-	// Remote management
-	remotes := router.Group("/remotes")
-	{
-		remotes.GET("", handlers.ListRemotes)
-		remotes.POST("/test", handlers.TestRemote)
-		remotes.POST("/:name", handlers.CreateRemote)
-		remotes.GET("/:name", handlers.GetRemoteInfo)
-		remotes.GET("/:name/quota", handlers.GetRemoteQuota)
-		remotes.DELETE("/:name", handlers.DeleteRemote)
-		remotes.GET("/:name/events", handlers.GetConnectionEvents)
-	}
-
 	// Provider management
 	providers := router.Group("/providers")
 	{
 		providers.GET("", handlers.ListProviders)
 		providers.GET("/:name", handlers.GetProviderOptions)
+	}
+
+	// Connection management
+	connections := router.Group("/connections")
+	{
+		connections.POST("", connHandler.Create)
+		connections.GET("", connHandler.List)
+		connections.POST("/test", connHandler.TestUnsavedConfig)
+		connections.GET("/:id", connHandler.Get)
+		connections.GET("/:id/config", connHandler.GetConfig)
+		connections.POST("/:id/test", connHandler.Test)
+		connections.GET("/:id/quota", connHandler.GetQuota)
+		connections.PUT("/:id", connHandler.Update)
+		connections.DELETE("/:id", connHandler.Delete)
 	}
 
 	// Task management
@@ -66,6 +88,13 @@ func RegisterAPIRoutes(router *gin.RouterGroup) {
 	files := router.Group("/files")
 	{
 		files.GET("/local", handlers.ListLocalFiles)
-		files.GET("/remote/:name", handlers.ListRemoteFiles)
+		files.GET("/remote/:id", filesHandler.ListRemoteFiles)
+	}
+
+	// Import management
+	imports := router.Group("/import")
+	{
+		imports.POST("/parse", importHandler.Parse)
+		imports.POST("/execute", importHandler.Execute)
 	}
 }

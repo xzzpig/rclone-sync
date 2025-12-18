@@ -29,11 +29,13 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/api/sse"
 )
 
+// JobProgress represents the current progress of a sync job.
 type JobProgress struct {
 	Transfers int64
 	Bytes     int64
 }
 
+// SyncEngine handles file synchronization operations using rclone.
 type SyncEngine struct {
 	jobService ports.JobService
 	logger     *zap.Logger
@@ -42,6 +44,7 @@ type SyncEngine struct {
 	activeJobs map[uuid.UUID]JobProgress
 }
 
+// NewSyncEngine creates a new SyncEngine instance.
 func NewSyncEngine(jobService ports.JobService, dataDir string) *SyncEngine {
 	workDir := filepath.Join(dataDir, "bisync_state")
 	return &SyncEngine{
@@ -52,6 +55,7 @@ func NewSyncEngine(jobService ports.JobService, dataDir string) *SyncEngine {
 	}
 }
 
+// GetJobProgress returns the current progress of a running job.
 func (e *SyncEngine) GetJobProgress(jobID uuid.UUID) (JobProgress, bool) {
 	e.statsMu.RLock()
 	defer e.statsMu.RUnlock()
@@ -102,11 +106,17 @@ func getConflictResolutionFromOptions(options map[string]any) (bisync.Prefer, bi
 
 // RunTask executes a sync task using the appropriate method based on task.Direction.
 // Supports bidirectional sync using bisync, and one-way sync (upload/download) using rclone sync.
-func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger string) error {
+func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger job.Trigger) error {
+	// Get connection name from task's connection edge (needed throughout function)
+	if task.Edges.Connection == nil {
+		return errs.ConstError("task connection edge not loaded")
+	}
+	connectionName := task.Edges.Connection.Name
+
 	// 1. Create Job record
 	jobEntity, err := e.jobService.CreateJob(ctx, task.ID, trigger)
 	if err != nil {
-		return errors.Join(errs.ErrSystem, errors.New("failed to create job"), err)
+		return errors.Join(errs.ErrSystem, errs.ConstError("failed to create job"), err)
 	}
 
 	// Initialize in-memory progress
@@ -126,7 +136,7 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger string
 	// 2. Update Job status to running
 	_, err = e.jobService.UpdateJobStatus(ctx, jobEntity.ID, string(job.StatusRunning), "")
 	if err != nil {
-		return errors.Join(errs.ErrSystem, errors.New("failed to update job status"), err)
+		return errors.Join(errs.ErrSystem, errs.ConstError("failed to update job status"), err)
 	}
 
 	// 3. Prepare Rclone context with stats group
@@ -154,7 +164,7 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger string
 		return err
 	}
 
-	f2Path := fmt.Sprintf("%s:%s", task.RemoteName, task.RemotePath)
+	f2Path := fmt.Sprintf("%s:%s", connectionName, task.RemotePath)
 	fDst, err := fs.NewFs(statsCtx, f2Path)
 	if err != nil {
 		e.failJob(ctx, jobEntity.ID, err)
@@ -171,7 +181,7 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger string
 	case taskent.DirectionDownload:
 		syncErr = e.runOneWay(statsCtx, fDst, fSrc)
 	default:
-		syncErr = fmt.Errorf("unsupported sync direction: %s", task.Direction)
+		syncErr = fmt.Errorf("unsupported sync direction: %s", task.Direction) //nolint:err113
 	}
 
 	// 9. Wait for poller to finish (it stops when statsCtx is cancelled or done)
@@ -184,16 +194,19 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger string
 		// Check if the error is due to context cancellation
 		if errors.Is(ctx.Err(), context.Canceled) {
 			e.logger.Info("Sync task cancelled", zap.Stringer("job_id", jobEntity.ID))
-			if _, updateErr := e.jobService.UpdateJobStatus(ctx, jobEntity.ID, string(job.StatusCancelled), "Task cancelled by user or shutdown"); updateErr != nil {
+			// Use a fresh context for DB operations since the original context is cancelled
+			dbCtx, dbCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			if _, updateErr := e.jobService.UpdateJobStatus(dbCtx, jobEntity.ID, string(job.StatusCancelled), "Task cancelled by user or shutdown"); updateErr != nil {
 				e.logger.Error("Failed to update job status to cancelled", zap.Error(updateErr))
 			}
+			dbCancel()
 			// Broadcast cancellation
 			s := accounting.Stats(statsCtx)
 			var files, bytes int64
 			if s != nil {
 				files, bytes = s.GetTransfers(), s.GetBytes()
 			}
-			e.broadcastJobUpdate(jobEntity.ID, task.ID, task.RemoteName, string(job.StatusCancelled), jobEntity.StartTime, time.Now(), files, bytes)
+			e.broadcastJobUpdate(jobEntity.ID, task.ID, connectionName, string(job.StatusCancelled), jobEntity.StartTime, time.Now(), files, bytes)
 			return syncErr
 		}
 
@@ -211,7 +224,7 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger string
 		if s != nil {
 			files, bytes = s.GetTransfers(), s.GetBytes()
 		}
-		e.broadcastJobUpdate(jobEntity.ID, task.ID, task.RemoteName, string(job.StatusFailed), jobEntity.StartTime, time.Now(), files, bytes)
+		e.broadcastJobUpdate(jobEntity.ID, task.ID, connectionName, string(job.StatusFailed), jobEntity.StartTime, time.Now(), files, bytes)
 		return syncErr
 	}
 
@@ -230,7 +243,7 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger string
 	}
 
 	// Broadcast success
-	e.broadcastJobUpdate(jobEntity.ID, task.ID, task.RemoteName, string(job.StatusSuccess), jobEntity.StartTime, time.Now(), files, bytes)
+	e.broadcastJobUpdate(jobEntity.ID, task.ID, connectionName, string(job.StatusSuccess), jobEntity.StartTime, time.Now(), files, bytes)
 
 	e.logger.Info("Sync task completed successfully", zap.Stringer("job_id", jobEntity.ID))
 
@@ -427,7 +440,12 @@ func (e *SyncEngine) processStats(ctx context.Context, jobID uuid.UUID, task *en
 	e.statsMu.Unlock()
 
 	// Broadcast progress update
-	e.broadcastJobUpdate(jobID, task.ID, task.RemoteName, string(job.StatusRunning), startTime, time.Time{}, s.GetTransfers(), s.GetBytes())
+	// Get connection name for broadcast
+	connectionName := ""
+	if task.Edges.Connection != nil {
+		connectionName = task.Edges.Connection.Name
+	}
+	e.broadcastJobUpdate(jobID, task.ID, connectionName, string(job.StatusRunning), startTime, time.Time{}, s.GetTransfers(), s.GetBytes())
 }
 
 func (e *SyncEngine) broadcastJobUpdate(jobID, taskID uuid.UUID, remoteName, status string, startTime, endTime time.Time, files, bytes int64) {
@@ -460,18 +478,20 @@ func getStatsInternals(s *accounting.StatsInfo) (*sync.RWMutex, *[]*accounting.T
 	// Access 'mu'
 	muField := statsVal.FieldByName("mu")
 	if !muField.IsValid() {
-		return nil, nil, errors.New("field 'mu' not found in accounting.StatsInfo")
+		return nil, nil, errs.ConstError("field 'mu' not found in accounting.StatsInfo")
 	}
-	muPtr := unsafe.Pointer(muField.UnsafeAddr())
+	muPtr := unsafe.Pointer(muField.UnsafeAddr()) //nolint:gosec // G103: Intentional unsafe access to rclone internals, see function doc
 	mu := (*sync.RWMutex)(muPtr)
 
 	// Access 'startedTransfers'
 	transfersField := statsVal.FieldByName("startedTransfers")
 	if !transfersField.IsValid() {
-		return nil, nil, errors.New("field 'startedTransfers' not found in accounting.StatsInfo")
+		return nil, nil, errs.ConstError("field 'startedTransfers' not found in accounting.StatsInfo")
 	}
-	transfersPtr := unsafe.Pointer(transfersField.UnsafeAddr())
+	transfersPtr := unsafe.Pointer(transfersField.UnsafeAddr()) //nolint:gosec // G103: Intentional unsafe access to rclone internals, see function doc
 	transfers := (*[]*accounting.Transfer)(transfersPtr)
 
 	return mu, transfers, nil
 }
+
+var _ ports.SyncEngine = (*SyncEngine)(nil)

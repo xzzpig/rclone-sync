@@ -36,9 +36,9 @@ const initialState: HistoryState = {
 };
 
 interface HistoryActions {
-  loadJobs: (params: { remote_name: string; task_id?: string; page?: number }) => Promise<void>;
+  loadJobs: (params: { connection_id: string; task_id?: string; page?: number }) => Promise<void>;
   loadLogs: (params: {
-    remote_name: string;
+    connection_id: string;
     task_id?: string;
     job_id?: string;
     level?: string;

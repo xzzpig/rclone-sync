@@ -25,130 +25,130 @@ type JobLogUpdate struct {
 }
 
 // Where appends a list predicates to the JobLogUpdate builder.
-func (jlu *JobLogUpdate) Where(ps ...predicate.JobLog) *JobLogUpdate {
-	jlu.mutation.Where(ps...)
-	return jlu
+func (_u *JobLogUpdate) Where(ps ...predicate.JobLog) *JobLogUpdate {
+	_u.mutation.Where(ps...)
+	return _u
 }
 
 // SetLevel sets the "level" field.
-func (jlu *JobLogUpdate) SetLevel(j joblog.Level) *JobLogUpdate {
-	jlu.mutation.SetLevel(j)
-	return jlu
+func (_u *JobLogUpdate) SetLevel(v joblog.Level) *JobLogUpdate {
+	_u.mutation.SetLevel(v)
+	return _u
 }
 
 // SetNillableLevel sets the "level" field if the given value is not nil.
-func (jlu *JobLogUpdate) SetNillableLevel(j *joblog.Level) *JobLogUpdate {
-	if j != nil {
-		jlu.SetLevel(*j)
+func (_u *JobLogUpdate) SetNillableLevel(v *joblog.Level) *JobLogUpdate {
+	if v != nil {
+		_u.SetLevel(*v)
 	}
-	return jlu
+	return _u
 }
 
 // SetTime sets the "time" field.
-func (jlu *JobLogUpdate) SetTime(t time.Time) *JobLogUpdate {
-	jlu.mutation.SetTime(t)
-	return jlu
+func (_u *JobLogUpdate) SetTime(v time.Time) *JobLogUpdate {
+	_u.mutation.SetTime(v)
+	return _u
 }
 
 // SetNillableTime sets the "time" field if the given value is not nil.
-func (jlu *JobLogUpdate) SetNillableTime(t *time.Time) *JobLogUpdate {
-	if t != nil {
-		jlu.SetTime(*t)
+func (_u *JobLogUpdate) SetNillableTime(v *time.Time) *JobLogUpdate {
+	if v != nil {
+		_u.SetTime(*v)
 	}
-	return jlu
+	return _u
 }
 
 // SetPath sets the "path" field.
-func (jlu *JobLogUpdate) SetPath(s string) *JobLogUpdate {
-	jlu.mutation.SetPath(s)
-	return jlu
+func (_u *JobLogUpdate) SetPath(v string) *JobLogUpdate {
+	_u.mutation.SetPath(v)
+	return _u
 }
 
 // SetNillablePath sets the "path" field if the given value is not nil.
-func (jlu *JobLogUpdate) SetNillablePath(s *string) *JobLogUpdate {
-	if s != nil {
-		jlu.SetPath(*s)
+func (_u *JobLogUpdate) SetNillablePath(v *string) *JobLogUpdate {
+	if v != nil {
+		_u.SetPath(*v)
 	}
-	return jlu
+	return _u
 }
 
 // ClearPath clears the value of the "path" field.
-func (jlu *JobLogUpdate) ClearPath() *JobLogUpdate {
-	jlu.mutation.ClearPath()
-	return jlu
+func (_u *JobLogUpdate) ClearPath() *JobLogUpdate {
+	_u.mutation.ClearPath()
+	return _u
 }
 
 // SetWhat sets the "what" field.
-func (jlu *JobLogUpdate) SetWhat(j joblog.What) *JobLogUpdate {
-	jlu.mutation.SetWhat(j)
-	return jlu
+func (_u *JobLogUpdate) SetWhat(v joblog.What) *JobLogUpdate {
+	_u.mutation.SetWhat(v)
+	return _u
 }
 
 // SetNillableWhat sets the "what" field if the given value is not nil.
-func (jlu *JobLogUpdate) SetNillableWhat(j *joblog.What) *JobLogUpdate {
-	if j != nil {
-		jlu.SetWhat(*j)
+func (_u *JobLogUpdate) SetNillableWhat(v *joblog.What) *JobLogUpdate {
+	if v != nil {
+		_u.SetWhat(*v)
 	}
-	return jlu
+	return _u
 }
 
 // SetSize sets the "size" field.
-func (jlu *JobLogUpdate) SetSize(i int64) *JobLogUpdate {
-	jlu.mutation.ResetSize()
-	jlu.mutation.SetSize(i)
-	return jlu
+func (_u *JobLogUpdate) SetSize(v int64) *JobLogUpdate {
+	_u.mutation.ResetSize()
+	_u.mutation.SetSize(v)
+	return _u
 }
 
 // SetNillableSize sets the "size" field if the given value is not nil.
-func (jlu *JobLogUpdate) SetNillableSize(i *int64) *JobLogUpdate {
-	if i != nil {
-		jlu.SetSize(*i)
+func (_u *JobLogUpdate) SetNillableSize(v *int64) *JobLogUpdate {
+	if v != nil {
+		_u.SetSize(*v)
 	}
-	return jlu
+	return _u
 }
 
-// AddSize adds i to the "size" field.
-func (jlu *JobLogUpdate) AddSize(i int64) *JobLogUpdate {
-	jlu.mutation.AddSize(i)
-	return jlu
+// AddSize adds value to the "size" field.
+func (_u *JobLogUpdate) AddSize(v int64) *JobLogUpdate {
+	_u.mutation.AddSize(v)
+	return _u
 }
 
 // ClearSize clears the value of the "size" field.
-func (jlu *JobLogUpdate) ClearSize() *JobLogUpdate {
-	jlu.mutation.ClearSize()
-	return jlu
+func (_u *JobLogUpdate) ClearSize() *JobLogUpdate {
+	_u.mutation.ClearSize()
+	return _u
 }
 
 // SetJobID sets the "job" edge to the Job entity by ID.
-func (jlu *JobLogUpdate) SetJobID(id uuid.UUID) *JobLogUpdate {
-	jlu.mutation.SetJobID(id)
-	return jlu
+func (_u *JobLogUpdate) SetJobID(id uuid.UUID) *JobLogUpdate {
+	_u.mutation.SetJobID(id)
+	return _u
 }
 
 // SetJob sets the "job" edge to the Job entity.
-func (jlu *JobLogUpdate) SetJob(j *Job) *JobLogUpdate {
-	return jlu.SetJobID(j.ID)
+func (_u *JobLogUpdate) SetJob(v *Job) *JobLogUpdate {
+	return _u.SetJobID(v.ID)
 }
 
 // Mutation returns the JobLogMutation object of the builder.
-func (jlu *JobLogUpdate) Mutation() *JobLogMutation {
-	return jlu.mutation
+func (_u *JobLogUpdate) Mutation() *JobLogMutation {
+	return _u.mutation
 }
 
 // ClearJob clears the "job" edge to the Job entity.
-func (jlu *JobLogUpdate) ClearJob() *JobLogUpdate {
-	jlu.mutation.ClearJob()
-	return jlu
+func (_u *JobLogUpdate) ClearJob() *JobLogUpdate {
+	_u.mutation.ClearJob()
+	return _u
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
-func (jlu *JobLogUpdate) Save(ctx context.Context) (int, error) {
-	return withHooks(ctx, jlu.sqlSave, jlu.mutation, jlu.hooks)
+func (_u *JobLogUpdate) Save(ctx context.Context) (int, error) {
+	return withHooks(ctx, _u.sqlSave, _u.mutation, _u.hooks)
 }
 
 // SaveX is like Save, but panics if an error occurs.
-func (jlu *JobLogUpdate) SaveX(ctx context.Context) int {
-	affected, err := jlu.Save(ctx)
+func (_u *JobLogUpdate) SaveX(ctx context.Context) int {
+	affected, err := _u.Save(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -156,73 +156,73 @@ func (jlu *JobLogUpdate) SaveX(ctx context.Context) int {
 }
 
 // Exec executes the query.
-func (jlu *JobLogUpdate) Exec(ctx context.Context) error {
-	_, err := jlu.Save(ctx)
+func (_u *JobLogUpdate) Exec(ctx context.Context) error {
+	_, err := _u.Save(ctx)
 	return err
 }
 
 // ExecX is like Exec, but panics if an error occurs.
-func (jlu *JobLogUpdate) ExecX(ctx context.Context) {
-	if err := jlu.Exec(ctx); err != nil {
+func (_u *JobLogUpdate) ExecX(ctx context.Context) {
+	if err := _u.Exec(ctx); err != nil {
 		panic(err)
 	}
 }
 
 // check runs all checks and user-defined validators on the builder.
-func (jlu *JobLogUpdate) check() error {
-	if v, ok := jlu.mutation.Level(); ok {
+func (_u *JobLogUpdate) check() error {
+	if v, ok := _u.mutation.Level(); ok {
 		if err := joblog.LevelValidator(v); err != nil {
 			return &ValidationError{Name: "level", err: fmt.Errorf(`ent: validator failed for field "JobLog.level": %w`, err)}
 		}
 	}
-	if v, ok := jlu.mutation.What(); ok {
+	if v, ok := _u.mutation.What(); ok {
 		if err := joblog.WhatValidator(v); err != nil {
 			return &ValidationError{Name: "what", err: fmt.Errorf(`ent: validator failed for field "JobLog.what": %w`, err)}
 		}
 	}
-	if jlu.mutation.JobCleared() && len(jlu.mutation.JobIDs()) > 0 {
+	if _u.mutation.JobCleared() && len(_u.mutation.JobIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "JobLog.job"`)
 	}
 	return nil
 }
 
-func (jlu *JobLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
-	if err := jlu.check(); err != nil {
-		return n, err
+func (_u *JobLogUpdate) sqlSave(ctx context.Context) (_node int, err error) {
+	if err := _u.check(); err != nil {
+		return _node, err
 	}
 	_spec := sqlgraph.NewUpdateSpec(joblog.Table, joblog.Columns, sqlgraph.NewFieldSpec(joblog.FieldID, field.TypeInt))
-	if ps := jlu.mutation.predicates; len(ps) > 0 {
+	if ps := _u.mutation.predicates; len(ps) > 0 {
 		_spec.Predicate = func(selector *sql.Selector) {
 			for i := range ps {
 				ps[i](selector)
 			}
 		}
 	}
-	if value, ok := jlu.mutation.Level(); ok {
+	if value, ok := _u.mutation.Level(); ok {
 		_spec.SetField(joblog.FieldLevel, field.TypeEnum, value)
 	}
-	if value, ok := jlu.mutation.Time(); ok {
+	if value, ok := _u.mutation.Time(); ok {
 		_spec.SetField(joblog.FieldTime, field.TypeTime, value)
 	}
-	if value, ok := jlu.mutation.Path(); ok {
+	if value, ok := _u.mutation.Path(); ok {
 		_spec.SetField(joblog.FieldPath, field.TypeString, value)
 	}
-	if jlu.mutation.PathCleared() {
+	if _u.mutation.PathCleared() {
 		_spec.ClearField(joblog.FieldPath, field.TypeString)
 	}
-	if value, ok := jlu.mutation.What(); ok {
+	if value, ok := _u.mutation.What(); ok {
 		_spec.SetField(joblog.FieldWhat, field.TypeEnum, value)
 	}
-	if value, ok := jlu.mutation.Size(); ok {
+	if value, ok := _u.mutation.Size(); ok {
 		_spec.SetField(joblog.FieldSize, field.TypeInt64, value)
 	}
-	if value, ok := jlu.mutation.AddedSize(); ok {
+	if value, ok := _u.mutation.AddedSize(); ok {
 		_spec.AddField(joblog.FieldSize, field.TypeInt64, value)
 	}
-	if jlu.mutation.SizeCleared() {
+	if _u.mutation.SizeCleared() {
 		_spec.ClearField(joblog.FieldSize, field.TypeInt64)
 	}
-	if jlu.mutation.JobCleared() {
+	if _u.mutation.JobCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: true,
@@ -235,7 +235,7 @@ func (jlu *JobLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := jlu.mutation.JobIDs(); len(nodes) > 0 {
+	if nodes := _u.mutation.JobIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: true,
@@ -251,7 +251,7 @@ func (jlu *JobLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	if n, err = sqlgraph.UpdateNodes(ctx, jlu.driver, _spec); err != nil {
+	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{joblog.Label}
 		} else if sqlgraph.IsConstraintError(err) {
@@ -259,8 +259,8 @@ func (jlu *JobLogUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		return 0, err
 	}
-	jlu.mutation.done = true
-	return n, nil
+	_u.mutation.done = true
+	return _node, nil
 }
 
 // JobLogUpdateOne is the builder for updating a single JobLog entity.
@@ -272,137 +272,137 @@ type JobLogUpdateOne struct {
 }
 
 // SetLevel sets the "level" field.
-func (jluo *JobLogUpdateOne) SetLevel(j joblog.Level) *JobLogUpdateOne {
-	jluo.mutation.SetLevel(j)
-	return jluo
+func (_u *JobLogUpdateOne) SetLevel(v joblog.Level) *JobLogUpdateOne {
+	_u.mutation.SetLevel(v)
+	return _u
 }
 
 // SetNillableLevel sets the "level" field if the given value is not nil.
-func (jluo *JobLogUpdateOne) SetNillableLevel(j *joblog.Level) *JobLogUpdateOne {
-	if j != nil {
-		jluo.SetLevel(*j)
+func (_u *JobLogUpdateOne) SetNillableLevel(v *joblog.Level) *JobLogUpdateOne {
+	if v != nil {
+		_u.SetLevel(*v)
 	}
-	return jluo
+	return _u
 }
 
 // SetTime sets the "time" field.
-func (jluo *JobLogUpdateOne) SetTime(t time.Time) *JobLogUpdateOne {
-	jluo.mutation.SetTime(t)
-	return jluo
+func (_u *JobLogUpdateOne) SetTime(v time.Time) *JobLogUpdateOne {
+	_u.mutation.SetTime(v)
+	return _u
 }
 
 // SetNillableTime sets the "time" field if the given value is not nil.
-func (jluo *JobLogUpdateOne) SetNillableTime(t *time.Time) *JobLogUpdateOne {
-	if t != nil {
-		jluo.SetTime(*t)
+func (_u *JobLogUpdateOne) SetNillableTime(v *time.Time) *JobLogUpdateOne {
+	if v != nil {
+		_u.SetTime(*v)
 	}
-	return jluo
+	return _u
 }
 
 // SetPath sets the "path" field.
-func (jluo *JobLogUpdateOne) SetPath(s string) *JobLogUpdateOne {
-	jluo.mutation.SetPath(s)
-	return jluo
+func (_u *JobLogUpdateOne) SetPath(v string) *JobLogUpdateOne {
+	_u.mutation.SetPath(v)
+	return _u
 }
 
 // SetNillablePath sets the "path" field if the given value is not nil.
-func (jluo *JobLogUpdateOne) SetNillablePath(s *string) *JobLogUpdateOne {
-	if s != nil {
-		jluo.SetPath(*s)
+func (_u *JobLogUpdateOne) SetNillablePath(v *string) *JobLogUpdateOne {
+	if v != nil {
+		_u.SetPath(*v)
 	}
-	return jluo
+	return _u
 }
 
 // ClearPath clears the value of the "path" field.
-func (jluo *JobLogUpdateOne) ClearPath() *JobLogUpdateOne {
-	jluo.mutation.ClearPath()
-	return jluo
+func (_u *JobLogUpdateOne) ClearPath() *JobLogUpdateOne {
+	_u.mutation.ClearPath()
+	return _u
 }
 
 // SetWhat sets the "what" field.
-func (jluo *JobLogUpdateOne) SetWhat(j joblog.What) *JobLogUpdateOne {
-	jluo.mutation.SetWhat(j)
-	return jluo
+func (_u *JobLogUpdateOne) SetWhat(v joblog.What) *JobLogUpdateOne {
+	_u.mutation.SetWhat(v)
+	return _u
 }
 
 // SetNillableWhat sets the "what" field if the given value is not nil.
-func (jluo *JobLogUpdateOne) SetNillableWhat(j *joblog.What) *JobLogUpdateOne {
-	if j != nil {
-		jluo.SetWhat(*j)
+func (_u *JobLogUpdateOne) SetNillableWhat(v *joblog.What) *JobLogUpdateOne {
+	if v != nil {
+		_u.SetWhat(*v)
 	}
-	return jluo
+	return _u
 }
 
 // SetSize sets the "size" field.
-func (jluo *JobLogUpdateOne) SetSize(i int64) *JobLogUpdateOne {
-	jluo.mutation.ResetSize()
-	jluo.mutation.SetSize(i)
-	return jluo
+func (_u *JobLogUpdateOne) SetSize(v int64) *JobLogUpdateOne {
+	_u.mutation.ResetSize()
+	_u.mutation.SetSize(v)
+	return _u
 }
 
 // SetNillableSize sets the "size" field if the given value is not nil.
-func (jluo *JobLogUpdateOne) SetNillableSize(i *int64) *JobLogUpdateOne {
-	if i != nil {
-		jluo.SetSize(*i)
+func (_u *JobLogUpdateOne) SetNillableSize(v *int64) *JobLogUpdateOne {
+	if v != nil {
+		_u.SetSize(*v)
 	}
-	return jluo
+	return _u
 }
 
-// AddSize adds i to the "size" field.
-func (jluo *JobLogUpdateOne) AddSize(i int64) *JobLogUpdateOne {
-	jluo.mutation.AddSize(i)
-	return jluo
+// AddSize adds value to the "size" field.
+func (_u *JobLogUpdateOne) AddSize(v int64) *JobLogUpdateOne {
+	_u.mutation.AddSize(v)
+	return _u
 }
 
 // ClearSize clears the value of the "size" field.
-func (jluo *JobLogUpdateOne) ClearSize() *JobLogUpdateOne {
-	jluo.mutation.ClearSize()
-	return jluo
+func (_u *JobLogUpdateOne) ClearSize() *JobLogUpdateOne {
+	_u.mutation.ClearSize()
+	return _u
 }
 
 // SetJobID sets the "job" edge to the Job entity by ID.
-func (jluo *JobLogUpdateOne) SetJobID(id uuid.UUID) *JobLogUpdateOne {
-	jluo.mutation.SetJobID(id)
-	return jluo
+func (_u *JobLogUpdateOne) SetJobID(id uuid.UUID) *JobLogUpdateOne {
+	_u.mutation.SetJobID(id)
+	return _u
 }
 
 // SetJob sets the "job" edge to the Job entity.
-func (jluo *JobLogUpdateOne) SetJob(j *Job) *JobLogUpdateOne {
-	return jluo.SetJobID(j.ID)
+func (_u *JobLogUpdateOne) SetJob(v *Job) *JobLogUpdateOne {
+	return _u.SetJobID(v.ID)
 }
 
 // Mutation returns the JobLogMutation object of the builder.
-func (jluo *JobLogUpdateOne) Mutation() *JobLogMutation {
-	return jluo.mutation
+func (_u *JobLogUpdateOne) Mutation() *JobLogMutation {
+	return _u.mutation
 }
 
 // ClearJob clears the "job" edge to the Job entity.
-func (jluo *JobLogUpdateOne) ClearJob() *JobLogUpdateOne {
-	jluo.mutation.ClearJob()
-	return jluo
+func (_u *JobLogUpdateOne) ClearJob() *JobLogUpdateOne {
+	_u.mutation.ClearJob()
+	return _u
 }
 
 // Where appends a list predicates to the JobLogUpdate builder.
-func (jluo *JobLogUpdateOne) Where(ps ...predicate.JobLog) *JobLogUpdateOne {
-	jluo.mutation.Where(ps...)
-	return jluo
+func (_u *JobLogUpdateOne) Where(ps ...predicate.JobLog) *JobLogUpdateOne {
+	_u.mutation.Where(ps...)
+	return _u
 }
 
 // Select allows selecting one or more fields (columns) of the returned entity.
 // The default is selecting all fields defined in the entity schema.
-func (jluo *JobLogUpdateOne) Select(field string, fields ...string) *JobLogUpdateOne {
-	jluo.fields = append([]string{field}, fields...)
-	return jluo
+func (_u *JobLogUpdateOne) Select(field string, fields ...string) *JobLogUpdateOne {
+	_u.fields = append([]string{field}, fields...)
+	return _u
 }
 
 // Save executes the query and returns the updated JobLog entity.
-func (jluo *JobLogUpdateOne) Save(ctx context.Context) (*JobLog, error) {
-	return withHooks(ctx, jluo.sqlSave, jluo.mutation, jluo.hooks)
+func (_u *JobLogUpdateOne) Save(ctx context.Context) (*JobLog, error) {
+	return withHooks(ctx, _u.sqlSave, _u.mutation, _u.hooks)
 }
 
 // SaveX is like Save, but panics if an error occurs.
-func (jluo *JobLogUpdateOne) SaveX(ctx context.Context) *JobLog {
-	node, err := jluo.Save(ctx)
+func (_u *JobLogUpdateOne) SaveX(ctx context.Context) *JobLog {
+	node, err := _u.Save(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -410,47 +410,47 @@ func (jluo *JobLogUpdateOne) SaveX(ctx context.Context) *JobLog {
 }
 
 // Exec executes the query on the entity.
-func (jluo *JobLogUpdateOne) Exec(ctx context.Context) error {
-	_, err := jluo.Save(ctx)
+func (_u *JobLogUpdateOne) Exec(ctx context.Context) error {
+	_, err := _u.Save(ctx)
 	return err
 }
 
 // ExecX is like Exec, but panics if an error occurs.
-func (jluo *JobLogUpdateOne) ExecX(ctx context.Context) {
-	if err := jluo.Exec(ctx); err != nil {
+func (_u *JobLogUpdateOne) ExecX(ctx context.Context) {
+	if err := _u.Exec(ctx); err != nil {
 		panic(err)
 	}
 }
 
 // check runs all checks and user-defined validators on the builder.
-func (jluo *JobLogUpdateOne) check() error {
-	if v, ok := jluo.mutation.Level(); ok {
+func (_u *JobLogUpdateOne) check() error {
+	if v, ok := _u.mutation.Level(); ok {
 		if err := joblog.LevelValidator(v); err != nil {
 			return &ValidationError{Name: "level", err: fmt.Errorf(`ent: validator failed for field "JobLog.level": %w`, err)}
 		}
 	}
-	if v, ok := jluo.mutation.What(); ok {
+	if v, ok := _u.mutation.What(); ok {
 		if err := joblog.WhatValidator(v); err != nil {
 			return &ValidationError{Name: "what", err: fmt.Errorf(`ent: validator failed for field "JobLog.what": %w`, err)}
 		}
 	}
-	if jluo.mutation.JobCleared() && len(jluo.mutation.JobIDs()) > 0 {
+	if _u.mutation.JobCleared() && len(_u.mutation.JobIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "JobLog.job"`)
 	}
 	return nil
 }
 
-func (jluo *JobLogUpdateOne) sqlSave(ctx context.Context) (_node *JobLog, err error) {
-	if err := jluo.check(); err != nil {
+func (_u *JobLogUpdateOne) sqlSave(ctx context.Context) (_node *JobLog, err error) {
+	if err := _u.check(); err != nil {
 		return _node, err
 	}
 	_spec := sqlgraph.NewUpdateSpec(joblog.Table, joblog.Columns, sqlgraph.NewFieldSpec(joblog.FieldID, field.TypeInt))
-	id, ok := jluo.mutation.ID()
+	id, ok := _u.mutation.ID()
 	if !ok {
 		return nil, &ValidationError{Name: "id", err: errors.New(`ent: missing "JobLog.id" for update`)}
 	}
 	_spec.Node.ID.Value = id
-	if fields := jluo.fields; len(fields) > 0 {
+	if fields := _u.fields; len(fields) > 0 {
 		_spec.Node.Columns = make([]string, 0, len(fields))
 		_spec.Node.Columns = append(_spec.Node.Columns, joblog.FieldID)
 		for _, f := range fields {
@@ -462,38 +462,38 @@ func (jluo *JobLogUpdateOne) sqlSave(ctx context.Context) (_node *JobLog, err er
 			}
 		}
 	}
-	if ps := jluo.mutation.predicates; len(ps) > 0 {
+	if ps := _u.mutation.predicates; len(ps) > 0 {
 		_spec.Predicate = func(selector *sql.Selector) {
 			for i := range ps {
 				ps[i](selector)
 			}
 		}
 	}
-	if value, ok := jluo.mutation.Level(); ok {
+	if value, ok := _u.mutation.Level(); ok {
 		_spec.SetField(joblog.FieldLevel, field.TypeEnum, value)
 	}
-	if value, ok := jluo.mutation.Time(); ok {
+	if value, ok := _u.mutation.Time(); ok {
 		_spec.SetField(joblog.FieldTime, field.TypeTime, value)
 	}
-	if value, ok := jluo.mutation.Path(); ok {
+	if value, ok := _u.mutation.Path(); ok {
 		_spec.SetField(joblog.FieldPath, field.TypeString, value)
 	}
-	if jluo.mutation.PathCleared() {
+	if _u.mutation.PathCleared() {
 		_spec.ClearField(joblog.FieldPath, field.TypeString)
 	}
-	if value, ok := jluo.mutation.What(); ok {
+	if value, ok := _u.mutation.What(); ok {
 		_spec.SetField(joblog.FieldWhat, field.TypeEnum, value)
 	}
-	if value, ok := jluo.mutation.Size(); ok {
+	if value, ok := _u.mutation.Size(); ok {
 		_spec.SetField(joblog.FieldSize, field.TypeInt64, value)
 	}
-	if value, ok := jluo.mutation.AddedSize(); ok {
+	if value, ok := _u.mutation.AddedSize(); ok {
 		_spec.AddField(joblog.FieldSize, field.TypeInt64, value)
 	}
-	if jluo.mutation.SizeCleared() {
+	if _u.mutation.SizeCleared() {
 		_spec.ClearField(joblog.FieldSize, field.TypeInt64)
 	}
-	if jluo.mutation.JobCleared() {
+	if _u.mutation.JobCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: true,
@@ -506,7 +506,7 @@ func (jluo *JobLogUpdateOne) sqlSave(ctx context.Context) (_node *JobLog, err er
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := jluo.mutation.JobIDs(); len(nodes) > 0 {
+	if nodes := _u.mutation.JobIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: true,
@@ -522,10 +522,10 @@ func (jluo *JobLogUpdateOne) sqlSave(ctx context.Context) (_node *JobLog, err er
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	_node = &JobLog{config: jluo.config}
+	_node = &JobLog{config: _u.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues
-	if err = sqlgraph.UpdateNode(ctx, jluo.driver, _spec); err != nil {
+	if err = sqlgraph.UpdateNode(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{joblog.Label}
 		} else if sqlgraph.IsConstraintError(err) {
@@ -533,6 +533,6 @@ func (jluo *JobLogUpdateOne) sqlSave(ctx context.Context) (_node *JobLog, err er
 		}
 		return nil, err
 	}
-	jluo.mutation.done = true
+	_u.mutation.done = true
 	return _node, nil
 }

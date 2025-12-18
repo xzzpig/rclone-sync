@@ -9,6 +9,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
@@ -31,9 +32,19 @@ func TestJobService(t *testing.T) {
 	taskService := NewTaskService(client)
 	ctx := context.Background()
 
+	// Create a test connection for use across tests
+	encryptor, err := crypto.NewEncryptor("test-secret-key-32-bytes-long!!")
+	require.NoError(t, err)
+	connService := NewConnectionService(client, encryptor)
+	testConn, err := connService.CreateConnection(ctx, "test-local", "local", map[string]string{
+		"type": "local",
+	})
+	require.NoError(t, err)
+	testConnID := testConn.ID
+
 	// Helper to create a task for jobs
 	createTask := func(t *testing.T) uuid.UUID {
-		task, err := taskService.CreateTask(ctx, "Job Test Task "+uuid.NewString(), "/l", "r", "/r", "bidirectional", "", false, nil)
+		task, err := taskService.CreateTask(ctx, "Job Test Task "+uuid.NewString(), "/l", testConnID, "/r", "bidirectional", "", false, nil)
 		require.NoError(t, err)
 		return task.ID
 	}
@@ -171,7 +182,7 @@ func TestJobService(t *testing.T) {
 		})
 
 		t.Run("ListJobs", func(t *testing.T) {
-			list, err := service.ListJobs(ctx, &taskID, "", 10, 0)
+			list, err := service.ListJobs(ctx, &taskID, nil, 10, 0)
 			assert.NoError(t, err)
 			assert.Len(t, list, 2)
 			// Should be ordered by StartTime Desc
@@ -191,7 +202,7 @@ func TestJobService(t *testing.T) {
 
 		// Verify it is now failed
 		updated, _ := service.GetJob(ctx, j.ID)
-		assert.Equal(t, job.StatusFailed, updated.Status)
+		assert.Equal(t, job.StatusCancelled, updated.Status)
 		assert.Contains(t, updated.Errors, "System crash")
 	})
 
@@ -252,26 +263,29 @@ func TestJobService(t *testing.T) {
 
 		t.Run("NoFilters", func(t *testing.T) {
 			// There might be jobs from other tests, so we just check count > 0 or specific logic
-			count, err := service.CountJobs(ctx, nil, "")
+			count, err := service.CountJobs(ctx, nil, nil)
 			assert.NoError(t, err)
 			assert.GreaterOrEqual(t, count, 2)
 		})
 
 		t.Run("FilterByTaskID", func(t *testing.T) {
-			count, err := service.CountJobs(ctx, &newTaskID, "")
+			count, err := service.CountJobs(ctx, &newTaskID, nil)
 			assert.NoError(t, err)
 			assert.Equal(t, 2, count)
 		})
 
-		t.Run("FilterByRemoteName", func(t *testing.T) {
-			// The helper createTask uses fixed remote names, let's create a specific one
-			uniqueRemote := "unique-remote-" + uuid.NewString()
-			uniqueTask, err := taskService.CreateTask(ctx, "Unique Remote Task", "/l", uniqueRemote, "/r", "bidirectional", "", false, nil)
+		t.Run("FilterByConnectionID", func(t *testing.T) {
+			// Create a unique connection for this test
+			uniqueConn, err := connService.CreateConnection(ctx, "unique-conn-"+uuid.NewString(), "local", map[string]string{
+				"type": "local",
+			})
+			require.NoError(t, err)
+			uniqueTask, err := taskService.CreateTask(ctx, "Unique Connection Task", "/l", uniqueConn.ID, "/r", "bidirectional", "", false, nil)
 			require.NoError(t, err)
 			_, err = service.CreateJob(ctx, uniqueTask.ID, "manual")
 			require.NoError(t, err)
 
-			count, err := service.CountJobs(ctx, nil, uniqueRemote)
+			count, err := service.CountJobs(ctx, nil, &uniqueConn.ID)
 			assert.NoError(t, err)
 			assert.Equal(t, 1, count)
 		})
@@ -292,7 +306,7 @@ func TestJobService(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Run("ListJobLogs_FilterByLevel", func(t *testing.T) {
-			logs, err := service.ListJobLogs(ctx, "", nil, &jobID, "info", 10, 0)
+			logs, err := service.ListJobLogs(ctx, nil, nil, &jobID, "info", 10, 0)
 			assert.NoError(t, err)
 			assert.Len(t, logs, 2)
 			for _, l := range logs {
@@ -301,18 +315,18 @@ func TestJobService(t *testing.T) {
 		})
 
 		t.Run("CountJobLogs_FilterByLevel", func(t *testing.T) {
-			count, err := service.CountJobLogs(ctx, "", nil, &jobID, "error")
+			count, err := service.CountJobLogs(ctx, nil, nil, &jobID, "error")
 			assert.NoError(t, err)
 			assert.Equal(t, 1, count)
 		})
 
 		t.Run("ListJobLogs_Pagination", func(t *testing.T) {
 			// Determine order (default desc time)
-			logs, err := service.ListJobLogs(ctx, "", nil, &jobID, "", 1, 0) // First page, size 1
+			logs, err := service.ListJobLogs(ctx, nil, nil, &jobID, "", 1, 0) // First page, size 1
 			assert.NoError(t, err)
 			require.Len(t, logs, 1)
 
-			logs2, err := service.ListJobLogs(ctx, "", nil, &jobID, "", 1, 1) // Second page, size 1
+			logs2, err := service.ListJobLogs(ctx, nil, nil, &jobID, "", 1, 1) // Second page, size 1
 			assert.NoError(t, err)
 			require.Len(t, logs2, 1)
 
@@ -340,5 +354,196 @@ func TestJobService(t *testing.T) {
 		emptyTask := createTask(t)
 		_, err := service.GetLastJobByTaskID(ctx, emptyTask)
 		assert.ErrorIs(t, err, errs.ErrNotFound)
+	})
+
+	t.Run("ListJobs_FilterByConnectionID", func(t *testing.T) {
+		// Create a unique connection for this test
+		uniqueConn, err := connService.CreateConnection(ctx, "list-jobs-conn-"+uuid.NewString(), "local", map[string]string{
+			"type": "local",
+		})
+		require.NoError(t, err)
+
+		// Create a task for this connection
+		uniqueTask, err := taskService.CreateTask(ctx, "List Jobs Task "+uuid.NewString(), "/l", uniqueConn.ID, "/r", "bidirectional", "", false, nil)
+		require.NoError(t, err)
+
+		// Create jobs for this task
+		job1, err := service.CreateJob(ctx, uniqueTask.ID, "manual")
+		require.NoError(t, err)
+		job2, err := service.CreateJob(ctx, uniqueTask.ID, "schedule")
+		require.NoError(t, err)
+
+		// List jobs by connectionID
+		jobs, err := service.ListJobs(ctx, nil, &uniqueConn.ID, 10, 0)
+		assert.NoError(t, err)
+		assert.GreaterOrEqual(t, len(jobs), 2)
+
+		// Verify both jobs are in the results
+		foundJob1 := false
+		foundJob2 := false
+		for _, j := range jobs {
+			if j.ID == job1.ID {
+				foundJob1 = true
+			}
+			if j.ID == job2.ID {
+				foundJob2 = true
+			}
+		}
+		assert.True(t, foundJob1)
+		assert.True(t, foundJob2)
+	})
+
+	t.Run("UpdateJobStatus_AllStatuses", func(t *testing.T) {
+		taskID := createTask(t)
+
+		// Test Failed status
+		t.Run("Failed", func(t *testing.T) {
+			j, err := service.CreateJob(ctx, taskID, "manual")
+			require.NoError(t, err)
+
+			updated, err := service.UpdateJobStatus(ctx, j.ID, string(job.StatusFailed), "Test error message")
+			assert.NoError(t, err)
+			assert.Equal(t, job.StatusFailed, updated.Status)
+			assert.NotNil(t, updated.EndTime)
+			assert.Equal(t, "Test error message", updated.Errors)
+		})
+
+		// Test Cancelled status
+		t.Run("Cancelled", func(t *testing.T) {
+			j, err := service.CreateJob(ctx, taskID, "manual")
+			require.NoError(t, err)
+
+			updated, err := service.UpdateJobStatus(ctx, j.ID, string(job.StatusCancelled), "User cancelled")
+			assert.NoError(t, err)
+			assert.Equal(t, job.StatusCancelled, updated.Status)
+			assert.NotNil(t, updated.EndTime)
+			assert.Equal(t, "User cancelled", updated.Errors)
+		})
+
+		// Test Success with error string (edge case)
+		t.Run("Success_WithErrorString", func(t *testing.T) {
+			j, err := service.CreateJob(ctx, taskID, "manual")
+			require.NoError(t, err)
+
+			updated, err := service.UpdateJobStatus(ctx, j.ID, string(job.StatusSuccess), "Warning: some files skipped")
+			assert.NoError(t, err)
+			assert.Equal(t, job.StatusSuccess, updated.Status)
+			assert.NotNil(t, updated.EndTime)
+			assert.Equal(t, "Warning: some files skipped", updated.Errors)
+		})
+
+		// Test Running -> Failed transition
+		t.Run("Running_ToFailed", func(t *testing.T) {
+			j, err := service.CreateJob(ctx, taskID, "manual")
+			require.NoError(t, err)
+
+			// First set to running
+			_, err = service.UpdateJobStatus(ctx, j.ID, string(job.StatusRunning), "")
+			require.NoError(t, err)
+
+			// Then fail it
+			updated, err := service.UpdateJobStatus(ctx, j.ID, string(job.StatusFailed), "Connection lost")
+			assert.NoError(t, err)
+			assert.Equal(t, job.StatusFailed, updated.Status)
+			assert.NotNil(t, updated.EndTime)
+			assert.Equal(t, "Connection lost", updated.Errors)
+		})
+	})
+}
+
+// Additional test for UpdateJobStatus with multiple status transitions
+func TestJobService_UpdateJobStatus_Transitions(t *testing.T) {
+	client := enttest.Open(t, "sqlite3", "file:ent?mode=memory&cache=shared&_fk=1")
+	defer client.Close()
+
+	service := NewJobService(client)
+	taskService := NewTaskService(client)
+	ctx := context.Background()
+
+	// Create test connection
+	encryptor, err := crypto.NewEncryptor("test-secret-key-32-bytes-long!!")
+	require.NoError(t, err)
+	connService := NewConnectionService(client, encryptor)
+	testConn, err := connService.CreateConnection(ctx, "test-transitions", "local", map[string]string{
+		"type": "local",
+	})
+	require.NoError(t, err)
+
+	// Create task
+	task, err := taskService.CreateTask(ctx, "Transition Test Task", "/l", testConn.ID, "/r", "bidirectional", "", false, nil)
+	require.NoError(t, err)
+
+	// Create job
+	j, err := service.CreateJob(ctx, task.ID, "manual")
+	require.NoError(t, err)
+	assert.Equal(t, job.StatusPending, j.Status)
+
+	// Pending -> Running
+	updated, err := service.UpdateJobStatus(ctx, j.ID, string(job.StatusRunning), "")
+	require.NoError(t, err)
+	assert.Equal(t, job.StatusRunning, updated.Status)
+	assert.True(t, updated.EndTime.IsZero())
+	assert.Empty(t, updated.Errors)
+
+	// Running -> Success
+	updated, err = service.UpdateJobStatus(ctx, j.ID, string(job.StatusSuccess), "")
+	require.NoError(t, err)
+	assert.Equal(t, job.StatusSuccess, updated.Status)
+	assert.False(t, updated.EndTime.IsZero())
+	assert.Empty(t, updated.Errors)
+}
+
+// Additional test for CountJobLogs with multiple filters
+func TestJobService_CountJobLogs_ComplexFilters(t *testing.T) {
+	client := enttest.Open(t, "sqlite3", "file:ent?mode=memory&cache=shared&_fk=1")
+	defer client.Close()
+
+	service := NewJobService(client)
+	taskService := NewTaskService(client)
+	ctx := context.Background()
+
+	// Create test connection
+	encryptor, err := crypto.NewEncryptor("test-secret-key-32-bytes-long!!")
+	require.NoError(t, err)
+	connService := NewConnectionService(client, encryptor)
+	testConn, err := connService.CreateConnection(ctx, "test-count-logs", "local", map[string]string{
+		"type": "local",
+	})
+	require.NoError(t, err)
+
+	// Create task
+	task, err := taskService.CreateTask(ctx, "Count Logs Task", "/l", testConn.ID, "/r", "bidirectional", "", false, nil)
+	require.NoError(t, err)
+
+	// Create job
+	j, err := service.CreateJob(ctx, task.ID, "manual")
+	require.NoError(t, err)
+
+	// Add various logs
+	_, err = service.AddJobLog(ctx, j.ID, "info", "upload", "/file1", 100)
+	require.NoError(t, err)
+	_, err = service.AddJobLog(ctx, j.ID, "info", "download", "/file2", 200)
+	require.NoError(t, err)
+	_, err = service.AddJobLog(ctx, j.ID, "error", "error", "/file3", 0)
+	require.NoError(t, err)
+	_, err = service.AddJobLog(ctx, j.ID, "warning", "delete", "/file4", 0)
+	require.NoError(t, err)
+
+	t.Run("CountByConnectionAndLevel", func(t *testing.T) {
+		count, err := service.CountJobLogs(ctx, &testConn.ID, nil, nil, "info")
+		assert.NoError(t, err)
+		assert.Equal(t, 2, count)
+	})
+
+	t.Run("CountByTaskAndLevel", func(t *testing.T) {
+		count, err := service.CountJobLogs(ctx, nil, &task.ID, nil, "error")
+		assert.NoError(t, err)
+		assert.Equal(t, 1, count)
+	})
+
+	t.Run("CountByJobOnly", func(t *testing.T) {
+		count, err := service.CountJobLogs(ctx, nil, nil, &j.ID, "")
+		assert.NoError(t, err)
+		assert.Equal(t, 4, count)
 	})
 }

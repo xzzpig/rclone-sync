@@ -20,6 +20,7 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/api/handlers"
 )
 
+// SetupRouter creates and configures the Gin router with all middleware and routes.
 func SetupRouter(syncEngine *rclone.SyncEngine, taskRunner *runner.Runner, jobService ports.JobService, watcher ports.Watcher, scheduler ports.Scheduler) *gin.Engine {
 	if config.Cfg.App.Environment == "development" {
 		gin.SetMode(gin.DebugMode)
@@ -91,23 +92,22 @@ func setupFrontendService(r *gin.Engine) error {
 		// Check if file exists in FS
 		f, err := fs.Open(path)
 		if err == nil {
-			f.Close()
+			_ = f.Close()
 			http.FileServer(fs).ServeHTTP(c.Writer, c.Request)
 			return
 		}
 		// Fallback to index.html for SPA
 		// Try to open index.html
 		f, err = fs.Open("index.html")
-		if err == nil {
-			f.Close()
-			// Serve index.html
-			c.Request.URL.Path = "/"
-			http.FileServer(fs).ServeHTTP(c.Writer, c.Request)
-			return
-		} else {
+		if err != nil {
 			logger.L.Error("Failed to serve index.html", zap.Error(err))
 			handlers.NotFoundHandler(c)
+			return
 		}
+		_ = f.Close()
+		// Serve index.html
+		c.Request.URL.Path = "/"
+		http.FileServer(fs).ServeHTTP(c.Writer, c.Request)
 	})
 
 	return nil

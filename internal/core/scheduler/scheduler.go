@@ -1,3 +1,4 @@
+// Package scheduler provides cron-based task scheduling for the application.
 package scheduler
 
 import (
@@ -11,6 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// Scheduler manages scheduled task executions using cron.
 type Scheduler struct {
 	cron    *cron.Cron
 	taskSvc ports.TaskService
@@ -21,6 +23,7 @@ type Scheduler struct {
 	running bool
 }
 
+// NewScheduler creates a new Scheduler instance.
 func NewScheduler(taskSvc ports.TaskService, runner ports.Runner, opts ...cron.Option) *Scheduler {
 	return &Scheduler{
 		cron:    cron.New(opts...), // Standard 5-field cron (minute, hour, day, month, weekday)
@@ -31,6 +34,7 @@ func NewScheduler(taskSvc ports.TaskService, runner ports.Runner, opts ...cron.O
 	}
 }
 
+// Start starts the scheduler and loads scheduled tasks from the database.
 func (s *Scheduler) Start() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -44,6 +48,7 @@ func (s *Scheduler) Start() {
 	s.running = true
 }
 
+// Stop stops the scheduler.
 func (s *Scheduler) Stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -79,6 +84,7 @@ func (s *Scheduler) loadScheduledTasks() {
 	s.logger.Info("Finished loading scheduled tasks", zap.Int("count", len(s.jobMap)))
 }
 
+// AddTask adds a task to the scheduler.
 func (s *Scheduler) AddTask(task *ent.Task) error {
 	if task.Schedule == "" {
 		return nil
@@ -88,6 +94,7 @@ func (s *Scheduler) AddTask(task *ent.Task) error {
 	return s.addJob(task)
 }
 
+// RemoveTask removes a task from the scheduler.
 func (s *Scheduler) RemoveTask(task *ent.Task) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -107,7 +114,7 @@ func (s *Scheduler) addJob(task *ent.Task) error {
 
 		// Reload task from database to get the latest configuration
 		ctx := context.Background()
-		currentTask, err := s.taskSvc.GetTask(ctx, taskID)
+		currentTask, err := s.taskSvc.GetTaskWithConnection(ctx, taskID)
 		if err != nil {
 			s.logger.Error("Failed to get task for scheduled run",
 				zap.String("task_id", taskIDStr),
@@ -115,7 +122,7 @@ func (s *Scheduler) addJob(task *ent.Task) error {
 			return
 		}
 
-		s.runner.StartTask(currentTask, "schedule")
+		_ = s.runner.StartTask(currentTask, "schedule")
 	})
 
 	if err != nil {
@@ -134,3 +141,5 @@ func (s *Scheduler) removeJob(taskID string) {
 		s.logger.Info("Removed task from scheduler", zap.String("task_id", taskID))
 	}
 }
+
+var _ ports.Scheduler = (*Scheduler)(nil)

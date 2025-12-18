@@ -38,7 +38,7 @@ import IconRefreshCw from '~icons/lucide/refresh-cw';
 import ConnectionViewLayout from '../layouts/ConnectionViewLayout';
 
 const History: Component = () => {
-  const params = useParams<{ connectionName: string }>();
+  const params = useParams<{ connectionId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams<{ task_id?: string; page?: string }>();
   const [historyState, historyActions] = useHistory();
@@ -53,7 +53,7 @@ const History: Component = () => {
     const taskId = selectedTaskId();
     const page = currentPage();
     historyActions.loadJobs({
-      remote_name: params.connectionName,
+      connection_id: params.connectionId,
       task_id: taskId,
       page,
     });
@@ -72,7 +72,7 @@ const History: Component = () => {
 
   // Filter tasks by current connection
   const filteredTasks = createMemo(() => {
-    return taskState.tasks.filter((t) => t.remote_name === params.connectionName);
+    return taskState.tasks.filter((t) => t.connection_id === params.connectionId);
   });
 
   const taskNameMap = createMemo(() => {
@@ -87,12 +87,12 @@ const History: Component = () => {
     const queryParams = new URLSearchParams();
     if (jobId) queryParams.set('job_id', jobId);
     if (taskId) queryParams.set('task_id', taskId);
-    navigate(`/connections/${params.connectionName}/log?${queryParams.toString()}`);
+    navigate(`/connections/${params.connectionId}/log?${queryParams.toString()}`);
   };
 
   const handleRefresh = () => {
     historyActions.loadJobs({
-      remote_name: params.connectionName,
+      connection_id: params.connectionId,
       task_id: selectedTaskId(),
       page: currentPage(),
     });

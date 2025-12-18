@@ -1,0 +1,737 @@
+openapi: 3.0.3
+info:
+  title: Rclone Sync Manager - Connection API
+  description: |
+    连接配置管理 API，用于管理云存储连接配置的数据库存储。
+    支持 CRUD 操作、连接状态监控和从 rclone.conf 导入功能。
+  version: 1.0.0
+  contact:
+    name: Rclone Sync Manager
+
+servers:
+  - url: /api
+    description: API Base Path
+
+tags:
+  - name: Connections
+    description: 连接配置管理
+  - name: Files
+    description: 文件浏览
+  - name: Import
+    description: 从 rclone.conf 导入
+
+paths:
+  /connections:
+    get:
+      tags: [Connections]
+      summary: 获取连接列表
+      description: 返回所有已配置的云存储连接（不包含敏感配置详情）
+      operationId: listConnections
+      responses:
+        "200":
+          description: 连接列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConnectionSummary"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      tags: [Connections]
+      summary: 创建新连接
+      description: 创建一个新的云存储连接，名称必须唯一
+      operationId: createConnection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConnectionCreate"
+      responses:
+        "201":
+          description: 连接创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectionSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          description: 连接名称已存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /connections/test:
+    post:
+      tags: [Connections]
+      summary: 测试未保存的配置
+      description: 测试未保存的连接配置是否可以正常工作（用于创建连接前验证）
+      operationId: testUnsavedConfig
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+                - config
+              properties:
+                type:
+                  type: string
+                  description: 提供商类型
+                config:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: 配置参数
+      responses:
+        "200":
+          description: 测试成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        "400":
+          description: 测试失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /connections/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: 连接 UUID
+
+    get:
+      tags: [Connections]
+      summary: 获取连接信息
+      description: 返回指定连接的基本信息（不包含配置详情）
+      operationId: getConnection
+      responses:
+        "200":
+          description: 连接信息
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectionSummary"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    put:
+      tags: [Connections]
+      summary: 更新连接配置
+      description: 更新指定连接的配置信息（支持可选更新连接名称和类型）
+      operationId: updateConnection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConnectionUpdate"
+      responses:
+        "204":
+          description: 连接更新成功（无返回内容）
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: 连接名称冲突
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    delete:
+      tags: [Connections]
+      summary: 删除连接
+      description: |
+        删除指定的云存储连接。
+        如果连接被同步任务使用，需要在查询参数中确认 force=true。
+      operationId: deleteConnection
+      parameters:
+        - name: force
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: 强制删除（即使有关联的同步任务）
+      responses:
+        "200":
+          description: 连接删除成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: 连接被同步任务使用，需要确认删除
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteConfirmation"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /connections/{id}/config:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: 连接 UUID
+
+    get:
+      tags: [Connections]
+      summary: 获取连接完整配置
+      description: 返回指定连接的完整配置（解密后，用于编辑）
+      operationId: getConnectionConfig
+      responses:
+        "200":
+          description: 连接完整配置
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                description: 完整配置参数（含敏感字段原值）
+                example:
+                  type: onedrive
+                  token: '{"access_token":"...","refresh_token":"..."}'
+                  drive_id: abc123
+                  drive_type: personal
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /connections/{id}/test:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: 连接 UUID
+
+    post:
+      tags: [Connections]
+      summary: 测试已保存的连接
+      description: 测试指定连接是否可以正常工作
+      operationId: testConnection
+      responses:
+        "200":
+          description: 连接测试成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        "400":
+          description: 连接测试失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /connections/{id}/quota:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: 连接 UUID
+
+    get:
+      tags: [Connections]
+      summary: 获取连接配额信息
+      description: 返回远程存储的空间使用情况
+      operationId: getConnectionQuota
+      responses:
+        "200":
+          description: 配额信息
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quota"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /connections/{id}/events:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: 连接 UUID
+
+    get:
+      tags: [Connections]
+      summary: 订阅连接事件
+      description: SSE 端点，用于实时推送连接状态变化事件
+      operationId: streamConnectionEvents
+      responses:
+        "200":
+          description: SSE 事件流
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /files/remote/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: 连接 UUID
+
+    get:
+      tags: [Files]
+      summary: 浏览远程文件目录
+      description: 根据连接 ID 列出远程存储的目录内容
+      operationId: listRemoteFiles
+      parameters:
+        - name: path
+          in: query
+          required: true
+          schema:
+            type: string
+          description: 远程目录路径
+          example: /
+      responses:
+        "200":
+          description: 目录内容列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FileEntry"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /import/parse:
+    post:
+      tags: [Import]
+      summary: 解析 rclone.conf 内容
+      description: |
+        解析用户粘贴的 rclone.conf 内容，返回验证结果和预览列表。
+        这是导入向导的第一步。
+      operationId: parseImport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - content
+              properties:
+                content:
+                  type: string
+                  description: rclone.conf 文件内容
+      responses:
+        "200":
+          description: 解析成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportParseResult"
+        "400":
+          description: 解析失败（格式错误或内部重复）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /import/execute:
+    post:
+      tags: [Import]
+      summary: 执行批量导入
+      description: |
+        将预览列表中的连接批量导入到数据库。
+        对于与现有连接名称冲突的项，将覆盖现有配置。
+      operationId: executeImport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - connections
+              properties:
+                connections:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/ImportItem"
+                  description: 要导入的连接列表
+      responses:
+        "200":
+          description: 导入成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  schemas:
+    ConnectionSummary:
+      type: object
+      required:
+        - id
+        - name
+        - type
+        - load_status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: 连接名称
+          example: my-onedrive
+        type:
+          type: string
+          description: 提供商类型
+          example: onedrive
+        load_status:
+          $ref: "#/components/schemas/LoadStatus"
+        load_error:
+          type: string
+          nullable: true
+          description: 加载失败时的错误信息
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ConnectionCreate:
+      type: object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+          description: 连接名称（必须唯一）
+          pattern: "^[a-zA-Z_][a-zA-Z0-9_-]*$"
+          maxLength: 64
+          example: my-onedrive
+        type:
+          type: string
+          description: 提供商类型
+          example: onedrive
+        config:
+          type: object
+          additionalProperties:
+            type: string
+          description: 配置参数
+          example:
+            token: '{"access_token":"...","refresh_token":"..."}'
+            drive_id: abc123
+
+    ConnectionUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          description: 可选：更新连接名称
+          pattern: "^[a-zA-Z_][a-zA-Z0-9_-]*$"
+          maxLength: 64
+          example: my-new-name
+        type:
+          type: string
+          description: 可选：更新提供商类型
+          example: s3
+        config:
+          type: object
+          additionalProperties:
+            type: string
+          description: 更新的配置参数（至少需要提供 name、type 或 config 之一）
+
+    LoadStatus:
+      type: string
+      enum:
+        - loaded
+        - loading
+        - error
+      description: |
+        加载状态（从内存获取）：
+        - loaded: 已加载到 rclone cache
+        - loading: 正在加载中
+        - error: 加载失败
+
+    Quota:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+          description: 总空间（字节）
+        used:
+          type: integer
+          format: int64
+          description: 已用空间（字节）
+        free:
+          type: integer
+          format: int64
+          description: 可用空间（字节）
+        trashed:
+          type: integer
+          format: int64
+          description: 回收站占用（字节）
+        other:
+          type: integer
+          format: int64
+          description: 其他占用（字节）
+
+    DeleteConfirmation:
+      type: object
+      required:
+        - message
+        - requires_confirmation
+      properties:
+        message:
+          type: string
+          description: 警告消息
+          example: 该连接被同步任务使用，确定要删除吗？
+        requires_confirmation:
+          type: boolean
+          example: true
+        task_count:
+          type: integer
+          description: 使用该连接的任务数量
+          example: 2
+
+    ImportParseResult:
+      type: object
+      required:
+        - valid
+        - connections
+      properties:
+        valid:
+          type: boolean
+          description: 是否可以继续导入
+        connections:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportPreviewItem"
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportError"
+
+    ImportPreviewItem:
+      type: object
+      required:
+        - name
+        - type
+        - config
+        - test_status
+        - will_overwrite
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        config:
+          type: object
+          additionalProperties:
+            type: string
+        test_status:
+          type: string
+          enum:
+            - pending
+            - success
+            - failed
+        test_error:
+          type: string
+          nullable: true
+        will_overwrite:
+          type: boolean
+          description: 是否会覆盖现有连接
+
+    ImportItem:
+      type: object
+      required:
+        - name
+        - type
+        - config
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        config:
+          type: object
+          additionalProperties:
+            type: string
+
+    ImportError:
+      type: object
+      required:
+        - name
+        - error
+      properties:
+        name:
+          type: string
+          description: 连接名称
+        error:
+          type: string
+          description: 错误类型
+          enum:
+            - duplicate_in_import
+            - missing_type
+            - invalid_format
+            - unsupported_type
+
+    ImportResult:
+      type: object
+      required:
+        - success_count
+        - failed_count
+      properties:
+        success_count:
+          type: integer
+          description: 成功导入的数量
+        failed_count:
+          type: integer
+          description: 失败的数量
+        created:
+          type: array
+          items:
+            type: string
+          description: 新创建的连接名称
+        updated:
+          type: array
+          items:
+            type: string
+          description: 更新的连接名称
+        failures:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportError"
+
+    FileEntry:
+      type: object
+      required:
+        - name
+        - path
+        - is_dir
+      properties:
+        name:
+          type: string
+          description: 文件或目录名称
+          example: Documents
+        path:
+          type: string
+          description: 完整路径
+          example: /Documents
+        is_dir:
+          type: boolean
+          description: 是否为目录
+          example: true
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: 错误代码
+        message:
+          type: string
+          description: 错误消息（已本地化）
+
+  responses:
+    BadRequest:
+      description: 请求参数无效
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    InternalError:
+      description: 服务器内部错误
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"

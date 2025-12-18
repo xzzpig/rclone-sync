@@ -24,8 +24,8 @@ func (Task) Fields() []ent.Field {
 			NotEmpty(),
 		field.String("source_path").
 			NotEmpty(),
-		field.String("remote_name").
-			NotEmpty(),
+		field.UUID("connection_id", uuid.UUID{}).
+			Optional(),
 		field.String("remote_path").
 			NotEmpty(),
 		field.Enum("direction").
@@ -50,5 +50,9 @@ func (Task) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.To("jobs", Job.Type).
 			Annotations(entsql.OnDelete(entsql.Cascade)),
+		edge.From("connection", Connection.Type).
+			Ref("tasks").
+			Unique().
+			Field("connection_id"),
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/core/ent/connection"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/task"
 )
@@ -23,148 +24,161 @@ type TaskCreate struct {
 }
 
 // SetName sets the "name" field.
-func (tc *TaskCreate) SetName(s string) *TaskCreate {
-	tc.mutation.SetName(s)
-	return tc
+func (_c *TaskCreate) SetName(v string) *TaskCreate {
+	_c.mutation.SetName(v)
+	return _c
 }
 
 // SetSourcePath sets the "source_path" field.
-func (tc *TaskCreate) SetSourcePath(s string) *TaskCreate {
-	tc.mutation.SetSourcePath(s)
-	return tc
+func (_c *TaskCreate) SetSourcePath(v string) *TaskCreate {
+	_c.mutation.SetSourcePath(v)
+	return _c
 }
 
-// SetRemoteName sets the "remote_name" field.
-func (tc *TaskCreate) SetRemoteName(s string) *TaskCreate {
-	tc.mutation.SetRemoteName(s)
-	return tc
+// SetConnectionID sets the "connection_id" field.
+func (_c *TaskCreate) SetConnectionID(v uuid.UUID) *TaskCreate {
+	_c.mutation.SetConnectionID(v)
+	return _c
+}
+
+// SetNillableConnectionID sets the "connection_id" field if the given value is not nil.
+func (_c *TaskCreate) SetNillableConnectionID(v *uuid.UUID) *TaskCreate {
+	if v != nil {
+		_c.SetConnectionID(*v)
+	}
+	return _c
 }
 
 // SetRemotePath sets the "remote_path" field.
-func (tc *TaskCreate) SetRemotePath(s string) *TaskCreate {
-	tc.mutation.SetRemotePath(s)
-	return tc
+func (_c *TaskCreate) SetRemotePath(v string) *TaskCreate {
+	_c.mutation.SetRemotePath(v)
+	return _c
 }
 
 // SetDirection sets the "direction" field.
-func (tc *TaskCreate) SetDirection(t task.Direction) *TaskCreate {
-	tc.mutation.SetDirection(t)
-	return tc
+func (_c *TaskCreate) SetDirection(v task.Direction) *TaskCreate {
+	_c.mutation.SetDirection(v)
+	return _c
 }
 
 // SetNillableDirection sets the "direction" field if the given value is not nil.
-func (tc *TaskCreate) SetNillableDirection(t *task.Direction) *TaskCreate {
-	if t != nil {
-		tc.SetDirection(*t)
+func (_c *TaskCreate) SetNillableDirection(v *task.Direction) *TaskCreate {
+	if v != nil {
+		_c.SetDirection(*v)
 	}
-	return tc
+	return _c
 }
 
 // SetSchedule sets the "schedule" field.
-func (tc *TaskCreate) SetSchedule(s string) *TaskCreate {
-	tc.mutation.SetSchedule(s)
-	return tc
+func (_c *TaskCreate) SetSchedule(v string) *TaskCreate {
+	_c.mutation.SetSchedule(v)
+	return _c
 }
 
 // SetNillableSchedule sets the "schedule" field if the given value is not nil.
-func (tc *TaskCreate) SetNillableSchedule(s *string) *TaskCreate {
-	if s != nil {
-		tc.SetSchedule(*s)
+func (_c *TaskCreate) SetNillableSchedule(v *string) *TaskCreate {
+	if v != nil {
+		_c.SetSchedule(*v)
 	}
-	return tc
+	return _c
 }
 
 // SetRealtime sets the "realtime" field.
-func (tc *TaskCreate) SetRealtime(b bool) *TaskCreate {
-	tc.mutation.SetRealtime(b)
-	return tc
+func (_c *TaskCreate) SetRealtime(v bool) *TaskCreate {
+	_c.mutation.SetRealtime(v)
+	return _c
 }
 
 // SetNillableRealtime sets the "realtime" field if the given value is not nil.
-func (tc *TaskCreate) SetNillableRealtime(b *bool) *TaskCreate {
-	if b != nil {
-		tc.SetRealtime(*b)
+func (_c *TaskCreate) SetNillableRealtime(v *bool) *TaskCreate {
+	if v != nil {
+		_c.SetRealtime(*v)
 	}
-	return tc
+	return _c
 }
 
 // SetOptions sets the "options" field.
-func (tc *TaskCreate) SetOptions(m map[string]interface{}) *TaskCreate {
-	tc.mutation.SetOptions(m)
-	return tc
+func (_c *TaskCreate) SetOptions(v map[string]interface{}) *TaskCreate {
+	_c.mutation.SetOptions(v)
+	return _c
 }
 
 // SetCreatedAt sets the "created_at" field.
-func (tc *TaskCreate) SetCreatedAt(t time.Time) *TaskCreate {
-	tc.mutation.SetCreatedAt(t)
-	return tc
+func (_c *TaskCreate) SetCreatedAt(v time.Time) *TaskCreate {
+	_c.mutation.SetCreatedAt(v)
+	return _c
 }
 
 // SetNillableCreatedAt sets the "created_at" field if the given value is not nil.
-func (tc *TaskCreate) SetNillableCreatedAt(t *time.Time) *TaskCreate {
-	if t != nil {
-		tc.SetCreatedAt(*t)
+func (_c *TaskCreate) SetNillableCreatedAt(v *time.Time) *TaskCreate {
+	if v != nil {
+		_c.SetCreatedAt(*v)
 	}
-	return tc
+	return _c
 }
 
 // SetUpdatedAt sets the "updated_at" field.
-func (tc *TaskCreate) SetUpdatedAt(t time.Time) *TaskCreate {
-	tc.mutation.SetUpdatedAt(t)
-	return tc
+func (_c *TaskCreate) SetUpdatedAt(v time.Time) *TaskCreate {
+	_c.mutation.SetUpdatedAt(v)
+	return _c
 }
 
 // SetNillableUpdatedAt sets the "updated_at" field if the given value is not nil.
-func (tc *TaskCreate) SetNillableUpdatedAt(t *time.Time) *TaskCreate {
-	if t != nil {
-		tc.SetUpdatedAt(*t)
+func (_c *TaskCreate) SetNillableUpdatedAt(v *time.Time) *TaskCreate {
+	if v != nil {
+		_c.SetUpdatedAt(*v)
 	}
-	return tc
+	return _c
 }
 
 // SetID sets the "id" field.
-func (tc *TaskCreate) SetID(u uuid.UUID) *TaskCreate {
-	tc.mutation.SetID(u)
-	return tc
+func (_c *TaskCreate) SetID(v uuid.UUID) *TaskCreate {
+	_c.mutation.SetID(v)
+	return _c
 }
 
 // SetNillableID sets the "id" field if the given value is not nil.
-func (tc *TaskCreate) SetNillableID(u *uuid.UUID) *TaskCreate {
-	if u != nil {
-		tc.SetID(*u)
+func (_c *TaskCreate) SetNillableID(v *uuid.UUID) *TaskCreate {
+	if v != nil {
+		_c.SetID(*v)
 	}
-	return tc
+	return _c
 }
 
 // AddJobIDs adds the "jobs" edge to the Job entity by IDs.
-func (tc *TaskCreate) AddJobIDs(ids ...uuid.UUID) *TaskCreate {
-	tc.mutation.AddJobIDs(ids...)
-	return tc
+func (_c *TaskCreate) AddJobIDs(ids ...uuid.UUID) *TaskCreate {
+	_c.mutation.AddJobIDs(ids...)
+	return _c
 }
 
 // AddJobs adds the "jobs" edges to the Job entity.
-func (tc *TaskCreate) AddJobs(j ...*Job) *TaskCreate {
-	ids := make([]uuid.UUID, len(j))
-	for i := range j {
-		ids[i] = j[i].ID
+func (_c *TaskCreate) AddJobs(v ...*Job) *TaskCreate {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
 	}
-	return tc.AddJobIDs(ids...)
+	return _c.AddJobIDs(ids...)
+}
+
+// SetConnection sets the "connection" edge to the Connection entity.
+func (_c *TaskCreate) SetConnection(v *Connection) *TaskCreate {
+	return _c.SetConnectionID(v.ID)
 }
 
 // Mutation returns the TaskMutation object of the builder.
-func (tc *TaskCreate) Mutation() *TaskMutation {
-	return tc.mutation
+func (_c *TaskCreate) Mutation() *TaskMutation {
+	return _c.mutation
 }
 
 // Save creates the Task in the database.
-func (tc *TaskCreate) Save(ctx context.Context) (*Task, error) {
-	tc.defaults()
-	return withHooks(ctx, tc.sqlSave, tc.mutation, tc.hooks)
+func (_c *TaskCreate) Save(ctx context.Context) (*Task, error) {
+	_c.defaults()
+	return withHooks(ctx, _c.sqlSave, _c.mutation, _c.hooks)
 }
 
 // SaveX calls Save and panics if Save returns an error.
-func (tc *TaskCreate) SaveX(ctx context.Context) *Task {
-	v, err := tc.Save(ctx)
+func (_c *TaskCreate) SaveX(ctx context.Context) *Task {
+	v, err := _c.Save(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -172,102 +186,94 @@ func (tc *TaskCreate) SaveX(ctx context.Context) *Task {
 }
 
 // Exec executes the query.
-func (tc *TaskCreate) Exec(ctx context.Context) error {
-	_, err := tc.Save(ctx)
+func (_c *TaskCreate) Exec(ctx context.Context) error {
+	_, err := _c.Save(ctx)
 	return err
 }
 
 // ExecX is like Exec, but panics if an error occurs.
-func (tc *TaskCreate) ExecX(ctx context.Context) {
-	if err := tc.Exec(ctx); err != nil {
+func (_c *TaskCreate) ExecX(ctx context.Context) {
+	if err := _c.Exec(ctx); err != nil {
 		panic(err)
 	}
 }
 
 // defaults sets the default values of the builder before save.
-func (tc *TaskCreate) defaults() {
-	if _, ok := tc.mutation.Direction(); !ok {
+func (_c *TaskCreate) defaults() {
+	if _, ok := _c.mutation.Direction(); !ok {
 		v := task.DefaultDirection
-		tc.mutation.SetDirection(v)
+		_c.mutation.SetDirection(v)
 	}
-	if _, ok := tc.mutation.Realtime(); !ok {
+	if _, ok := _c.mutation.Realtime(); !ok {
 		v := task.DefaultRealtime
-		tc.mutation.SetRealtime(v)
+		_c.mutation.SetRealtime(v)
 	}
-	if _, ok := tc.mutation.CreatedAt(); !ok {
+	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := task.DefaultCreatedAt()
-		tc.mutation.SetCreatedAt(v)
+		_c.mutation.SetCreatedAt(v)
 	}
-	if _, ok := tc.mutation.UpdatedAt(); !ok {
+	if _, ok := _c.mutation.UpdatedAt(); !ok {
 		v := task.DefaultUpdatedAt()
-		tc.mutation.SetUpdatedAt(v)
+		_c.mutation.SetUpdatedAt(v)
 	}
-	if _, ok := tc.mutation.ID(); !ok {
+	if _, ok := _c.mutation.ID(); !ok {
 		v := task.DefaultID()
-		tc.mutation.SetID(v)
+		_c.mutation.SetID(v)
 	}
 }
 
 // check runs all checks and user-defined validators on the builder.
-func (tc *TaskCreate) check() error {
-	if _, ok := tc.mutation.Name(); !ok {
+func (_c *TaskCreate) check() error {
+	if _, ok := _c.mutation.Name(); !ok {
 		return &ValidationError{Name: "name", err: errors.New(`ent: missing required field "Task.name"`)}
 	}
-	if v, ok := tc.mutation.Name(); ok {
+	if v, ok := _c.mutation.Name(); ok {
 		if err := task.NameValidator(v); err != nil {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Task.name": %w`, err)}
 		}
 	}
-	if _, ok := tc.mutation.SourcePath(); !ok {
+	if _, ok := _c.mutation.SourcePath(); !ok {
 		return &ValidationError{Name: "source_path", err: errors.New(`ent: missing required field "Task.source_path"`)}
 	}
-	if v, ok := tc.mutation.SourcePath(); ok {
+	if v, ok := _c.mutation.SourcePath(); ok {
 		if err := task.SourcePathValidator(v); err != nil {
 			return &ValidationError{Name: "source_path", err: fmt.Errorf(`ent: validator failed for field "Task.source_path": %w`, err)}
 		}
 	}
-	if _, ok := tc.mutation.RemoteName(); !ok {
-		return &ValidationError{Name: "remote_name", err: errors.New(`ent: missing required field "Task.remote_name"`)}
-	}
-	if v, ok := tc.mutation.RemoteName(); ok {
-		if err := task.RemoteNameValidator(v); err != nil {
-			return &ValidationError{Name: "remote_name", err: fmt.Errorf(`ent: validator failed for field "Task.remote_name": %w`, err)}
-		}
-	}
-	if _, ok := tc.mutation.RemotePath(); !ok {
+	if _, ok := _c.mutation.RemotePath(); !ok {
 		return &ValidationError{Name: "remote_path", err: errors.New(`ent: missing required field "Task.remote_path"`)}
 	}
-	if v, ok := tc.mutation.RemotePath(); ok {
+	if v, ok := _c.mutation.RemotePath(); ok {
 		if err := task.RemotePathValidator(v); err != nil {
 			return &ValidationError{Name: "remote_path", err: fmt.Errorf(`ent: validator failed for field "Task.remote_path": %w`, err)}
 		}
 	}
-	if _, ok := tc.mutation.Direction(); !ok {
+	if _, ok := _c.mutation.Direction(); !ok {
 		return &ValidationError{Name: "direction", err: errors.New(`ent: missing required field "Task.direction"`)}
 	}
-	if v, ok := tc.mutation.Direction(); ok {
+	if v, ok := _c.mutation.Direction(); ok {
 		if err := task.DirectionValidator(v); err != nil {
 			return &ValidationError{Name: "direction", err: fmt.Errorf(`ent: validator failed for field "Task.direction": %w`, err)}
 		}
 	}
-	if _, ok := tc.mutation.Realtime(); !ok {
+	if _, ok := _c.mutation.Realtime(); !ok {
 		return &ValidationError{Name: "realtime", err: errors.New(`ent: missing required field "Task.realtime"`)}
 	}
-	if _, ok := tc.mutation.CreatedAt(); !ok {
+	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "Task.created_at"`)}
 	}
-	if _, ok := tc.mutation.UpdatedAt(); !ok {
+	if _, ok := _c.mutation.UpdatedAt(); !ok {
 		return &ValidationError{Name: "updated_at", err: errors.New(`ent: missing required field "Task.updated_at"`)}
 	}
 	return nil
 }
 
-func (tc *TaskCreate) sqlSave(ctx context.Context) (*Task, error) {
-	if err := tc.check(); err != nil {
+func (_c *TaskCreate) sqlSave(ctx context.Context) (*Task, error) {
+	if err := _c.check(); err != nil {
 		return nil, err
 	}
-	_node, _spec := tc.createSpec()
-	if err := sqlgraph.CreateNode(ctx, tc.driver, _spec); err != nil {
+	_node, _spec := _c.createSpec()
+	if err := sqlgraph.CreateNode(ctx, _c.driver, _spec); err != nil {
 		if sqlgraph.IsConstraintError(err) {
 			err = &ConstraintError{msg: err.Error(), wrap: err}
 		}
@@ -280,61 +286,57 @@ func (tc *TaskCreate) sqlSave(ctx context.Context) (*Task, error) {
 			return nil, err
 		}
 	}
-	tc.mutation.id = &_node.ID
-	tc.mutation.done = true
+	_c.mutation.id = &_node.ID
+	_c.mutation.done = true
 	return _node, nil
 }
 
-func (tc *TaskCreate) createSpec() (*Task, *sqlgraph.CreateSpec) {
+func (_c *TaskCreate) createSpec() (*Task, *sqlgraph.CreateSpec) {
 	var (
-		_node = &Task{config: tc.config}
+		_node = &Task{config: _c.config}
 		_spec = sqlgraph.NewCreateSpec(task.Table, sqlgraph.NewFieldSpec(task.FieldID, field.TypeUUID))
 	)
-	if id, ok := tc.mutation.ID(); ok {
+	if id, ok := _c.mutation.ID(); ok {
 		_node.ID = id
 		_spec.ID.Value = &id
 	}
-	if value, ok := tc.mutation.Name(); ok {
+	if value, ok := _c.mutation.Name(); ok {
 		_spec.SetField(task.FieldName, field.TypeString, value)
 		_node.Name = value
 	}
-	if value, ok := tc.mutation.SourcePath(); ok {
+	if value, ok := _c.mutation.SourcePath(); ok {
 		_spec.SetField(task.FieldSourcePath, field.TypeString, value)
 		_node.SourcePath = value
 	}
-	if value, ok := tc.mutation.RemoteName(); ok {
-		_spec.SetField(task.FieldRemoteName, field.TypeString, value)
-		_node.RemoteName = value
-	}
-	if value, ok := tc.mutation.RemotePath(); ok {
+	if value, ok := _c.mutation.RemotePath(); ok {
 		_spec.SetField(task.FieldRemotePath, field.TypeString, value)
 		_node.RemotePath = value
 	}
-	if value, ok := tc.mutation.Direction(); ok {
+	if value, ok := _c.mutation.Direction(); ok {
 		_spec.SetField(task.FieldDirection, field.TypeEnum, value)
 		_node.Direction = value
 	}
-	if value, ok := tc.mutation.Schedule(); ok {
+	if value, ok := _c.mutation.Schedule(); ok {
 		_spec.SetField(task.FieldSchedule, field.TypeString, value)
 		_node.Schedule = value
 	}
-	if value, ok := tc.mutation.Realtime(); ok {
+	if value, ok := _c.mutation.Realtime(); ok {
 		_spec.SetField(task.FieldRealtime, field.TypeBool, value)
 		_node.Realtime = value
 	}
-	if value, ok := tc.mutation.Options(); ok {
+	if value, ok := _c.mutation.Options(); ok {
 		_spec.SetField(task.FieldOptions, field.TypeJSON, value)
 		_node.Options = value
 	}
-	if value, ok := tc.mutation.CreatedAt(); ok {
+	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(task.FieldCreatedAt, field.TypeTime, value)
 		_node.CreatedAt = value
 	}
-	if value, ok := tc.mutation.UpdatedAt(); ok {
+	if value, ok := _c.mutation.UpdatedAt(); ok {
 		_spec.SetField(task.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
 	}
-	if nodes := tc.mutation.JobsIDs(); len(nodes) > 0 {
+	if nodes := _c.mutation.JobsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
 			Inverse: false,
@@ -350,6 +352,23 @@ func (tc *TaskCreate) createSpec() (*Task, *sqlgraph.CreateSpec) {
 		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
+	if nodes := _c.mutation.ConnectionIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   task.ConnectionTable,
+			Columns: []string{task.ConnectionColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(connection.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.ConnectionID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
 	return _node, _spec
 }
 
@@ -361,16 +380,16 @@ type TaskCreateBulk struct {
 }
 
 // Save creates the Task entities in the database.
-func (tcb *TaskCreateBulk) Save(ctx context.Context) ([]*Task, error) {
-	if tcb.err != nil {
-		return nil, tcb.err
+func (_c *TaskCreateBulk) Save(ctx context.Context) ([]*Task, error) {
+	if _c.err != nil {
+		return nil, _c.err
 	}
-	specs := make([]*sqlgraph.CreateSpec, len(tcb.builders))
-	nodes := make([]*Task, len(tcb.builders))
-	mutators := make([]Mutator, len(tcb.builders))
-	for i := range tcb.builders {
+	specs := make([]*sqlgraph.CreateSpec, len(_c.builders))
+	nodes := make([]*Task, len(_c.builders))
+	mutators := make([]Mutator, len(_c.builders))
+	for i := range _c.builders {
 		func(i int, root context.Context) {
-			builder := tcb.builders[i]
+			builder := _c.builders[i]
 			builder.defaults()
 			var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 				mutation, ok := m.(*TaskMutation)
@@ -384,11 +403,11 @@ func (tcb *TaskCreateBulk) Save(ctx context.Context) ([]*Task, error) {
 				var err error
 				nodes[i], specs[i] = builder.createSpec()
 				if i < len(mutators)-1 {
-					_, err = mutators[i+1].Mutate(root, tcb.builders[i+1].mutation)
+					_, err = mutators[i+1].Mutate(root, _c.builders[i+1].mutation)
 				} else {
 					spec := &sqlgraph.BatchCreateSpec{Nodes: specs}
 					// Invoke the actual operation on the latest mutation in the chain.
-					if err = sqlgraph.BatchCreate(ctx, tcb.driver, spec); err != nil {
+					if err = sqlgraph.BatchCreate(ctx, _c.driver, spec); err != nil {
 						if sqlgraph.IsConstraintError(err) {
 							err = &ConstraintError{msg: err.Error(), wrap: err}
 						}
@@ -408,7 +427,7 @@ func (tcb *TaskCreateBulk) Save(ctx context.Context) ([]*Task, error) {
 		}(i, ctx)
 	}
 	if len(mutators) > 0 {
-		if _, err := mutators[0].Mutate(ctx, tcb.builders[0].mutation); err != nil {
+		if _, err := mutators[0].Mutate(ctx, _c.builders[0].mutation); err != nil {
 			return nil, err
 		}
 	}
@@ -416,8 +435,8 @@ func (tcb *TaskCreateBulk) Save(ctx context.Context) ([]*Task, error) {
 }
 
 // SaveX is like Save, but panics if an error occurs.
-func (tcb *TaskCreateBulk) SaveX(ctx context.Context) []*Task {
-	v, err := tcb.Save(ctx)
+func (_c *TaskCreateBulk) SaveX(ctx context.Context) []*Task {
+	v, err := _c.Save(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -425,14 +444,14 @@ func (tcb *TaskCreateBulk) SaveX(ctx context.Context) []*Task {
 }
 
 // Exec executes the query.
-func (tcb *TaskCreateBulk) Exec(ctx context.Context) error {
-	_, err := tcb.Save(ctx)
+func (_c *TaskCreateBulk) Exec(ctx context.Context) error {
+	_, err := _c.Save(ctx)
 	return err
 }
 
 // ExecX is like Exec, but panics if an error occurs.
-func (tcb *TaskCreateBulk) ExecX(ctx context.Context) {
-	if err := tcb.Exec(ctx); err != nil {
+func (_c *TaskCreateBulk) ExecX(ctx context.Context) {
+	if err := _c.Exec(ctx); err != nil {
 		panic(err)
 	}
 }

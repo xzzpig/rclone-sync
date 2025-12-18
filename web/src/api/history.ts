@@ -2,7 +2,7 @@ import api from '@/lib/api';
 import { Job, PaginatedResponse } from '@/lib/types';
 
 export interface JobsParams {
-  remote_name?: string;
+  connection_id?: string;
   task_id?: string;
   limit?: number;
   offset?: number;

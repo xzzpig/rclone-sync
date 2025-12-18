@@ -9,8 +9,15 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/xzzpig/rclone-sync/internal/core/crypto"
+	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
+	"github.com/xzzpig/rclone-sync/internal/core/services"
+	"github.com/xzzpig/rclone-sync/internal/rclone"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func TestListLocalFiles(t *testing.T) {
@@ -48,7 +55,7 @@ func TestListLocalFiles(t *testing.T) {
 		},
 		{
 			name:           "invalid path",
-			path:           "/nonexistent/path",
+			path:           filepath.Join(tmpDir, "nonexistent"),
 			expectedDirs:   nil,
 			expectedStatus: http.StatusBadRequest,
 		},
@@ -114,21 +121,61 @@ func TestListLocalFilesWithBlacklist(t *testing.T) {
 func TestListRemoteFiles(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
+	// Setup test database and services
+	client := enttest.Open(t, "sqlite3", "file:ent?mode=memory&cache=shared&_fk=1")
+	defer client.Close()
+
+	encryptor, err := crypto.NewEncryptor("test-key-12345678901234567890123")
+	require.NoError(t, err)
+
+	connService := services.NewConnectionService(client, encryptor)
+	filesHandler := NewFilesHandler(connService)
+
+	// Create a test connection
+	conn, err := connService.CreateConnection(t.Context(), "test_remote", "local", map[string]string{
+		"type": "local",
+	})
+	require.NoError(t, err)
+
+	storage := rclone.NewDBStorage(connService)
+	storage.Install()
+
+	tmpDir := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(tmpDir, "test_folder"), 0755))
+
 	tests := []struct {
 		name           string
-		remoteName     string
+		connectionID   string
 		path           string
 		expectedStatus int
 	}{
 		{
-			name:           "missing remote name",
-			remoteName:     "",
+			name:           "successful listing",
+			connectionID:   conn.ID.String(),
+			path:           tmpDir,
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "missing connection id",
+			connectionID:   "",
+			path:           "/",
+			expectedStatus: http.StatusNotFound,
+		},
+		{
+			name:           "invalid connection id format",
+			connectionID:   "invalid-uuid",
+			path:           "/",
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "connection not found",
+			connectionID:   uuid.New().String(),
 			path:           "/",
 			expectedStatus: http.StatusNotFound,
 		},
 		{
 			name:           "missing path",
-			remoteName:     "test-remote",
+			connectionID:   conn.ID.String(),
 			path:           "",
 			expectedStatus: http.StatusBadRequest,
 		},
@@ -137,9 +184,9 @@ func TestListRemoteFiles(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			router := gin.New()
-			router.GET("/files/remote/:name", ListRemoteFiles)
+			router.GET("/files/remote/:id", filesHandler.ListRemoteFiles)
 
-			url := "/files/remote/" + tt.remoteName
+			url := "/files/remote/" + tt.connectionID
 			if tt.path != "" {
 				url += "?path=" + tt.path
 			}

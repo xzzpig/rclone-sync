@@ -1,3 +1,4 @@
+// Package sse provides Server-Sent Events functionality for real-time updates.
 package sse
 
 import (
@@ -9,11 +10,13 @@ import (
 	"go.uber.org/zap"
 )
 
+// Event represents a Server-Sent Event with a type and data payload.
 type Event struct {
 	Type string `json:"type"`
 	Data any    `json:"data"`
 }
 
+// Broadcaster manages SSE client subscriptions and event distribution.
 type Broadcaster struct {
 	clients   map[chan Event]bool
 	mu        sync.RWMutex
@@ -35,6 +38,7 @@ func GetBroker() *Broadcaster {
 	return broker
 }
 
+// NewBroadcaster creates a new Broadcaster instance.
 func NewBroadcaster() *Broadcaster {
 	return &Broadcaster{
 		clients:   make(map[chan Event]bool),
@@ -55,6 +59,7 @@ func (b *Broadcaster) run() {
 	}
 }
 
+// Subscribe registers a new client and returns a channel for receiving events.
 func (b *Broadcaster) Subscribe() chan Event {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -64,6 +69,7 @@ func (b *Broadcaster) Subscribe() chan Event {
 	return client
 }
 
+// Unsubscribe removes a client from the broadcaster.
 func (b *Broadcaster) Unsubscribe(client chan Event) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -74,6 +80,7 @@ func (b *Broadcaster) Unsubscribe(client chan Event) {
 	}
 }
 
+// Submit sends an event to all subscribed clients.
 func (b *Broadcaster) Submit(event Event) {
 	select {
 	case b.eventChan <- event:
@@ -94,15 +101,17 @@ func (b *Broadcaster) broadcast(event Event) {
 	}
 }
 
+// Stop terminates the broadcaster's event loop.
 func (b *Broadcaster) Stop() {
 	close(b.stopChan)
 }
 
+// Handler is a Gin handler function for SSE endpoints.
 func Handler(c *gin.Context) {
 	clientChan := GetBroker().Subscribe()
 	defer GetBroker().Unsubscribe(clientChan)
 
-	c.Stream(func(w io.Writer) bool {
+	c.Stream(func(_ io.Writer) bool {
 		select {
 		case event, ok := <-clientChan:
 			if !ok {

@@ -76,6 +76,12 @@ other = "Failed to create remote"
 [error_failed_to_get_quota]
 other = "Failed to get remote quota"
 
+[error_import_parse_failed]
+other = "Failed to parse rclone.conf content"
+
+[error_import_empty_list]
+other = "No connections to import"
+
 # Status messages
 [status_syncing]
 other = "Syncing"

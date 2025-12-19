@@ -27,6 +27,8 @@ const (
 	ErrFailedToListRemotes  = "error_failed_to_list_remotes"
 	ErrFailedToCreateRemote = "error_failed_to_create_remote"
 	ErrFailedToGetQuota     = "error_failed_to_get_quota"
+	ErrImportParseFailed    = "error_import_parse_failed"
+	ErrImportEmptyList      = "error_import_empty_list"
 )
 
 // Status message keys

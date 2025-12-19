@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/core/ent/connection"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/task"
 )
 
@@ -23,8 +24,8 @@ type Task struct {
 	Name string `json:"name,omitempty"`
 	// SourcePath holds the value of the "source_path" field.
 	SourcePath string `json:"source_path,omitempty"`
-	// RemoteName holds the value of the "remote_name" field.
-	RemoteName string `json:"remote_name,omitempty"`
+	// ConnectionID holds the value of the "connection_id" field.
+	ConnectionID uuid.UUID `json:"connection_id,omitempty"`
 	// RemotePath holds the value of the "remote_path" field.
 	RemotePath string `json:"remote_path,omitempty"`
 	// Direction holds the value of the "direction" field.
@@ -49,9 +50,11 @@ type Task struct {
 type TaskEdges struct {
 	// Jobs holds the value of the jobs edge.
 	Jobs []*Job `json:"jobs,omitempty"`
+	// Connection holds the value of the connection edge.
+	Connection *Connection `json:"connection,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [2]bool
 }
 
 // JobsOrErr returns the Jobs value or an error if the edge
@@ -63,6 +66,17 @@ func (e TaskEdges) JobsOrErr() ([]*Job, error) {
 	return nil, &NotLoadedError{edge: "jobs"}
 }
 
+// ConnectionOrErr returns the Connection value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e TaskEdges) ConnectionOrErr() (*Connection, error) {
+	if e.Connection != nil {
+		return e.Connection, nil
+	} else if e.loadedTypes[1] {
+		return nil, &NotFoundError{label: connection.Label}
+	}
+	return nil, &NotLoadedError{edge: "connection"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*Task) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
@@ -72,11 +86,11 @@ func (*Task) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case task.FieldRealtime:
 			values[i] = new(sql.NullBool)
-		case task.FieldName, task.FieldSourcePath, task.FieldRemoteName, task.FieldRemotePath, task.FieldDirection, task.FieldSchedule:
+		case task.FieldName, task.FieldSourcePath, task.FieldRemotePath, task.FieldDirection, task.FieldSchedule:
 			values[i] = new(sql.NullString)
 		case task.FieldCreatedAt, task.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
-		case task.FieldID:
+		case task.FieldID, task.FieldConnectionID:
 			values[i] = new(uuid.UUID)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -87,7 +101,7 @@ func (*Task) scanValues(columns []string) ([]any, error) {
 
 // assignValues assigns the values that were returned from sql.Rows (after scanning)
 // to the Task fields.
-func (t *Task) assignValues(columns []string, values []any) error {
+func (_m *Task) assignValues(columns []string, values []any) error {
 	if m, n := len(values), len(columns); m < n {
 		return fmt.Errorf("mismatch number of scan values: %d != %d", m, n)
 	}
@@ -97,55 +111,55 @@ func (t *Task) assignValues(columns []string, values []any) error {
 			if value, ok := values[i].(*uuid.UUID); !ok {
 				return fmt.Errorf("unexpected type %T for field id", values[i])
 			} else if value != nil {
-				t.ID = *value
+				_m.ID = *value
 			}
 		case task.FieldName:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field name", values[i])
 			} else if value.Valid {
-				t.Name = value.String
+				_m.Name = value.String
 			}
 		case task.FieldSourcePath:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field source_path", values[i])
 			} else if value.Valid {
-				t.SourcePath = value.String
+				_m.SourcePath = value.String
 			}
-		case task.FieldRemoteName:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field remote_name", values[i])
-			} else if value.Valid {
-				t.RemoteName = value.String
+		case task.FieldConnectionID:
+			if value, ok := values[i].(*uuid.UUID); !ok {
+				return fmt.Errorf("unexpected type %T for field connection_id", values[i])
+			} else if value != nil {
+				_m.ConnectionID = *value
 			}
 		case task.FieldRemotePath:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field remote_path", values[i])
 			} else if value.Valid {
-				t.RemotePath = value.String
+				_m.RemotePath = value.String
 			}
 		case task.FieldDirection:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field direction", values[i])
 			} else if value.Valid {
-				t.Direction = task.Direction(value.String)
+				_m.Direction = task.Direction(value.String)
 			}
 		case task.FieldSchedule:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field schedule", values[i])
 			} else if value.Valid {
-				t.Schedule = value.String
+				_m.Schedule = value.String
 			}
 		case task.FieldRealtime:
 			if value, ok := values[i].(*sql.NullBool); !ok {
 				return fmt.Errorf("unexpected type %T for field realtime", values[i])
 			} else if value.Valid {
-				t.Realtime = value.Bool
+				_m.Realtime = value.Bool
 			}
 		case task.FieldOptions:
 			if value, ok := values[i].(*[]byte); !ok {
 				return fmt.Errorf("unexpected type %T for field options", values[i])
 			} else if value != nil && len(*value) > 0 {
-				if err := json.Unmarshal(*value, &t.Options); err != nil {
+				if err := json.Unmarshal(*value, &_m.Options); err != nil {
 					return fmt.Errorf("unmarshal field options: %w", err)
 				}
 			}
@@ -153,16 +167,16 @@ func (t *Task) assignValues(columns []string, values []any) error {
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
 			} else if value.Valid {
-				t.CreatedAt = value.Time
+				_m.CreatedAt = value.Time
 			}
 		case task.FieldUpdatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field updated_at", values[i])
 			} else if value.Valid {
-				t.UpdatedAt = value.Time
+				_m.UpdatedAt = value.Time
 			}
 		default:
-			t.selectValues.Set(columns[i], values[i])
+			_m.selectValues.Set(columns[i], values[i])
 		}
 	}
 	return nil
@@ -170,67 +184,72 @@ func (t *Task) assignValues(columns []string, values []any) error {
 
 // Value returns the ent.Value that was dynamically selected and assigned to the Task.
 // This includes values selected through modifiers, order, etc.
-func (t *Task) Value(name string) (ent.Value, error) {
-	return t.selectValues.Get(name)
+func (_m *Task) Value(name string) (ent.Value, error) {
+	return _m.selectValues.Get(name)
 }
 
 // QueryJobs queries the "jobs" edge of the Task entity.
-func (t *Task) QueryJobs() *JobQuery {
-	return NewTaskClient(t.config).QueryJobs(t)
+func (_m *Task) QueryJobs() *JobQuery {
+	return NewTaskClient(_m.config).QueryJobs(_m)
+}
+
+// QueryConnection queries the "connection" edge of the Task entity.
+func (_m *Task) QueryConnection() *ConnectionQuery {
+	return NewTaskClient(_m.config).QueryConnection(_m)
 }
 
 // Update returns a builder for updating this Task.
 // Note that you need to call Task.Unwrap() before calling this method if this Task
 // was returned from a transaction, and the transaction was committed or rolled back.
-func (t *Task) Update() *TaskUpdateOne {
-	return NewTaskClient(t.config).UpdateOne(t)
+func (_m *Task) Update() *TaskUpdateOne {
+	return NewTaskClient(_m.config).UpdateOne(_m)
 }
 
 // Unwrap unwraps the Task entity that was returned from a transaction after it was closed,
 // so that all future queries will be executed through the driver which created the transaction.
-func (t *Task) Unwrap() *Task {
-	_tx, ok := t.config.driver.(*txDriver)
+func (_m *Task) Unwrap() *Task {
+	_tx, ok := _m.config.driver.(*txDriver)
 	if !ok {
 		panic("ent: Task is not a transactional entity")
 	}
-	t.config.driver = _tx.drv
-	return t
+	_m.config.driver = _tx.drv
+	return _m
 }
 
 // String implements the fmt.Stringer.
-func (t *Task) String() string {
+func (_m *Task) String() string {
 	var builder strings.Builder
 	builder.WriteString("Task(")
-	builder.WriteString(fmt.Sprintf("id=%v, ", t.ID))
+	builder.WriteString(fmt.Sprintf("id=%v, ", _m.ID))
 	builder.WriteString("name=")
-	builder.WriteString(t.Name)
+	builder.WriteString(_m.Name)
 	builder.WriteString(", ")
 	builder.WriteString("source_path=")
-	builder.WriteString(t.SourcePath)
+	builder.WriteString(_m.SourcePath)
 	builder.WriteString(", ")
-	builder.WriteString("remote_name=")
-	builder.WriteString(t.RemoteName)
+	builder.WriteString("connection_id=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ConnectionID))
 	builder.WriteString(", ")
 	builder.WriteString("remote_path=")
-	builder.WriteString(t.RemotePath)
+	builder.WriteString(_m.RemotePath)
 	builder.WriteString(", ")
 	builder.WriteString("direction=")
-	builder.WriteString(fmt.Sprintf("%v", t.Direction))
+	builder.WriteString(fmt.Sprintf("%v", _m.Direction))
 	builder.WriteString(", ")
 	builder.WriteString("schedule=")
-	builder.WriteString(t.Schedule)
+	builder.WriteString(_m.Schedule)
 	builder.WriteString(", ")
 	builder.WriteString("realtime=")
-	builder.WriteString(fmt.Sprintf("%v", t.Realtime))
+	builder.WriteString(fmt.Sprintf("%v", _m.Realtime))
 	builder.WriteString(", ")
 	builder.WriteString("options=")
-	builder.WriteString(fmt.Sprintf("%v", t.Options))
+	builder.WriteString(fmt.Sprintf("%v", _m.Options))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
-	builder.WriteString(t.CreatedAt.Format(time.ANSIC))
+	builder.WriteString(_m.CreatedAt.Format(time.ANSIC))
 	builder.WriteString(", ")
 	builder.WriteString("updated_at=")
-	builder.WriteString(t.UpdatedAt.Format(time.ANSIC))
+	builder.WriteString(_m.UpdatedAt.Format(time.ANSIC))
 	builder.WriteByte(')')
 	return builder.String()
 }

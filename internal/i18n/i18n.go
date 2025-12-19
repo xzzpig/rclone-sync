@@ -1,3 +1,4 @@
+// Package i18n provides internationalization support for the application.
 package i18n
 
 import (
@@ -17,13 +18,13 @@ var localeFS embed.FS
 
 var bundle *i18n.Bundle
 
-// Init 初始化 i18n bundle
-// 应该在应用启动时调用
+// Init initializes the i18n bundle.
+// Should be called when the application starts.
 func Init() error {
 	bundle = i18n.NewBundle(language.English)
 	bundle.RegisterUnmarshalFunc("toml", toml.Unmarshal)
 
-	// 从嵌入文件加载
+	// Load from embedded files
 	if _, err := bundle.LoadMessageFileFS(localeFS, "locales/en.toml"); err != nil {
 		return fmt.Errorf("failed to load en.toml: %w", err)
 	}
@@ -87,30 +88,30 @@ func TPlural(localizer *i18n.Localizer, msgID string, count int, data map[string
 	return msg
 }
 
-// ========== context.Context 相关函数 ==========
+// ========== context.Context related functions ==========
 
-// contextKey 是 context.Context 中存储值的键类型
+// contextKey is the type for keys used to store values in context.Context
 type contextKey string
 
 const (
-	// ContextKeyLocalizer 是 context.Context 中 Localizer 的键
+	// ContextKeyLocalizer is the key for Localizer in context.Context
 	ContextKeyLocalizer contextKey = "i18n.localizer"
-	// ContextKeyLocale 是 context.Context 中 locale 字符串的键
+	// ContextKeyLocale is the key for the locale string in context.Context
 	ContextKeyLocale contextKey = "i18n.locale"
 )
 
-// WithLocalizer 将 Localizer 存入 context.Context
+// WithLocalizer stores a Localizer in context.Context
 func WithLocalizer(ctx context.Context, localizer *i18n.Localizer) context.Context {
 	return context.WithValue(ctx, ContextKeyLocalizer, localizer)
 }
 
-// WithLocale 将 locale 字符串存入 context.Context
+// WithLocale stores a locale string in context.Context
 func WithLocale(ctx context.Context, locale string) context.Context {
 	return context.WithValue(ctx, ContextKeyLocale, locale)
 }
 
-// LocalizerFromContext 从 context.Context 获取 Localizer
-// 如果不存在，返回英文 Localizer
+// LocalizerFromContext retrieves a Localizer from context.Context
+// If not found, returns an English Localizer
 func LocalizerFromContext(ctx context.Context) *i18n.Localizer {
 	if localizer, ok := ctx.Value(ContextKeyLocalizer).(*i18n.Localizer); ok {
 		return localizer
@@ -118,8 +119,8 @@ func LocalizerFromContext(ctx context.Context) *i18n.Localizer {
 	return NewLocalizer("en")
 }
 
-// LocaleFromContext 从 context.Context 获取 locale 字符串
-// 如果不存在，返回 "en"
+// LocaleFromContext retrieves a locale string from context.Context
+// If not found, returns "en"
 func LocaleFromContext(ctx context.Context) string {
 	if locale, ok := ctx.Value(ContextKeyLocale).(string); ok {
 		return locale
@@ -127,124 +128,124 @@ func LocaleFromContext(ctx context.Context) string {
 	return "en"
 }
 
-// Ctx 是在业务逻辑中使用的便捷翻译函数
-// 直接从 context.Context 获取 Localizer 并翻译消息
+// Ctx is a convenient translation function for business logic
+// It retrieves the Localizer directly from context.Context and translates the message
 func Ctx(ctx context.Context, msgID string) string {
 	return T(LocalizerFromContext(ctx), msgID)
 }
 
-// CtxWithData 是在业务逻辑中使用的带数据便捷翻译函数
+// CtxWithData is a convenient translation function with data for business logic
 func CtxWithData(ctx context.Context, msgID string, data map[string]interface{}) string {
 	return TWithData(LocalizerFromContext(ctx), msgID, data)
 }
 
-// CtxPlural 是在业务逻辑中使用的复数便捷翻译函数
+// CtxPlural is a convenient plural translation function for business logic
 func CtxPlural(ctx context.Context, msgID string, count int, data map[string]interface{}) string {
 	return TPlural(LocalizerFromContext(ctx), msgID, count, data)
 }
 
-// ========== I18nError 错误类型 ==========
+// ========== I18nError error type ==========
 
-// I18nError 是一个可翻译的错误类型
-// 用于在业务逻辑层返回需要翻译的错误
-type I18nError struct {
-	// MsgID 是翻译消息的键
+// Error is a translatable error type
+// Used to return errors that need to be translated in the business logic layer
+type Error struct {
+	// MsgID is the key for the translated message
 	MsgID string
-	// Data 是翻译模板的数据（可选）
+	// Data is the data for the translation template (optional)
 	Data map[string]interface{}
-	// StatusCode 是 HTTP 状态码（默认 400）
+	// StatusCode is the HTTP status code (default 400)
 	StatusCode int
-	// Cause 是原始错误（可选）
+	// Cause is the original error (optional)
 	Cause error
 }
 
-// Error 实现 error 接口
-// 返回消息 ID（用于日志等场景）
-func (e *I18nError) Error() string {
+// Error implements the error interface
+// Returns the message ID (for logging and other scenarios)
+func (e *Error) Error() string {
 	if e.Cause != nil {
 		return fmt.Sprintf("%s: %v", e.MsgID, e.Cause)
 	}
 	return e.MsgID
 }
 
-// Unwrap 返回原始错误
-func (e *I18nError) Unwrap() error {
+// Unwrap returns the original error
+func (e *Error) Unwrap() error {
 	return e.Cause
 }
 
-// Translate 使用给定的 localizer 翻译错误消息
-func (e *I18nError) Translate(localizer *i18n.Localizer) string {
+// Translate translates the error message using the given localizer
+func (e *Error) Translate(localizer *i18n.Localizer) string {
 	if e.Data != nil {
 		return TWithData(localizer, e.MsgID, e.Data)
 	}
 	return T(localizer, e.MsgID)
 }
 
-// TranslateCtx 使用 context 中的 localizer 翻译错误消息
-func (e *I18nError) TranslateCtx(ctx context.Context) string {
+// TranslateCtx translates the error message using the localizer from context
+func (e *Error) TranslateCtx(ctx context.Context) string {
 	return e.Translate(LocalizerFromContext(ctx))
 }
 
-// NewI18nError 创建一个新的 I18nError
-func NewI18nError(msgID string) *I18nError {
-	return &I18nError{
+// NewI18nError creates a new I18nError
+func NewI18nError(msgID string) *Error {
+	return &Error{
 		MsgID:      msgID,
 		StatusCode: 400,
 	}
 }
 
-// NewI18nErrorWithData 创建一个带数据的 I18nError
-func NewI18nErrorWithData(msgID string, data map[string]interface{}) *I18nError {
-	return &I18nError{
+// NewI18nErrorWithData creates an I18nError with data
+func NewI18nErrorWithData(msgID string, data map[string]interface{}) *Error {
+	return &Error{
 		MsgID:      msgID,
 		Data:       data,
 		StatusCode: 400,
 	}
 }
 
-// WithStatus 设置 HTTP 状态码
-func (e *I18nError) WithStatus(code int) *I18nError {
+// WithStatus sets the HTTP status code
+func (e *Error) WithStatus(code int) *Error {
 	e.StatusCode = code
 	return e
 }
 
-// WithCause 设置原始错误
-func (e *I18nError) WithCause(err error) *I18nError {
+// WithCause sets the original error
+func (e *Error) WithCause(err error) *Error {
 	e.Cause = err
 	return e
 }
 
-// WithData 设置翻译数据
-func (e *I18nError) WithData(data map[string]interface{}) *I18nError {
+// WithData sets the translation data
+func (e *Error) WithData(data map[string]interface{}) *Error {
 	e.Data = data
 	return e
 }
 
-// 常用错误构造函数
+// Common error constructors
 
-// ErrNotFoundI18n 返回 404 错误
-func ErrNotFoundI18n(msgID string) *I18nError {
+// ErrNotFoundI18n returns a 404 error
+func ErrNotFoundI18n(msgID string) *Error {
 	return NewI18nError(msgID).WithStatus(404)
 }
 
-// ErrBadRequestI18n 返回 400 错误
-func ErrBadRequestI18n(msgID string) *I18nError {
+// ErrBadRequestI18n returns a 400 error
+func ErrBadRequestI18n(msgID string) *Error {
 	return NewI18nError(msgID).WithStatus(400)
 }
 
-// ErrInternalI18n 返回 500 错误
-func ErrInternalI18n(msgID string) *I18nError {
+// ErrInternalI18n returns a 500 error
+func ErrInternalI18n(msgID string) *Error {
 	return NewI18nError(msgID).WithStatus(500)
 }
 
-// ErrUnauthorizedI18n 返回 401 错误
-func ErrUnauthorizedI18n(msgID string) *I18nError {
+// ErrUnauthorizedI18n returns a 401 error
+func ErrUnauthorizedI18n(msgID string) *Error {
 	return NewI18nError(msgID).WithStatus(401)
 }
 
-// IsI18nError 检查错误是否为 I18nError
-func IsI18nError(err error) (*I18nError, bool) {
-	var i18nErr *I18nError
+// IsI18nError checks if the error is an I18nError
+func IsI18nError(err error) (*Error, bool) {
+	var i18nErr *Error
 	if errors.As(err, &i18nErr) {
 		return i18nErr, true
 	}

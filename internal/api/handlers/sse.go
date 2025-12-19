@@ -9,6 +9,7 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/i18n"
 )
 
+// SSEHandler handles Server-Sent Events HTTP requests.
 type SSEHandler struct {
 }
 
@@ -26,7 +27,7 @@ func GetGlobalEvents(c *gin.Context) {
 	c.Header("Connection", "keep-alive")
 	c.Header("Transfer-Encoding", "chunked")
 
-	c.Stream(func(w io.Writer) bool {
+	c.Stream(func(_ io.Writer) bool {
 		select {
 		case event, ok := <-clientChan:
 			if !ok {
@@ -81,7 +82,7 @@ func GetConnectionEvents(c *gin.Context) {
 	c.Header("Connection", "keep-alive")
 	c.Header("Transfer-Encoding", "chunked")
 
-	c.Stream(func(w io.Writer) bool {
+	c.Stream(func(_ io.Writer) bool {
 		select {
 		case event, ok := <-clientChan:
 			if !ok {

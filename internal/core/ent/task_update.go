@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/core/ent/connection"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/predicate"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/task"
@@ -25,197 +26,214 @@ type TaskUpdate struct {
 }
 
 // Where appends a list predicates to the TaskUpdate builder.
-func (tu *TaskUpdate) Where(ps ...predicate.Task) *TaskUpdate {
-	tu.mutation.Where(ps...)
-	return tu
+func (_u *TaskUpdate) Where(ps ...predicate.Task) *TaskUpdate {
+	_u.mutation.Where(ps...)
+	return _u
 }
 
 // SetName sets the "name" field.
-func (tu *TaskUpdate) SetName(s string) *TaskUpdate {
-	tu.mutation.SetName(s)
-	return tu
+func (_u *TaskUpdate) SetName(v string) *TaskUpdate {
+	_u.mutation.SetName(v)
+	return _u
 }
 
 // SetNillableName sets the "name" field if the given value is not nil.
-func (tu *TaskUpdate) SetNillableName(s *string) *TaskUpdate {
-	if s != nil {
-		tu.SetName(*s)
+func (_u *TaskUpdate) SetNillableName(v *string) *TaskUpdate {
+	if v != nil {
+		_u.SetName(*v)
 	}
-	return tu
+	return _u
 }
 
 // SetSourcePath sets the "source_path" field.
-func (tu *TaskUpdate) SetSourcePath(s string) *TaskUpdate {
-	tu.mutation.SetSourcePath(s)
-	return tu
+func (_u *TaskUpdate) SetSourcePath(v string) *TaskUpdate {
+	_u.mutation.SetSourcePath(v)
+	return _u
 }
 
 // SetNillableSourcePath sets the "source_path" field if the given value is not nil.
-func (tu *TaskUpdate) SetNillableSourcePath(s *string) *TaskUpdate {
-	if s != nil {
-		tu.SetSourcePath(*s)
+func (_u *TaskUpdate) SetNillableSourcePath(v *string) *TaskUpdate {
+	if v != nil {
+		_u.SetSourcePath(*v)
 	}
-	return tu
+	return _u
 }
 
-// SetRemoteName sets the "remote_name" field.
-func (tu *TaskUpdate) SetRemoteName(s string) *TaskUpdate {
-	tu.mutation.SetRemoteName(s)
-	return tu
+// SetConnectionID sets the "connection_id" field.
+func (_u *TaskUpdate) SetConnectionID(v uuid.UUID) *TaskUpdate {
+	_u.mutation.SetConnectionID(v)
+	return _u
 }
 
-// SetNillableRemoteName sets the "remote_name" field if the given value is not nil.
-func (tu *TaskUpdate) SetNillableRemoteName(s *string) *TaskUpdate {
-	if s != nil {
-		tu.SetRemoteName(*s)
+// SetNillableConnectionID sets the "connection_id" field if the given value is not nil.
+func (_u *TaskUpdate) SetNillableConnectionID(v *uuid.UUID) *TaskUpdate {
+	if v != nil {
+		_u.SetConnectionID(*v)
 	}
-	return tu
+	return _u
+}
+
+// ClearConnectionID clears the value of the "connection_id" field.
+func (_u *TaskUpdate) ClearConnectionID() *TaskUpdate {
+	_u.mutation.ClearConnectionID()
+	return _u
 }
 
 // SetRemotePath sets the "remote_path" field.
-func (tu *TaskUpdate) SetRemotePath(s string) *TaskUpdate {
-	tu.mutation.SetRemotePath(s)
-	return tu
+func (_u *TaskUpdate) SetRemotePath(v string) *TaskUpdate {
+	_u.mutation.SetRemotePath(v)
+	return _u
 }
 
 // SetNillableRemotePath sets the "remote_path" field if the given value is not nil.
-func (tu *TaskUpdate) SetNillableRemotePath(s *string) *TaskUpdate {
-	if s != nil {
-		tu.SetRemotePath(*s)
+func (_u *TaskUpdate) SetNillableRemotePath(v *string) *TaskUpdate {
+	if v != nil {
+		_u.SetRemotePath(*v)
 	}
-	return tu
+	return _u
 }
 
 // SetDirection sets the "direction" field.
-func (tu *TaskUpdate) SetDirection(t task.Direction) *TaskUpdate {
-	tu.mutation.SetDirection(t)
-	return tu
+func (_u *TaskUpdate) SetDirection(v task.Direction) *TaskUpdate {
+	_u.mutation.SetDirection(v)
+	return _u
 }
 
 // SetNillableDirection sets the "direction" field if the given value is not nil.
-func (tu *TaskUpdate) SetNillableDirection(t *task.Direction) *TaskUpdate {
-	if t != nil {
-		tu.SetDirection(*t)
+func (_u *TaskUpdate) SetNillableDirection(v *task.Direction) *TaskUpdate {
+	if v != nil {
+		_u.SetDirection(*v)
 	}
-	return tu
+	return _u
 }
 
 // SetSchedule sets the "schedule" field.
-func (tu *TaskUpdate) SetSchedule(s string) *TaskUpdate {
-	tu.mutation.SetSchedule(s)
-	return tu
+func (_u *TaskUpdate) SetSchedule(v string) *TaskUpdate {
+	_u.mutation.SetSchedule(v)
+	return _u
 }
 
 // SetNillableSchedule sets the "schedule" field if the given value is not nil.
-func (tu *TaskUpdate) SetNillableSchedule(s *string) *TaskUpdate {
-	if s != nil {
-		tu.SetSchedule(*s)
+func (_u *TaskUpdate) SetNillableSchedule(v *string) *TaskUpdate {
+	if v != nil {
+		_u.SetSchedule(*v)
 	}
-	return tu
+	return _u
 }
 
 // ClearSchedule clears the value of the "schedule" field.
-func (tu *TaskUpdate) ClearSchedule() *TaskUpdate {
-	tu.mutation.ClearSchedule()
-	return tu
+func (_u *TaskUpdate) ClearSchedule() *TaskUpdate {
+	_u.mutation.ClearSchedule()
+	return _u
 }
 
 // SetRealtime sets the "realtime" field.
-func (tu *TaskUpdate) SetRealtime(b bool) *TaskUpdate {
-	tu.mutation.SetRealtime(b)
-	return tu
+func (_u *TaskUpdate) SetRealtime(v bool) *TaskUpdate {
+	_u.mutation.SetRealtime(v)
+	return _u
 }
 
 // SetNillableRealtime sets the "realtime" field if the given value is not nil.
-func (tu *TaskUpdate) SetNillableRealtime(b *bool) *TaskUpdate {
-	if b != nil {
-		tu.SetRealtime(*b)
+func (_u *TaskUpdate) SetNillableRealtime(v *bool) *TaskUpdate {
+	if v != nil {
+		_u.SetRealtime(*v)
 	}
-	return tu
+	return _u
 }
 
 // SetOptions sets the "options" field.
-func (tu *TaskUpdate) SetOptions(m map[string]interface{}) *TaskUpdate {
-	tu.mutation.SetOptions(m)
-	return tu
+func (_u *TaskUpdate) SetOptions(v map[string]interface{}) *TaskUpdate {
+	_u.mutation.SetOptions(v)
+	return _u
 }
 
 // ClearOptions clears the value of the "options" field.
-func (tu *TaskUpdate) ClearOptions() *TaskUpdate {
-	tu.mutation.ClearOptions()
-	return tu
+func (_u *TaskUpdate) ClearOptions() *TaskUpdate {
+	_u.mutation.ClearOptions()
+	return _u
 }
 
 // SetCreatedAt sets the "created_at" field.
-func (tu *TaskUpdate) SetCreatedAt(t time.Time) *TaskUpdate {
-	tu.mutation.SetCreatedAt(t)
-	return tu
+func (_u *TaskUpdate) SetCreatedAt(v time.Time) *TaskUpdate {
+	_u.mutation.SetCreatedAt(v)
+	return _u
 }
 
 // SetNillableCreatedAt sets the "created_at" field if the given value is not nil.
-func (tu *TaskUpdate) SetNillableCreatedAt(t *time.Time) *TaskUpdate {
-	if t != nil {
-		tu.SetCreatedAt(*t)
+func (_u *TaskUpdate) SetNillableCreatedAt(v *time.Time) *TaskUpdate {
+	if v != nil {
+		_u.SetCreatedAt(*v)
 	}
-	return tu
+	return _u
 }
 
 // SetUpdatedAt sets the "updated_at" field.
-func (tu *TaskUpdate) SetUpdatedAt(t time.Time) *TaskUpdate {
-	tu.mutation.SetUpdatedAt(t)
-	return tu
+func (_u *TaskUpdate) SetUpdatedAt(v time.Time) *TaskUpdate {
+	_u.mutation.SetUpdatedAt(v)
+	return _u
 }
 
 // AddJobIDs adds the "jobs" edge to the Job entity by IDs.
-func (tu *TaskUpdate) AddJobIDs(ids ...uuid.UUID) *TaskUpdate {
-	tu.mutation.AddJobIDs(ids...)
-	return tu
+func (_u *TaskUpdate) AddJobIDs(ids ...uuid.UUID) *TaskUpdate {
+	_u.mutation.AddJobIDs(ids...)
+	return _u
 }
 
 // AddJobs adds the "jobs" edges to the Job entity.
-func (tu *TaskUpdate) AddJobs(j ...*Job) *TaskUpdate {
-	ids := make([]uuid.UUID, len(j))
-	for i := range j {
-		ids[i] = j[i].ID
+func (_u *TaskUpdate) AddJobs(v ...*Job) *TaskUpdate {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
 	}
-	return tu.AddJobIDs(ids...)
+	return _u.AddJobIDs(ids...)
+}
+
+// SetConnection sets the "connection" edge to the Connection entity.
+func (_u *TaskUpdate) SetConnection(v *Connection) *TaskUpdate {
+	return _u.SetConnectionID(v.ID)
 }
 
 // Mutation returns the TaskMutation object of the builder.
-func (tu *TaskUpdate) Mutation() *TaskMutation {
-	return tu.mutation
+func (_u *TaskUpdate) Mutation() *TaskMutation {
+	return _u.mutation
 }
 
 // ClearJobs clears all "jobs" edges to the Job entity.
-func (tu *TaskUpdate) ClearJobs() *TaskUpdate {
-	tu.mutation.ClearJobs()
-	return tu
+func (_u *TaskUpdate) ClearJobs() *TaskUpdate {
+	_u.mutation.ClearJobs()
+	return _u
 }
 
 // RemoveJobIDs removes the "jobs" edge to Job entities by IDs.
-func (tu *TaskUpdate) RemoveJobIDs(ids ...uuid.UUID) *TaskUpdate {
-	tu.mutation.RemoveJobIDs(ids...)
-	return tu
+func (_u *TaskUpdate) RemoveJobIDs(ids ...uuid.UUID) *TaskUpdate {
+	_u.mutation.RemoveJobIDs(ids...)
+	return _u
 }
 
 // RemoveJobs removes "jobs" edges to Job entities.
-func (tu *TaskUpdate) RemoveJobs(j ...*Job) *TaskUpdate {
-	ids := make([]uuid.UUID, len(j))
-	for i := range j {
-		ids[i] = j[i].ID
+func (_u *TaskUpdate) RemoveJobs(v ...*Job) *TaskUpdate {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
 	}
-	return tu.RemoveJobIDs(ids...)
+	return _u.RemoveJobIDs(ids...)
+}
+
+// ClearConnection clears the "connection" edge to the Connection entity.
+func (_u *TaskUpdate) ClearConnection() *TaskUpdate {
+	_u.mutation.ClearConnection()
+	return _u
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
-func (tu *TaskUpdate) Save(ctx context.Context) (int, error) {
-	tu.defaults()
-	return withHooks(ctx, tu.sqlSave, tu.mutation, tu.hooks)
+func (_u *TaskUpdate) Save(ctx context.Context) (int, error) {
+	_u.defaults()
+	return withHooks(ctx, _u.sqlSave, _u.mutation, _u.hooks)
 }
 
 // SaveX is like Save, but panics if an error occurs.
-func (tu *TaskUpdate) SaveX(ctx context.Context) int {
-	affected, err := tu.Save(ctx)
+func (_u *TaskUpdate) SaveX(ctx context.Context) int {
+	affected, err := _u.Save(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -223,49 +241,44 @@ func (tu *TaskUpdate) SaveX(ctx context.Context) int {
 }
 
 // Exec executes the query.
-func (tu *TaskUpdate) Exec(ctx context.Context) error {
-	_, err := tu.Save(ctx)
+func (_u *TaskUpdate) Exec(ctx context.Context) error {
+	_, err := _u.Save(ctx)
 	return err
 }
 
 // ExecX is like Exec, but panics if an error occurs.
-func (tu *TaskUpdate) ExecX(ctx context.Context) {
-	if err := tu.Exec(ctx); err != nil {
+func (_u *TaskUpdate) ExecX(ctx context.Context) {
+	if err := _u.Exec(ctx); err != nil {
 		panic(err)
 	}
 }
 
 // defaults sets the default values of the builder before save.
-func (tu *TaskUpdate) defaults() {
-	if _, ok := tu.mutation.UpdatedAt(); !ok {
+func (_u *TaskUpdate) defaults() {
+	if _, ok := _u.mutation.UpdatedAt(); !ok {
 		v := task.UpdateDefaultUpdatedAt()
-		tu.mutation.SetUpdatedAt(v)
+		_u.mutation.SetUpdatedAt(v)
 	}
 }
 
 // check runs all checks and user-defined validators on the builder.
-func (tu *TaskUpdate) check() error {
-	if v, ok := tu.mutation.Name(); ok {
+func (_u *TaskUpdate) check() error {
+	if v, ok := _u.mutation.Name(); ok {
 		if err := task.NameValidator(v); err != nil {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Task.name": %w`, err)}
 		}
 	}
-	if v, ok := tu.mutation.SourcePath(); ok {
+	if v, ok := _u.mutation.SourcePath(); ok {
 		if err := task.SourcePathValidator(v); err != nil {
 			return &ValidationError{Name: "source_path", err: fmt.Errorf(`ent: validator failed for field "Task.source_path": %w`, err)}
 		}
 	}
-	if v, ok := tu.mutation.RemoteName(); ok {
-		if err := task.RemoteNameValidator(v); err != nil {
-			return &ValidationError{Name: "remote_name", err: fmt.Errorf(`ent: validator failed for field "Task.remote_name": %w`, err)}
-		}
-	}
-	if v, ok := tu.mutation.RemotePath(); ok {
+	if v, ok := _u.mutation.RemotePath(); ok {
 		if err := task.RemotePathValidator(v); err != nil {
 			return &ValidationError{Name: "remote_path", err: fmt.Errorf(`ent: validator failed for field "Task.remote_path": %w`, err)}
 		}
 	}
-	if v, ok := tu.mutation.Direction(); ok {
+	if v, ok := _u.mutation.Direction(); ok {
 		if err := task.DirectionValidator(v); err != nil {
 			return &ValidationError{Name: "direction", err: fmt.Errorf(`ent: validator failed for field "Task.direction": %w`, err)}
 		}
@@ -273,55 +286,52 @@ func (tu *TaskUpdate) check() error {
 	return nil
 }
 
-func (tu *TaskUpdate) sqlSave(ctx context.Context) (n int, err error) {
-	if err := tu.check(); err != nil {
-		return n, err
+func (_u *TaskUpdate) sqlSave(ctx context.Context) (_node int, err error) {
+	if err := _u.check(); err != nil {
+		return _node, err
 	}
 	_spec := sqlgraph.NewUpdateSpec(task.Table, task.Columns, sqlgraph.NewFieldSpec(task.FieldID, field.TypeUUID))
-	if ps := tu.mutation.predicates; len(ps) > 0 {
+	if ps := _u.mutation.predicates; len(ps) > 0 {
 		_spec.Predicate = func(selector *sql.Selector) {
 			for i := range ps {
 				ps[i](selector)
 			}
 		}
 	}
-	if value, ok := tu.mutation.Name(); ok {
+	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(task.FieldName, field.TypeString, value)
 	}
-	if value, ok := tu.mutation.SourcePath(); ok {
+	if value, ok := _u.mutation.SourcePath(); ok {
 		_spec.SetField(task.FieldSourcePath, field.TypeString, value)
 	}
-	if value, ok := tu.mutation.RemoteName(); ok {
-		_spec.SetField(task.FieldRemoteName, field.TypeString, value)
-	}
-	if value, ok := tu.mutation.RemotePath(); ok {
+	if value, ok := _u.mutation.RemotePath(); ok {
 		_spec.SetField(task.FieldRemotePath, field.TypeString, value)
 	}
-	if value, ok := tu.mutation.Direction(); ok {
+	if value, ok := _u.mutation.Direction(); ok {
 		_spec.SetField(task.FieldDirection, field.TypeEnum, value)
 	}
-	if value, ok := tu.mutation.Schedule(); ok {
+	if value, ok := _u.mutation.Schedule(); ok {
 		_spec.SetField(task.FieldSchedule, field.TypeString, value)
 	}
-	if tu.mutation.ScheduleCleared() {
+	if _u.mutation.ScheduleCleared() {
 		_spec.ClearField(task.FieldSchedule, field.TypeString)
 	}
-	if value, ok := tu.mutation.Realtime(); ok {
+	if value, ok := _u.mutation.Realtime(); ok {
 		_spec.SetField(task.FieldRealtime, field.TypeBool, value)
 	}
-	if value, ok := tu.mutation.Options(); ok {
+	if value, ok := _u.mutation.Options(); ok {
 		_spec.SetField(task.FieldOptions, field.TypeJSON, value)
 	}
-	if tu.mutation.OptionsCleared() {
+	if _u.mutation.OptionsCleared() {
 		_spec.ClearField(task.FieldOptions, field.TypeJSON)
 	}
-	if value, ok := tu.mutation.CreatedAt(); ok {
+	if value, ok := _u.mutation.CreatedAt(); ok {
 		_spec.SetField(task.FieldCreatedAt, field.TypeTime, value)
 	}
-	if value, ok := tu.mutation.UpdatedAt(); ok {
+	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(task.FieldUpdatedAt, field.TypeTime, value)
 	}
-	if tu.mutation.JobsCleared() {
+	if _u.mutation.JobsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
 			Inverse: false,
@@ -334,7 +344,7 @@ func (tu *TaskUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := tu.mutation.RemovedJobsIDs(); len(nodes) > 0 && !tu.mutation.JobsCleared() {
+	if nodes := _u.mutation.RemovedJobsIDs(); len(nodes) > 0 && !_u.mutation.JobsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
 			Inverse: false,
@@ -350,7 +360,7 @@ func (tu *TaskUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := tu.mutation.JobsIDs(); len(nodes) > 0 {
+	if nodes := _u.mutation.JobsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
 			Inverse: false,
@@ -366,7 +376,36 @@ func (tu *TaskUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	if n, err = sqlgraph.UpdateNodes(ctx, tu.driver, _spec); err != nil {
+	if _u.mutation.ConnectionCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   task.ConnectionTable,
+			Columns: []string{task.ConnectionColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(connection.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ConnectionIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   task.ConnectionTable,
+			Columns: []string{task.ConnectionColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(connection.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{task.Label}
 		} else if sqlgraph.IsConstraintError(err) {
@@ -374,8 +413,8 @@ func (tu *TaskUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		return 0, err
 	}
-	tu.mutation.done = true
-	return n, nil
+	_u.mutation.done = true
+	return _node, nil
 }
 
 // TaskUpdateOne is the builder for updating a single Task entity.
@@ -387,204 +426,221 @@ type TaskUpdateOne struct {
 }
 
 // SetName sets the "name" field.
-func (tuo *TaskUpdateOne) SetName(s string) *TaskUpdateOne {
-	tuo.mutation.SetName(s)
-	return tuo
+func (_u *TaskUpdateOne) SetName(v string) *TaskUpdateOne {
+	_u.mutation.SetName(v)
+	return _u
 }
 
 // SetNillableName sets the "name" field if the given value is not nil.
-func (tuo *TaskUpdateOne) SetNillableName(s *string) *TaskUpdateOne {
-	if s != nil {
-		tuo.SetName(*s)
+func (_u *TaskUpdateOne) SetNillableName(v *string) *TaskUpdateOne {
+	if v != nil {
+		_u.SetName(*v)
 	}
-	return tuo
+	return _u
 }
 
 // SetSourcePath sets the "source_path" field.
-func (tuo *TaskUpdateOne) SetSourcePath(s string) *TaskUpdateOne {
-	tuo.mutation.SetSourcePath(s)
-	return tuo
+func (_u *TaskUpdateOne) SetSourcePath(v string) *TaskUpdateOne {
+	_u.mutation.SetSourcePath(v)
+	return _u
 }
 
 // SetNillableSourcePath sets the "source_path" field if the given value is not nil.
-func (tuo *TaskUpdateOne) SetNillableSourcePath(s *string) *TaskUpdateOne {
-	if s != nil {
-		tuo.SetSourcePath(*s)
+func (_u *TaskUpdateOne) SetNillableSourcePath(v *string) *TaskUpdateOne {
+	if v != nil {
+		_u.SetSourcePath(*v)
 	}
-	return tuo
+	return _u
 }
 
-// SetRemoteName sets the "remote_name" field.
-func (tuo *TaskUpdateOne) SetRemoteName(s string) *TaskUpdateOne {
-	tuo.mutation.SetRemoteName(s)
-	return tuo
+// SetConnectionID sets the "connection_id" field.
+func (_u *TaskUpdateOne) SetConnectionID(v uuid.UUID) *TaskUpdateOne {
+	_u.mutation.SetConnectionID(v)
+	return _u
 }
 
-// SetNillableRemoteName sets the "remote_name" field if the given value is not nil.
-func (tuo *TaskUpdateOne) SetNillableRemoteName(s *string) *TaskUpdateOne {
-	if s != nil {
-		tuo.SetRemoteName(*s)
+// SetNillableConnectionID sets the "connection_id" field if the given value is not nil.
+func (_u *TaskUpdateOne) SetNillableConnectionID(v *uuid.UUID) *TaskUpdateOne {
+	if v != nil {
+		_u.SetConnectionID(*v)
 	}
-	return tuo
+	return _u
+}
+
+// ClearConnectionID clears the value of the "connection_id" field.
+func (_u *TaskUpdateOne) ClearConnectionID() *TaskUpdateOne {
+	_u.mutation.ClearConnectionID()
+	return _u
 }
 
 // SetRemotePath sets the "remote_path" field.
-func (tuo *TaskUpdateOne) SetRemotePath(s string) *TaskUpdateOne {
-	tuo.mutation.SetRemotePath(s)
-	return tuo
+func (_u *TaskUpdateOne) SetRemotePath(v string) *TaskUpdateOne {
+	_u.mutation.SetRemotePath(v)
+	return _u
 }
 
 // SetNillableRemotePath sets the "remote_path" field if the given value is not nil.
-func (tuo *TaskUpdateOne) SetNillableRemotePath(s *string) *TaskUpdateOne {
-	if s != nil {
-		tuo.SetRemotePath(*s)
+func (_u *TaskUpdateOne) SetNillableRemotePath(v *string) *TaskUpdateOne {
+	if v != nil {
+		_u.SetRemotePath(*v)
 	}
-	return tuo
+	return _u
 }
 
 // SetDirection sets the "direction" field.
-func (tuo *TaskUpdateOne) SetDirection(t task.Direction) *TaskUpdateOne {
-	tuo.mutation.SetDirection(t)
-	return tuo
+func (_u *TaskUpdateOne) SetDirection(v task.Direction) *TaskUpdateOne {
+	_u.mutation.SetDirection(v)
+	return _u
 }
 
 // SetNillableDirection sets the "direction" field if the given value is not nil.
-func (tuo *TaskUpdateOne) SetNillableDirection(t *task.Direction) *TaskUpdateOne {
-	if t != nil {
-		tuo.SetDirection(*t)
+func (_u *TaskUpdateOne) SetNillableDirection(v *task.Direction) *TaskUpdateOne {
+	if v != nil {
+		_u.SetDirection(*v)
 	}
-	return tuo
+	return _u
 }
 
 // SetSchedule sets the "schedule" field.
-func (tuo *TaskUpdateOne) SetSchedule(s string) *TaskUpdateOne {
-	tuo.mutation.SetSchedule(s)
-	return tuo
+func (_u *TaskUpdateOne) SetSchedule(v string) *TaskUpdateOne {
+	_u.mutation.SetSchedule(v)
+	return _u
 }
 
 // SetNillableSchedule sets the "schedule" field if the given value is not nil.
-func (tuo *TaskUpdateOne) SetNillableSchedule(s *string) *TaskUpdateOne {
-	if s != nil {
-		tuo.SetSchedule(*s)
+func (_u *TaskUpdateOne) SetNillableSchedule(v *string) *TaskUpdateOne {
+	if v != nil {
+		_u.SetSchedule(*v)
 	}
-	return tuo
+	return _u
 }
 
 // ClearSchedule clears the value of the "schedule" field.
-func (tuo *TaskUpdateOne) ClearSchedule() *TaskUpdateOne {
-	tuo.mutation.ClearSchedule()
-	return tuo
+func (_u *TaskUpdateOne) ClearSchedule() *TaskUpdateOne {
+	_u.mutation.ClearSchedule()
+	return _u
 }
 
 // SetRealtime sets the "realtime" field.
-func (tuo *TaskUpdateOne) SetRealtime(b bool) *TaskUpdateOne {
-	tuo.mutation.SetRealtime(b)
-	return tuo
+func (_u *TaskUpdateOne) SetRealtime(v bool) *TaskUpdateOne {
+	_u.mutation.SetRealtime(v)
+	return _u
 }
 
 // SetNillableRealtime sets the "realtime" field if the given value is not nil.
-func (tuo *TaskUpdateOne) SetNillableRealtime(b *bool) *TaskUpdateOne {
-	if b != nil {
-		tuo.SetRealtime(*b)
+func (_u *TaskUpdateOne) SetNillableRealtime(v *bool) *TaskUpdateOne {
+	if v != nil {
+		_u.SetRealtime(*v)
 	}
-	return tuo
+	return _u
 }
 
 // SetOptions sets the "options" field.
-func (tuo *TaskUpdateOne) SetOptions(m map[string]interface{}) *TaskUpdateOne {
-	tuo.mutation.SetOptions(m)
-	return tuo
+func (_u *TaskUpdateOne) SetOptions(v map[string]interface{}) *TaskUpdateOne {
+	_u.mutation.SetOptions(v)
+	return _u
 }
 
 // ClearOptions clears the value of the "options" field.
-func (tuo *TaskUpdateOne) ClearOptions() *TaskUpdateOne {
-	tuo.mutation.ClearOptions()
-	return tuo
+func (_u *TaskUpdateOne) ClearOptions() *TaskUpdateOne {
+	_u.mutation.ClearOptions()
+	return _u
 }
 
 // SetCreatedAt sets the "created_at" field.
-func (tuo *TaskUpdateOne) SetCreatedAt(t time.Time) *TaskUpdateOne {
-	tuo.mutation.SetCreatedAt(t)
-	return tuo
+func (_u *TaskUpdateOne) SetCreatedAt(v time.Time) *TaskUpdateOne {
+	_u.mutation.SetCreatedAt(v)
+	return _u
 }
 
 // SetNillableCreatedAt sets the "created_at" field if the given value is not nil.
-func (tuo *TaskUpdateOne) SetNillableCreatedAt(t *time.Time) *TaskUpdateOne {
-	if t != nil {
-		tuo.SetCreatedAt(*t)
+func (_u *TaskUpdateOne) SetNillableCreatedAt(v *time.Time) *TaskUpdateOne {
+	if v != nil {
+		_u.SetCreatedAt(*v)
 	}
-	return tuo
+	return _u
 }
 
 // SetUpdatedAt sets the "updated_at" field.
-func (tuo *TaskUpdateOne) SetUpdatedAt(t time.Time) *TaskUpdateOne {
-	tuo.mutation.SetUpdatedAt(t)
-	return tuo
+func (_u *TaskUpdateOne) SetUpdatedAt(v time.Time) *TaskUpdateOne {
+	_u.mutation.SetUpdatedAt(v)
+	return _u
 }
 
 // AddJobIDs adds the "jobs" edge to the Job entity by IDs.
-func (tuo *TaskUpdateOne) AddJobIDs(ids ...uuid.UUID) *TaskUpdateOne {
-	tuo.mutation.AddJobIDs(ids...)
-	return tuo
+func (_u *TaskUpdateOne) AddJobIDs(ids ...uuid.UUID) *TaskUpdateOne {
+	_u.mutation.AddJobIDs(ids...)
+	return _u
 }
 
 // AddJobs adds the "jobs" edges to the Job entity.
-func (tuo *TaskUpdateOne) AddJobs(j ...*Job) *TaskUpdateOne {
-	ids := make([]uuid.UUID, len(j))
-	for i := range j {
-		ids[i] = j[i].ID
+func (_u *TaskUpdateOne) AddJobs(v ...*Job) *TaskUpdateOne {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
 	}
-	return tuo.AddJobIDs(ids...)
+	return _u.AddJobIDs(ids...)
+}
+
+// SetConnection sets the "connection" edge to the Connection entity.
+func (_u *TaskUpdateOne) SetConnection(v *Connection) *TaskUpdateOne {
+	return _u.SetConnectionID(v.ID)
 }
 
 // Mutation returns the TaskMutation object of the builder.
-func (tuo *TaskUpdateOne) Mutation() *TaskMutation {
-	return tuo.mutation
+func (_u *TaskUpdateOne) Mutation() *TaskMutation {
+	return _u.mutation
 }
 
 // ClearJobs clears all "jobs" edges to the Job entity.
-func (tuo *TaskUpdateOne) ClearJobs() *TaskUpdateOne {
-	tuo.mutation.ClearJobs()
-	return tuo
+func (_u *TaskUpdateOne) ClearJobs() *TaskUpdateOne {
+	_u.mutation.ClearJobs()
+	return _u
 }
 
 // RemoveJobIDs removes the "jobs" edge to Job entities by IDs.
-func (tuo *TaskUpdateOne) RemoveJobIDs(ids ...uuid.UUID) *TaskUpdateOne {
-	tuo.mutation.RemoveJobIDs(ids...)
-	return tuo
+func (_u *TaskUpdateOne) RemoveJobIDs(ids ...uuid.UUID) *TaskUpdateOne {
+	_u.mutation.RemoveJobIDs(ids...)
+	return _u
 }
 
 // RemoveJobs removes "jobs" edges to Job entities.
-func (tuo *TaskUpdateOne) RemoveJobs(j ...*Job) *TaskUpdateOne {
-	ids := make([]uuid.UUID, len(j))
-	for i := range j {
-		ids[i] = j[i].ID
+func (_u *TaskUpdateOne) RemoveJobs(v ...*Job) *TaskUpdateOne {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
 	}
-	return tuo.RemoveJobIDs(ids...)
+	return _u.RemoveJobIDs(ids...)
+}
+
+// ClearConnection clears the "connection" edge to the Connection entity.
+func (_u *TaskUpdateOne) ClearConnection() *TaskUpdateOne {
+	_u.mutation.ClearConnection()
+	return _u
 }
 
 // Where appends a list predicates to the TaskUpdate builder.
-func (tuo *TaskUpdateOne) Where(ps ...predicate.Task) *TaskUpdateOne {
-	tuo.mutation.Where(ps...)
-	return tuo
+func (_u *TaskUpdateOne) Where(ps ...predicate.Task) *TaskUpdateOne {
+	_u.mutation.Where(ps...)
+	return _u
 }
 
 // Select allows selecting one or more fields (columns) of the returned entity.
 // The default is selecting all fields defined in the entity schema.
-func (tuo *TaskUpdateOne) Select(field string, fields ...string) *TaskUpdateOne {
-	tuo.fields = append([]string{field}, fields...)
-	return tuo
+func (_u *TaskUpdateOne) Select(field string, fields ...string) *TaskUpdateOne {
+	_u.fields = append([]string{field}, fields...)
+	return _u
 }
 
 // Save executes the query and returns the updated Task entity.
-func (tuo *TaskUpdateOne) Save(ctx context.Context) (*Task, error) {
-	tuo.defaults()
-	return withHooks(ctx, tuo.sqlSave, tuo.mutation, tuo.hooks)
+func (_u *TaskUpdateOne) Save(ctx context.Context) (*Task, error) {
+	_u.defaults()
+	return withHooks(ctx, _u.sqlSave, _u.mutation, _u.hooks)
 }
 
 // SaveX is like Save, but panics if an error occurs.
-func (tuo *TaskUpdateOne) SaveX(ctx context.Context) *Task {
-	node, err := tuo.Save(ctx)
+func (_u *TaskUpdateOne) SaveX(ctx context.Context) *Task {
+	node, err := _u.Save(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -592,49 +648,44 @@ func (tuo *TaskUpdateOne) SaveX(ctx context.Context) *Task {
 }
 
 // Exec executes the query on the entity.
-func (tuo *TaskUpdateOne) Exec(ctx context.Context) error {
-	_, err := tuo.Save(ctx)
+func (_u *TaskUpdateOne) Exec(ctx context.Context) error {
+	_, err := _u.Save(ctx)
 	return err
 }
 
 // ExecX is like Exec, but panics if an error occurs.
-func (tuo *TaskUpdateOne) ExecX(ctx context.Context) {
-	if err := tuo.Exec(ctx); err != nil {
+func (_u *TaskUpdateOne) ExecX(ctx context.Context) {
+	if err := _u.Exec(ctx); err != nil {
 		panic(err)
 	}
 }
 
 // defaults sets the default values of the builder before save.
-func (tuo *TaskUpdateOne) defaults() {
-	if _, ok := tuo.mutation.UpdatedAt(); !ok {
+func (_u *TaskUpdateOne) defaults() {
+	if _, ok := _u.mutation.UpdatedAt(); !ok {
 		v := task.UpdateDefaultUpdatedAt()
-		tuo.mutation.SetUpdatedAt(v)
+		_u.mutation.SetUpdatedAt(v)
 	}
 }
 
 // check runs all checks and user-defined validators on the builder.
-func (tuo *TaskUpdateOne) check() error {
-	if v, ok := tuo.mutation.Name(); ok {
+func (_u *TaskUpdateOne) check() error {
+	if v, ok := _u.mutation.Name(); ok {
 		if err := task.NameValidator(v); err != nil {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Task.name": %w`, err)}
 		}
 	}
-	if v, ok := tuo.mutation.SourcePath(); ok {
+	if v, ok := _u.mutation.SourcePath(); ok {
 		if err := task.SourcePathValidator(v); err != nil {
 			return &ValidationError{Name: "source_path", err: fmt.Errorf(`ent: validator failed for field "Task.source_path": %w`, err)}
 		}
 	}
-	if v, ok := tuo.mutation.RemoteName(); ok {
-		if err := task.RemoteNameValidator(v); err != nil {
-			return &ValidationError{Name: "remote_name", err: fmt.Errorf(`ent: validator failed for field "Task.remote_name": %w`, err)}
-		}
-	}
-	if v, ok := tuo.mutation.RemotePath(); ok {
+	if v, ok := _u.mutation.RemotePath(); ok {
 		if err := task.RemotePathValidator(v); err != nil {
 			return &ValidationError{Name: "remote_path", err: fmt.Errorf(`ent: validator failed for field "Task.remote_path": %w`, err)}
 		}
 	}
-	if v, ok := tuo.mutation.Direction(); ok {
+	if v, ok := _u.mutation.Direction(); ok {
 		if err := task.DirectionValidator(v); err != nil {
 			return &ValidationError{Name: "direction", err: fmt.Errorf(`ent: validator failed for field "Task.direction": %w`, err)}
 		}
@@ -642,17 +693,17 @@ func (tuo *TaskUpdateOne) check() error {
 	return nil
 }
 
-func (tuo *TaskUpdateOne) sqlSave(ctx context.Context) (_node *Task, err error) {
-	if err := tuo.check(); err != nil {
+func (_u *TaskUpdateOne) sqlSave(ctx context.Context) (_node *Task, err error) {
+	if err := _u.check(); err != nil {
 		return _node, err
 	}
 	_spec := sqlgraph.NewUpdateSpec(task.Table, task.Columns, sqlgraph.NewFieldSpec(task.FieldID, field.TypeUUID))
-	id, ok := tuo.mutation.ID()
+	id, ok := _u.mutation.ID()
 	if !ok {
 		return nil, &ValidationError{Name: "id", err: errors.New(`ent: missing "Task.id" for update`)}
 	}
 	_spec.Node.ID.Value = id
-	if fields := tuo.fields; len(fields) > 0 {
+	if fields := _u.fields; len(fields) > 0 {
 		_spec.Node.Columns = make([]string, 0, len(fields))
 		_spec.Node.Columns = append(_spec.Node.Columns, task.FieldID)
 		for _, f := range fields {
@@ -664,50 +715,47 @@ func (tuo *TaskUpdateOne) sqlSave(ctx context.Context) (_node *Task, err error) 
 			}
 		}
 	}
-	if ps := tuo.mutation.predicates; len(ps) > 0 {
+	if ps := _u.mutation.predicates; len(ps) > 0 {
 		_spec.Predicate = func(selector *sql.Selector) {
 			for i := range ps {
 				ps[i](selector)
 			}
 		}
 	}
-	if value, ok := tuo.mutation.Name(); ok {
+	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(task.FieldName, field.TypeString, value)
 	}
-	if value, ok := tuo.mutation.SourcePath(); ok {
+	if value, ok := _u.mutation.SourcePath(); ok {
 		_spec.SetField(task.FieldSourcePath, field.TypeString, value)
 	}
-	if value, ok := tuo.mutation.RemoteName(); ok {
-		_spec.SetField(task.FieldRemoteName, field.TypeString, value)
-	}
-	if value, ok := tuo.mutation.RemotePath(); ok {
+	if value, ok := _u.mutation.RemotePath(); ok {
 		_spec.SetField(task.FieldRemotePath, field.TypeString, value)
 	}
-	if value, ok := tuo.mutation.Direction(); ok {
+	if value, ok := _u.mutation.Direction(); ok {
 		_spec.SetField(task.FieldDirection, field.TypeEnum, value)
 	}
-	if value, ok := tuo.mutation.Schedule(); ok {
+	if value, ok := _u.mutation.Schedule(); ok {
 		_spec.SetField(task.FieldSchedule, field.TypeString, value)
 	}
-	if tuo.mutation.ScheduleCleared() {
+	if _u.mutation.ScheduleCleared() {
 		_spec.ClearField(task.FieldSchedule, field.TypeString)
 	}
-	if value, ok := tuo.mutation.Realtime(); ok {
+	if value, ok := _u.mutation.Realtime(); ok {
 		_spec.SetField(task.FieldRealtime, field.TypeBool, value)
 	}
-	if value, ok := tuo.mutation.Options(); ok {
+	if value, ok := _u.mutation.Options(); ok {
 		_spec.SetField(task.FieldOptions, field.TypeJSON, value)
 	}
-	if tuo.mutation.OptionsCleared() {
+	if _u.mutation.OptionsCleared() {
 		_spec.ClearField(task.FieldOptions, field.TypeJSON)
 	}
-	if value, ok := tuo.mutation.CreatedAt(); ok {
+	if value, ok := _u.mutation.CreatedAt(); ok {
 		_spec.SetField(task.FieldCreatedAt, field.TypeTime, value)
 	}
-	if value, ok := tuo.mutation.UpdatedAt(); ok {
+	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(task.FieldUpdatedAt, field.TypeTime, value)
 	}
-	if tuo.mutation.JobsCleared() {
+	if _u.mutation.JobsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
 			Inverse: false,
@@ -720,7 +768,7 @@ func (tuo *TaskUpdateOne) sqlSave(ctx context.Context) (_node *Task, err error) 
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := tuo.mutation.RemovedJobsIDs(); len(nodes) > 0 && !tuo.mutation.JobsCleared() {
+	if nodes := _u.mutation.RemovedJobsIDs(); len(nodes) > 0 && !_u.mutation.JobsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
 			Inverse: false,
@@ -736,7 +784,7 @@ func (tuo *TaskUpdateOne) sqlSave(ctx context.Context) (_node *Task, err error) 
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := tuo.mutation.JobsIDs(); len(nodes) > 0 {
+	if nodes := _u.mutation.JobsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
 			Inverse: false,
@@ -752,10 +800,39 @@ func (tuo *TaskUpdateOne) sqlSave(ctx context.Context) (_node *Task, err error) 
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	_node = &Task{config: tuo.config}
+	if _u.mutation.ConnectionCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   task.ConnectionTable,
+			Columns: []string{task.ConnectionColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(connection.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ConnectionIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   task.ConnectionTable,
+			Columns: []string{task.ConnectionColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(connection.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	_node = &Task{config: _u.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues
-	if err = sqlgraph.UpdateNode(ctx, tuo.driver, _spec); err != nil {
+	if err = sqlgraph.UpdateNode(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{task.Label}
 		} else if sqlgraph.IsConstraintError(err) {
@@ -763,6 +840,6 @@ func (tuo *TaskUpdateOne) sqlSave(ctx context.Context) (_node *Task, err error) 
 		}
 		return nil, err
 	}
-	tuo.mutation.done = true
+	_u.mutation.done = true
 	return _node, nil
 }

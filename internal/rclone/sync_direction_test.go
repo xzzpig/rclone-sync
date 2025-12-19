@@ -10,13 +10,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/xzzpig/rclone-sync/internal/core/services"
 	"github.com/xzzpig/rclone-sync/internal/rclone"
 )
 
 func TestSyncEngine_RunTask_Upload(t *testing.T) {
-	client, jobService, cleanup := setupIntegrationTest(t)
-	defer cleanup()
+	connService, taskService, jobService, _ := setupIntegrationTest(t)
+	ctx := context.Background()
 
 	// 1. Setup test directories
 	sourceDir := t.TempDir()
@@ -32,12 +31,14 @@ func TestSyncEngine_RunTask_Upload(t *testing.T) {
 	err = os.WriteFile(destGarbagePath, []byte("garbage"), 0644)
 	require.NoError(t, err)
 
-	// 2. Create a test task (Direction: upload)
-	taskService := services.NewTaskService(client)
-	testTask, err := taskService.CreateTask(context.Background(),
+	// 2. Create Connection and Task via ConnectionService (this goes to database)
+	testConn, err := connService.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"})
+	require.NoError(t, err)
+
+	testTask, err := taskService.CreateTask(ctx,
 		"TestUploadSync",
 		sourceDir,
-		"local",
+		testConn.ID,
 		destDir,
 		"upload",
 		"",
@@ -48,21 +49,17 @@ func TestSyncEngine_RunTask_Upload(t *testing.T) {
 
 	// 3. Setup SyncEngine
 	dataDir := t.TempDir()
-	rcloneConfPath := filepath.Join(dataDir, "rclone.conf")
-	confContent := `[local]
-type = local
-`
-	err = os.WriteFile(rcloneConfPath, []byte(confContent), 0644)
-	require.NoError(t, err)
-	rclone.InitConfig(rcloneConfPath)
-
 	syncEngine := rclone.NewSyncEngine(jobService, dataDir)
 
-	// 4. Run the task
-	err = syncEngine.RunTask(context.Background(), testTask, "manual")
+	// 4. Reload task with Connection edge before running
+	testTask, err = taskService.GetTaskWithConnection(ctx, testTask.ID)
 	require.NoError(t, err)
 
-	// 5. Verify results
+	// 5. Run the task - this should use DBStorage to read the connection config
+	err = syncEngine.RunTask(ctx, testTask, "manual")
+	require.NoError(t, err)
+
+	// 6. Verify results
 	// Source file should exist in Dest
 	destFilePath := filepath.Join(destDir, "upload_test.txt")
 	_, err = os.Stat(destFilePath)
@@ -79,15 +76,15 @@ type = local
 	assert.True(t, os.IsNotExist(err), "Extra file in destination should be deleted")
 
 	// Verify Job Status
-	jobs, err := jobService.ListJobs(context.Background(), &testTask.ID, "", 10, 0)
+	jobs, err := jobService.ListJobs(ctx, &testTask.ID, nil, 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs, 1)
 	assert.Equal(t, "success", string(jobs[0].Status))
 }
 
 func TestSyncEngine_RunTask_Download(t *testing.T) {
-	client, jobService, cleanup := setupIntegrationTest(t)
-	defer cleanup()
+	connService, taskService, jobService, _ := setupIntegrationTest(t)
+	ctx := context.Background()
 
 	// 1. Setup test directories
 	sourceDir := t.TempDir()
@@ -103,12 +100,14 @@ func TestSyncEngine_RunTask_Download(t *testing.T) {
 	err = os.WriteFile(sourceGarbagePath, []byte("local garbage"), 0644)
 	require.NoError(t, err)
 
-	// 2. Create a test task (Direction: download)
-	taskService := services.NewTaskService(client)
-	testTask, err := taskService.CreateTask(context.Background(),
+	// 2. Create Connection and Task via ConnectionService (this goes to database)
+	testConn, err := connService.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"})
+	require.NoError(t, err)
+
+	testTask, err := taskService.CreateTask(ctx,
 		"TestDownloadSync",
 		sourceDir,
-		"local",
+		testConn.ID,
 		destDir,
 		"download",
 		"",
@@ -119,21 +118,17 @@ func TestSyncEngine_RunTask_Download(t *testing.T) {
 
 	// 3. Setup SyncEngine
 	dataDir := t.TempDir()
-	rcloneConfPath := filepath.Join(dataDir, "rclone.conf")
-	confContent := `[local]
-type = local
-`
-	err = os.WriteFile(rcloneConfPath, []byte(confContent), 0644)
-	require.NoError(t, err)
-	rclone.InitConfig(rcloneConfPath)
-
 	syncEngine := rclone.NewSyncEngine(jobService, dataDir)
 
-	// 4. Run the task
-	err = syncEngine.RunTask(context.Background(), testTask, "manual")
+	// 4. Reload task with Connection edge before running
+	testTask, err = taskService.GetTaskWithConnection(ctx, testTask.ID)
 	require.NoError(t, err)
 
-	// 5. Verify results
+	// 5. Run the task - this should use DBStorage to read the connection config
+	err = syncEngine.RunTask(ctx, testTask, "manual")
+	require.NoError(t, err)
+
+	// 6. Verify results
 	// Remote file should exist in Source
 	sourceTransferredPath := filepath.Join(sourceDir, "download_test.txt")
 	_, err = os.Stat(sourceTransferredPath)
@@ -144,15 +139,15 @@ type = local
 	assert.True(t, os.IsNotExist(err), "Extra file in source should be deleted")
 
 	// Verify Job Status
-	jobs, err := jobService.ListJobs(context.Background(), &testTask.ID, "", 10, 0)
+	jobs, err := jobService.ListJobs(ctx, &testTask.ID, nil, 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs, 1)
 	assert.Equal(t, "success", string(jobs[0].Status))
 }
 
 func TestSyncEngine_RunTask_Bidirectional(t *testing.T) {
-	client, jobService, cleanup := setupIntegrationTest(t)
-	defer cleanup()
+	connService, taskService, jobService, _ := setupIntegrationTest(t)
+	ctx := context.Background()
 
 	// 1. Setup test directories
 	sourceDir := t.TempDir()
@@ -168,12 +163,14 @@ func TestSyncEngine_RunTask_Bidirectional(t *testing.T) {
 	err = os.WriteFile(destFilePath, []byte("dest content"), 0644)
 	require.NoError(t, err)
 
-	// 2. Create a test task (Direction: bidirectional)
-	taskService := services.NewTaskService(client)
-	testTask, err := taskService.CreateTask(context.Background(),
+	// 2. Create Connection and Task via ConnectionService (this goes to database)
+	testConn, err := connService.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"})
+	require.NoError(t, err)
+
+	testTask, err := taskService.CreateTask(ctx,
 		"TestBidirectionalSync",
 		sourceDir,
-		"local",
+		testConn.ID,
 		destDir,
 		"bidirectional",
 		"",
@@ -184,21 +181,17 @@ func TestSyncEngine_RunTask_Bidirectional(t *testing.T) {
 
 	// 3. Setup SyncEngine
 	dataDir := t.TempDir()
-	rcloneConfPath := filepath.Join(dataDir, "rclone.conf")
-	confContent := `[local]
-type = local
-`
-	err = os.WriteFile(rcloneConfPath, []byte(confContent), 0644)
-	require.NoError(t, err)
-	rclone.InitConfig(rcloneConfPath)
-
 	syncEngine := rclone.NewSyncEngine(jobService, dataDir)
 
-	// 4. Run the task
-	err = syncEngine.RunTask(context.Background(), testTask, "manual")
+	// 4. Reload task with Connection edge before running
+	testTask, err = taskService.GetTaskWithConnection(ctx, testTask.ID)
 	require.NoError(t, err)
 
-	// 5. Verify results
+	// 5. Run the task - this should use DBStorage to read the connection config
+	err = syncEngine.RunTask(ctx, testTask, "manual")
+	require.NoError(t, err)
+
+	// 6. Verify results
 	// Source file should exist in Dest
 	destSourceFilePath := filepath.Join(destDir, "bidirectional_source.txt")
 	_, err = os.Stat(destSourceFilePath)
@@ -210,7 +203,7 @@ type = local
 	assert.NoError(t, err, "Destination file should be synced to source")
 
 	// Verify Job Status
-	jobs, err := jobService.ListJobs(context.Background(), &testTask.ID, "", 10, 0)
+	jobs, err := jobService.ListJobs(ctx, &testTask.ID, nil, 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs, 1)
 	assert.Equal(t, "success", string(jobs[0].Status))

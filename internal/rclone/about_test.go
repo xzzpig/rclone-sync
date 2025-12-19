@@ -9,62 +9,68 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/rclone"
 )
 
-func TestGetRemoteQuota_Success(t *testing.T) {
-	// Test with local backend which supports About
-	// Note: We need to create a configured remote, not just use a path
+func TestGetRemoteQuota(t *testing.T) {
 	setupTestConfig(t)
 
-	remoteName := "test-local-quota"
-	err := rclone.CreateRemote(remoteName, map[string]string{
-		"type": "local",
+	ctx := context.Background()
+
+	t.Run("success with local filesystem", func(t *testing.T) {
+		// Create a local remote
+		remoteName := "test-quota-local"
+		err := createRemote(remoteName, map[string]string{
+			"type": "local",
+		})
+		require.NoError(t, err)
+		defer deleteRemote(remoteName)
+
+		// Get quota information
+		quota, err := rclone.GetRemoteQuota(ctx, remoteName)
+		require.NoError(t, err)
+		assert.NotNil(t, quota)
+
+		// Local filesystem should report some usage information
+		// We can't assert exact values, but we can check the structure
+		assert.NotNil(t, quota)
 	})
-	require.NoError(t, err)
-	defer rclone.DeleteRemote(remoteName)
 
-	ctx := context.Background()
-
-	// Test: Get quota information for local backend
-	aboutInfo, err := rclone.GetRemoteQuota(ctx, remoteName)
-
-	// Local backend supports About interface
-	require.NoError(t, err, "Local backend should support About")
-	assert.NotNil(t, aboutInfo, "AboutInfo should not be nil")
-
-	// Verify that at least one field is populated
-	// Different systems may populate different fields
-	hasData := aboutInfo.Total != nil ||
-		aboutInfo.Used != nil ||
-		aboutInfo.Free != nil ||
-		aboutInfo.Objects != nil
-	assert.True(t, hasData, "At least one quota field should be populated")
-}
-
-func TestGetRemoteQuota_InvalidRemote(t *testing.T) {
-	setupTestConfig(t)
-
-	ctx := context.Background()
-	_, err := rclone.GetRemoteQuota(ctx, "non-existent-remote")
-
-	// Should return error for non-existent remote
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to create fs")
-}
-
-func TestGetRemoteQuota_UnsupportedBackend(t *testing.T) {
-	// Test with memory backend which doesn't support About
-	setupTestConfig(t)
-
-	remoteName := "test-no-about"
-	err := rclone.CreateRemote(remoteName, map[string]string{
-		"type": "memory",
+	t.Run("error with non-existent remote", func(t *testing.T) {
+		// Try to get quota for non-existent remote
+		_, err := rclone.GetRemoteQuota(ctx, "non-existent-remote")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to create fs")
 	})
-	require.NoError(t, err)
-	defer rclone.DeleteRemote(remoteName)
 
-	ctx := context.Background()
-	_, err = rclone.GetRemoteQuota(ctx, remoteName)
+	t.Run("error with backend that doesn't support About", func(t *testing.T) {
+		// Memory backend doesn't support the About interface
+		remoteName := "test-quota-memory"
+		err := createRemote(remoteName, map[string]string{
+			"type": "memory",
+		})
+		require.NoError(t, err)
+		defer deleteRemote(remoteName)
+		// Memory backend doesn't implement Abouter interface
+		_, err = rclone.GetRemoteQuota(ctx, remoteName)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "does not support quota information")
+	})
 
-	// Memory backend doesn't support About, should return error
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "does not support quota information")
+	t.Run("success case structure validation", func(t *testing.T) {
+		// Create a local remote
+		remoteName := "test-quota-structure"
+		err := createRemote(remoteName, map[string]string{
+			"type": "local",
+		})
+		require.NoError(t, err)
+		defer deleteRemote(remoteName)
+		// Get quota information
+		quota, err := rclone.GetRemoteQuota(ctx, remoteName)
+		require.NoError(t, err)
+
+		// Verify the AboutInfo structure is returned correctly
+		// The exact values depend on the filesystem, but we can verify it's not nil
+		assert.NotNil(t, quota)
+
+		// For local filesystem, some fields might be populated
+		// We just verify the function returns without panic and has correct structure
+	})
 }

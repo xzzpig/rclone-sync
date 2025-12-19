@@ -11,6 +11,7 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/i18n"
 )
 
+// JobHandler handles job-related HTTP requests.
 type JobHandler struct {
 }
 
@@ -54,10 +55,10 @@ func ListJobs(c *gin.Context) {
 
 	// Parse pagination
 	if l := c.Query("limit"); l != "" {
-		fmt.Sscanf(l, "%d", &limit)
+		_, _ = fmt.Sscanf(l, "%d", &limit)
 	}
 	if o := c.Query("offset"); o != "" {
-		fmt.Sscanf(o, "%d", &offset)
+		_, _ = fmt.Sscanf(o, "%d", &offset)
 	}
 
 	var taskID *uuid.UUID
@@ -68,16 +69,24 @@ func ListJobs(c *gin.Context) {
 		}
 	}
 
-	// Support filtering by remote_name
-	remoteName := c.Query("remote_name")
+	// Support filtering by connection_id
+	var connectionID *uuid.UUID
+	if connIDStr := c.Query("connection_id"); connIDStr != "" {
+		parsed, err := uuid.Parse(connIDStr)
+		if err != nil {
+			HandleError(c, NewLocalizedError(c, http.StatusBadRequest, i18n.ErrInvalidIDFormat, "invalid connection_id format"))
+			return
+		}
+		connectionID = &parsed
+	}
 
-	total, err := service.CountJobs(c.Request.Context(), taskID, remoteName)
+	total, err := service.CountJobs(c.Request.Context(), taskID, connectionID)
 	if err != nil {
 		HandleError(c, err)
 		return
 	}
 
-	jobs, err := service.ListJobs(c.Request.Context(), taskID, remoteName, limit, offset)
+	jobs, err := service.ListJobs(c.Request.Context(), taskID, connectionID, limit, offset)
 	if err != nil {
 		HandleError(c, err)
 		return

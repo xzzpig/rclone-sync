@@ -3,14 +3,17 @@ import LanguageSwitcher from '@/components/common/LanguageSwitcher';
 import ModeToggle from '@/components/common/ModeToggle';
 import { Button } from '@/components/ui/button';
 import { ListSkeleton } from '@/components/ui/skeletons';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { AddConnectionDialog } from '@/modules/connections/components/AddConnectionDialog';
 import { ConnectionSidebarItem } from '@/modules/connections/components/ConnectionSidebarItem';
+import { ImportWizard } from '@/modules/connections/components/ImportWizard/ImportWizard';
 import * as m from '@/paraglide/messages.js';
 import { useTasks } from '@/store/tasks';
 import { A } from '@solidjs/router';
 import { useQuery } from '@tanstack/solid-query';
 import { Component, For, createSignal } from 'solid-js';
 import IconCloud from '~icons/lucide/cloud';
+import IconImport from '~icons/lucide/import';
 import IconLayoutGrid from '~icons/lucide/layout-grid';
 import IconPlus from '~icons/lucide/plus';
 import IconSettings from '~icons/lucide/settings';
@@ -22,6 +25,7 @@ const Sidebar: Component = () => {
     staleTime: 5 * 60 * 1000, // 5 minutes
   }));
   const [isDialogOpen, setIsDialogOpen] = createSignal(false);
+  const [isImportOpen, setIsImportOpen] = createSignal(false);
   const [, actions] = useTasks();
 
   return (
@@ -51,15 +55,32 @@ const Sidebar: Component = () => {
           <h2 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {m.common_connections()}
           </h2>
-          <Button
-            variant="ghost"
-            size="sm"
-            class="size-6 p-0 hover:bg-muted"
-            onClick={() => setIsDialogOpen(true)}
-            title={m.connection_addNew()}
-          >
-            <IconPlus class="size-4" />
-          </Button>
+          <div class="flex items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger
+                as={Button}
+                variant="ghost"
+                size="sm"
+                class="size-6 p-0 hover:bg-muted"
+                onClick={() => setIsImportOpen(true)}
+              >
+                <IconImport class="size-4" />
+              </TooltipTrigger>
+              <TooltipContent>{m.connection_importConfig()}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger
+                as={Button}
+                variant="ghost"
+                size="sm"
+                class="size-6 p-0 hover:bg-muted"
+                onClick={() => setIsDialogOpen(true)}
+              >
+                <IconPlus class="size-4" />
+              </TooltipTrigger>
+              <TooltipContent>{m.connection_addNew()}</TooltipContent>
+            </Tooltip>
+          </div>
         </div>
 
         <div class="space-y-1">
@@ -86,10 +107,7 @@ const Sidebar: Component = () => {
               }
             >
               {(conn) => (
-                <ConnectionSidebarItem
-                  connection={conn}
-                  status={actions.getTaskStatus(conn.name)}
-                />
+                <ConnectionSidebarItem connection={conn} status={actions.getTaskStatus(conn.id)} />
               )}
             </For>
           )}
@@ -116,6 +134,7 @@ const Sidebar: Component = () => {
       </div>
 
       <AddConnectionDialog isOpen={isDialogOpen()} onClose={() => setIsDialogOpen(false)} />
+      <ImportWizard isOpen={isImportOpen()} onClose={() => setIsImportOpen(false)} />
     </nav>
   );
 };

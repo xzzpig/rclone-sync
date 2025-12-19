@@ -1,3 +1,4 @@
+// Package ui provides embedded web UI assets for the application.
 package ui
 
 import (

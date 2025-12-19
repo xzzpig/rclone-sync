@@ -1,4 +1,4 @@
-import { getRemoteQuota } from '@/api/connections';
+import { getConnectionQuota } from '@/api/connections';
 import StatusIcon from '@/components/common/StatusIcon';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -14,16 +14,16 @@ const Overview: Component = () => {
   const params = useParams();
   const [, actions] = useTasks();
 
-  const connectionName = () => params.connectionName;
+  const connectionId = () => params.connectionId;
   const quotaQuery = useQuery(() => ({
-    queryKey: ['remoteQuota', connectionName()],
-    queryFn: () => getRemoteQuota(connectionName()!),
-    enabled: !!connectionName(),
+    queryKey: ['connectionQuota', connectionId()],
+    queryFn: () => getConnectionQuota(connectionId()!),
+    enabled: !!connectionId(),
     refetchInterval: 60000, // Refetch every 60 seconds
   }));
 
   // Use createMemo to ensure proper reactive tracking when connection changes
-  const status = createMemo(() => actions.getTaskStatus(connectionName()));
+  const status = createMemo(() => actions.getTaskStatus(connectionId()));
 
   const statusLabel = () => {
     const s = status();

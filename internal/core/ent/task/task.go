@@ -20,8 +20,8 @@ const (
 	FieldName = "name"
 	// FieldSourcePath holds the string denoting the source_path field in the database.
 	FieldSourcePath = "source_path"
-	// FieldRemoteName holds the string denoting the remote_name field in the database.
-	FieldRemoteName = "remote_name"
+	// FieldConnectionID holds the string denoting the connection_id field in the database.
+	FieldConnectionID = "connection_id"
 	// FieldRemotePath holds the string denoting the remote_path field in the database.
 	FieldRemotePath = "remote_path"
 	// FieldDirection holds the string denoting the direction field in the database.
@@ -38,6 +38,8 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// EdgeJobs holds the string denoting the jobs edge name in mutations.
 	EdgeJobs = "jobs"
+	// EdgeConnection holds the string denoting the connection edge name in mutations.
+	EdgeConnection = "connection"
 	// Table holds the table name of the task in the database.
 	Table = "tasks"
 	// JobsTable is the table that holds the jobs relation/edge.
@@ -47,6 +49,13 @@ const (
 	JobsInverseTable = "jobs"
 	// JobsColumn is the table column denoting the jobs relation/edge.
 	JobsColumn = "task_jobs"
+	// ConnectionTable is the table that holds the connection relation/edge.
+	ConnectionTable = "tasks"
+	// ConnectionInverseTable is the table name for the Connection entity.
+	// It exists in this package in order to avoid circular dependency with the "connection" package.
+	ConnectionInverseTable = "connections"
+	// ConnectionColumn is the table column denoting the connection relation/edge.
+	ConnectionColumn = "connection_id"
 )
 
 // Columns holds all SQL columns for task fields.
@@ -54,7 +63,7 @@ var Columns = []string{
 	FieldID,
 	FieldName,
 	FieldSourcePath,
-	FieldRemoteName,
+	FieldConnectionID,
 	FieldRemotePath,
 	FieldDirection,
 	FieldSchedule,
@@ -79,8 +88,6 @@ var (
 	NameValidator func(string) error
 	// SourcePathValidator is a validator for the "source_path" field. It is called by the builders before save.
 	SourcePathValidator func(string) error
-	// RemoteNameValidator is a validator for the "remote_name" field. It is called by the builders before save.
-	RemoteNameValidator func(string) error
 	// RemotePathValidator is a validator for the "remote_path" field. It is called by the builders before save.
 	RemotePathValidator func(string) error
 	// DefaultRealtime holds the default value on creation for the "realtime" field.
@@ -140,9 +147,9 @@ func BySourcePath(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSourcePath, opts...).ToFunc()
 }
 
-// ByRemoteName orders the results by the remote_name field.
-func ByRemoteName(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldRemoteName, opts...).ToFunc()
+// ByConnectionID orders the results by the connection_id field.
+func ByConnectionID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldConnectionID, opts...).ToFunc()
 }
 
 // ByRemotePath orders the results by the remote_path field.
@@ -188,10 +195,24 @@ func ByJobs(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newJobsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByConnectionField orders the results by connection field.
+func ByConnectionField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newConnectionStep(), sql.OrderByField(field, opts...))
+	}
+}
 func newJobsStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(JobsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, JobsTable, JobsColumn),
+	)
+}
+func newConnectionStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ConnectionInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, ConnectionTable, ConnectionColumn),
 	)
 }

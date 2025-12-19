@@ -76,6 +76,12 @@ other = "创建远程连接失败"
 [error_failed_to_get_quota]
 other = "获取远程配额失败"
 
+[error_import_parse_failed]
+other = "解析 rclone.conf 内容失败"
+
+[error_import_empty_list]
+other = "没有可导入的连接"
+
 # Status messages
 [status_syncing]
 other = "同步中"

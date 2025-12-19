@@ -23,92 +23,92 @@ type JobLogCreate struct {
 }
 
 // SetLevel sets the "level" field.
-func (jlc *JobLogCreate) SetLevel(j joblog.Level) *JobLogCreate {
-	jlc.mutation.SetLevel(j)
-	return jlc
+func (_c *JobLogCreate) SetLevel(v joblog.Level) *JobLogCreate {
+	_c.mutation.SetLevel(v)
+	return _c
 }
 
 // SetTime sets the "time" field.
-func (jlc *JobLogCreate) SetTime(t time.Time) *JobLogCreate {
-	jlc.mutation.SetTime(t)
-	return jlc
+func (_c *JobLogCreate) SetTime(v time.Time) *JobLogCreate {
+	_c.mutation.SetTime(v)
+	return _c
 }
 
 // SetNillableTime sets the "time" field if the given value is not nil.
-func (jlc *JobLogCreate) SetNillableTime(t *time.Time) *JobLogCreate {
-	if t != nil {
-		jlc.SetTime(*t)
+func (_c *JobLogCreate) SetNillableTime(v *time.Time) *JobLogCreate {
+	if v != nil {
+		_c.SetTime(*v)
 	}
-	return jlc
+	return _c
 }
 
 // SetPath sets the "path" field.
-func (jlc *JobLogCreate) SetPath(s string) *JobLogCreate {
-	jlc.mutation.SetPath(s)
-	return jlc
+func (_c *JobLogCreate) SetPath(v string) *JobLogCreate {
+	_c.mutation.SetPath(v)
+	return _c
 }
 
 // SetNillablePath sets the "path" field if the given value is not nil.
-func (jlc *JobLogCreate) SetNillablePath(s *string) *JobLogCreate {
-	if s != nil {
-		jlc.SetPath(*s)
+func (_c *JobLogCreate) SetNillablePath(v *string) *JobLogCreate {
+	if v != nil {
+		_c.SetPath(*v)
 	}
-	return jlc
+	return _c
 }
 
 // SetWhat sets the "what" field.
-func (jlc *JobLogCreate) SetWhat(j joblog.What) *JobLogCreate {
-	jlc.mutation.SetWhat(j)
-	return jlc
+func (_c *JobLogCreate) SetWhat(v joblog.What) *JobLogCreate {
+	_c.mutation.SetWhat(v)
+	return _c
 }
 
 // SetNillableWhat sets the "what" field if the given value is not nil.
-func (jlc *JobLogCreate) SetNillableWhat(j *joblog.What) *JobLogCreate {
-	if j != nil {
-		jlc.SetWhat(*j)
+func (_c *JobLogCreate) SetNillableWhat(v *joblog.What) *JobLogCreate {
+	if v != nil {
+		_c.SetWhat(*v)
 	}
-	return jlc
+	return _c
 }
 
 // SetSize sets the "size" field.
-func (jlc *JobLogCreate) SetSize(i int64) *JobLogCreate {
-	jlc.mutation.SetSize(i)
-	return jlc
+func (_c *JobLogCreate) SetSize(v int64) *JobLogCreate {
+	_c.mutation.SetSize(v)
+	return _c
 }
 
 // SetNillableSize sets the "size" field if the given value is not nil.
-func (jlc *JobLogCreate) SetNillableSize(i *int64) *JobLogCreate {
-	if i != nil {
-		jlc.SetSize(*i)
+func (_c *JobLogCreate) SetNillableSize(v *int64) *JobLogCreate {
+	if v != nil {
+		_c.SetSize(*v)
 	}
-	return jlc
+	return _c
 }
 
 // SetJobID sets the "job" edge to the Job entity by ID.
-func (jlc *JobLogCreate) SetJobID(id uuid.UUID) *JobLogCreate {
-	jlc.mutation.SetJobID(id)
-	return jlc
+func (_c *JobLogCreate) SetJobID(id uuid.UUID) *JobLogCreate {
+	_c.mutation.SetJobID(id)
+	return _c
 }
 
 // SetJob sets the "job" edge to the Job entity.
-func (jlc *JobLogCreate) SetJob(j *Job) *JobLogCreate {
-	return jlc.SetJobID(j.ID)
+func (_c *JobLogCreate) SetJob(v *Job) *JobLogCreate {
+	return _c.SetJobID(v.ID)
 }
 
 // Mutation returns the JobLogMutation object of the builder.
-func (jlc *JobLogCreate) Mutation() *JobLogMutation {
-	return jlc.mutation
+func (_c *JobLogCreate) Mutation() *JobLogMutation {
+	return _c.mutation
 }
 
 // Save creates the JobLog in the database.
-func (jlc *JobLogCreate) Save(ctx context.Context) (*JobLog, error) {
-	jlc.defaults()
-	return withHooks(ctx, jlc.sqlSave, jlc.mutation, jlc.hooks)
+func (_c *JobLogCreate) Save(ctx context.Context) (*JobLog, error) {
+	_c.defaults()
+	return withHooks(ctx, _c.sqlSave, _c.mutation, _c.hooks)
 }
 
 // SaveX calls Save and panics if Save returns an error.
-func (jlc *JobLogCreate) SaveX(ctx context.Context) *JobLog {
-	v, err := jlc.Save(ctx)
+func (_c *JobLogCreate) SaveX(ctx context.Context) *JobLog {
+	v, err := _c.Save(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -116,63 +116,63 @@ func (jlc *JobLogCreate) SaveX(ctx context.Context) *JobLog {
 }
 
 // Exec executes the query.
-func (jlc *JobLogCreate) Exec(ctx context.Context) error {
-	_, err := jlc.Save(ctx)
+func (_c *JobLogCreate) Exec(ctx context.Context) error {
+	_, err := _c.Save(ctx)
 	return err
 }
 
 // ExecX is like Exec, but panics if an error occurs.
-func (jlc *JobLogCreate) ExecX(ctx context.Context) {
-	if err := jlc.Exec(ctx); err != nil {
+func (_c *JobLogCreate) ExecX(ctx context.Context) {
+	if err := _c.Exec(ctx); err != nil {
 		panic(err)
 	}
 }
 
 // defaults sets the default values of the builder before save.
-func (jlc *JobLogCreate) defaults() {
-	if _, ok := jlc.mutation.Time(); !ok {
+func (_c *JobLogCreate) defaults() {
+	if _, ok := _c.mutation.Time(); !ok {
 		v := joblog.DefaultTime()
-		jlc.mutation.SetTime(v)
+		_c.mutation.SetTime(v)
 	}
-	if _, ok := jlc.mutation.What(); !ok {
+	if _, ok := _c.mutation.What(); !ok {
 		v := joblog.DefaultWhat
-		jlc.mutation.SetWhat(v)
+		_c.mutation.SetWhat(v)
 	}
 }
 
 // check runs all checks and user-defined validators on the builder.
-func (jlc *JobLogCreate) check() error {
-	if _, ok := jlc.mutation.Level(); !ok {
+func (_c *JobLogCreate) check() error {
+	if _, ok := _c.mutation.Level(); !ok {
 		return &ValidationError{Name: "level", err: errors.New(`ent: missing required field "JobLog.level"`)}
 	}
-	if v, ok := jlc.mutation.Level(); ok {
+	if v, ok := _c.mutation.Level(); ok {
 		if err := joblog.LevelValidator(v); err != nil {
 			return &ValidationError{Name: "level", err: fmt.Errorf(`ent: validator failed for field "JobLog.level": %w`, err)}
 		}
 	}
-	if _, ok := jlc.mutation.Time(); !ok {
+	if _, ok := _c.mutation.Time(); !ok {
 		return &ValidationError{Name: "time", err: errors.New(`ent: missing required field "JobLog.time"`)}
 	}
-	if _, ok := jlc.mutation.What(); !ok {
+	if _, ok := _c.mutation.What(); !ok {
 		return &ValidationError{Name: "what", err: errors.New(`ent: missing required field "JobLog.what"`)}
 	}
-	if v, ok := jlc.mutation.What(); ok {
+	if v, ok := _c.mutation.What(); ok {
 		if err := joblog.WhatValidator(v); err != nil {
 			return &ValidationError{Name: "what", err: fmt.Errorf(`ent: validator failed for field "JobLog.what": %w`, err)}
 		}
 	}
-	if len(jlc.mutation.JobIDs()) == 0 {
+	if len(_c.mutation.JobIDs()) == 0 {
 		return &ValidationError{Name: "job", err: errors.New(`ent: missing required edge "JobLog.job"`)}
 	}
 	return nil
 }
 
-func (jlc *JobLogCreate) sqlSave(ctx context.Context) (*JobLog, error) {
-	if err := jlc.check(); err != nil {
+func (_c *JobLogCreate) sqlSave(ctx context.Context) (*JobLog, error) {
+	if err := _c.check(); err != nil {
 		return nil, err
 	}
-	_node, _spec := jlc.createSpec()
-	if err := sqlgraph.CreateNode(ctx, jlc.driver, _spec); err != nil {
+	_node, _spec := _c.createSpec()
+	if err := sqlgraph.CreateNode(ctx, _c.driver, _spec); err != nil {
 		if sqlgraph.IsConstraintError(err) {
 			err = &ConstraintError{msg: err.Error(), wrap: err}
 		}
@@ -180,37 +180,37 @@ func (jlc *JobLogCreate) sqlSave(ctx context.Context) (*JobLog, error) {
 	}
 	id := _spec.ID.Value.(int64)
 	_node.ID = int(id)
-	jlc.mutation.id = &_node.ID
-	jlc.mutation.done = true
+	_c.mutation.id = &_node.ID
+	_c.mutation.done = true
 	return _node, nil
 }
 
-func (jlc *JobLogCreate) createSpec() (*JobLog, *sqlgraph.CreateSpec) {
+func (_c *JobLogCreate) createSpec() (*JobLog, *sqlgraph.CreateSpec) {
 	var (
-		_node = &JobLog{config: jlc.config}
+		_node = &JobLog{config: _c.config}
 		_spec = sqlgraph.NewCreateSpec(joblog.Table, sqlgraph.NewFieldSpec(joblog.FieldID, field.TypeInt))
 	)
-	if value, ok := jlc.mutation.Level(); ok {
+	if value, ok := _c.mutation.Level(); ok {
 		_spec.SetField(joblog.FieldLevel, field.TypeEnum, value)
 		_node.Level = value
 	}
-	if value, ok := jlc.mutation.Time(); ok {
+	if value, ok := _c.mutation.Time(); ok {
 		_spec.SetField(joblog.FieldTime, field.TypeTime, value)
 		_node.Time = value
 	}
-	if value, ok := jlc.mutation.Path(); ok {
+	if value, ok := _c.mutation.Path(); ok {
 		_spec.SetField(joblog.FieldPath, field.TypeString, value)
 		_node.Path = value
 	}
-	if value, ok := jlc.mutation.What(); ok {
+	if value, ok := _c.mutation.What(); ok {
 		_spec.SetField(joblog.FieldWhat, field.TypeEnum, value)
 		_node.What = value
 	}
-	if value, ok := jlc.mutation.Size(); ok {
+	if value, ok := _c.mutation.Size(); ok {
 		_spec.SetField(joblog.FieldSize, field.TypeInt64, value)
 		_node.Size = value
 	}
-	if nodes := jlc.mutation.JobIDs(); len(nodes) > 0 {
+	if nodes := _c.mutation.JobIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: true,
@@ -238,16 +238,16 @@ type JobLogCreateBulk struct {
 }
 
 // Save creates the JobLog entities in the database.
-func (jlcb *JobLogCreateBulk) Save(ctx context.Context) ([]*JobLog, error) {
-	if jlcb.err != nil {
-		return nil, jlcb.err
+func (_c *JobLogCreateBulk) Save(ctx context.Context) ([]*JobLog, error) {
+	if _c.err != nil {
+		return nil, _c.err
 	}
-	specs := make([]*sqlgraph.CreateSpec, len(jlcb.builders))
-	nodes := make([]*JobLog, len(jlcb.builders))
-	mutators := make([]Mutator, len(jlcb.builders))
-	for i := range jlcb.builders {
+	specs := make([]*sqlgraph.CreateSpec, len(_c.builders))
+	nodes := make([]*JobLog, len(_c.builders))
+	mutators := make([]Mutator, len(_c.builders))
+	for i := range _c.builders {
 		func(i int, root context.Context) {
-			builder := jlcb.builders[i]
+			builder := _c.builders[i]
 			builder.defaults()
 			var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 				mutation, ok := m.(*JobLogMutation)
@@ -261,11 +261,11 @@ func (jlcb *JobLogCreateBulk) Save(ctx context.Context) ([]*JobLog, error) {
 				var err error
 				nodes[i], specs[i] = builder.createSpec()
 				if i < len(mutators)-1 {
-					_, err = mutators[i+1].Mutate(root, jlcb.builders[i+1].mutation)
+					_, err = mutators[i+1].Mutate(root, _c.builders[i+1].mutation)
 				} else {
 					spec := &sqlgraph.BatchCreateSpec{Nodes: specs}
 					// Invoke the actual operation on the latest mutation in the chain.
-					if err = sqlgraph.BatchCreate(ctx, jlcb.driver, spec); err != nil {
+					if err = sqlgraph.BatchCreate(ctx, _c.driver, spec); err != nil {
 						if sqlgraph.IsConstraintError(err) {
 							err = &ConstraintError{msg: err.Error(), wrap: err}
 						}
@@ -289,7 +289,7 @@ func (jlcb *JobLogCreateBulk) Save(ctx context.Context) ([]*JobLog, error) {
 		}(i, ctx)
 	}
 	if len(mutators) > 0 {
-		if _, err := mutators[0].Mutate(ctx, jlcb.builders[0].mutation); err != nil {
+		if _, err := mutators[0].Mutate(ctx, _c.builders[0].mutation); err != nil {
 			return nil, err
 		}
 	}
@@ -297,8 +297,8 @@ func (jlcb *JobLogCreateBulk) Save(ctx context.Context) ([]*JobLog, error) {
 }
 
 // SaveX is like Save, but panics if an error occurs.
-func (jlcb *JobLogCreateBulk) SaveX(ctx context.Context) []*JobLog {
-	v, err := jlcb.Save(ctx)
+func (_c *JobLogCreateBulk) SaveX(ctx context.Context) []*JobLog {
+	v, err := _c.Save(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -306,14 +306,14 @@ func (jlcb *JobLogCreateBulk) SaveX(ctx context.Context) []*JobLog {
 }
 
 // Exec executes the query.
-func (jlcb *JobLogCreateBulk) Exec(ctx context.Context) error {
-	_, err := jlcb.Save(ctx)
+func (_c *JobLogCreateBulk) Exec(ctx context.Context) error {
+	_, err := _c.Save(ctx)
 	return err
 }
 
 // ExecX is like Exec, but panics if an error occurs.
-func (jlcb *JobLogCreateBulk) ExecX(ctx context.Context) {
-	if err := jlcb.Exec(ctx); err != nil {
+func (_c *JobLogCreateBulk) ExecX(ctx context.Context) {
+	if err := _c.Exec(ctx); err != nil {
 		panic(err)
 	}
 }

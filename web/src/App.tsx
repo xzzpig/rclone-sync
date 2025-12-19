@@ -21,7 +21,7 @@ const App: Component = () => {
           <Router root={AppShell}>
             <Route path="/" component={WelcomeView} />
             <Route path="/overview" component={WelcomeView} />
-            <Route path="/connections/:connectionName" component={ConnectionLayout}>
+            <Route path="/connections/:connectionId" component={ConnectionLayout}>
               <Route path="/" component={Overview} />
               <Route path="/tasks" component={Tasks} />
               <Route path="/history" component={History} />

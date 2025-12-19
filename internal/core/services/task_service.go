@@ -9,14 +9,17 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/task"
 	"github.com/xzzpig/rclone-sync/internal/core/errs"
+	"github.com/xzzpig/rclone-sync/internal/core/ports"
 
 	"github.com/google/uuid"
 )
 
+// TaskService provides operations for managing sync tasks.
 type TaskService struct {
 	client *ent.Client
 }
 
+// NewTaskService creates a new TaskService instance.
 func NewTaskService(client *ent.Client) *TaskService {
 	return &TaskService{client: client}
 }
@@ -41,11 +44,12 @@ func withLatestJobPredicate(q *ent.JobQuery) {
 	})
 }
 
-func (s *TaskService) CreateTask(ctx context.Context, name, sourcePath, remoteName, remotePath, direction, schedule string, realtime bool, options map[string]interface{}) (*ent.Task, error) {
+// CreateTask creates a new sync task with the given parameters.
+func (s *TaskService) CreateTask(ctx context.Context, name, sourcePath string, connectionID uuid.UUID, remotePath, direction, schedule string, realtime bool, options map[string]interface{}) (*ent.Task, error) {
 	t, err := s.client.Task.Create().
 		SetName(name).
 		SetSourcePath(sourcePath).
-		SetRemoteName(remoteName).
+		SetConnectionID(connectionID).
 		SetRemotePath(remotePath).
 		SetDirection(task.Direction(direction)).
 		SetSchedule(schedule).
@@ -61,9 +65,11 @@ func (s *TaskService) CreateTask(ctx context.Context, name, sourcePath, remoteNa
 	return t, nil
 }
 
+// ListAllTasks retrieves all tasks with their latest job and connection.
 func (s *TaskService) ListAllTasks(ctx context.Context) ([]*ent.Task, error) {
 	tasks, err := s.client.Task.Query().
 		WithJobs(withLatestJobPredicate).
+		WithConnection().
 		All(ctx)
 	if err != nil {
 		return nil, errors.Join(errs.ErrSystem, err)
@@ -71,14 +77,15 @@ func (s *TaskService) ListAllTasks(ctx context.Context) ([]*ent.Task, error) {
 	return tasks, nil
 }
 
-func (s *TaskService) ListTasksByRemote(ctx context.Context, remoteName string) ([]*ent.Task, error) {
+// ListTasksByConnection retrieves tasks by connection ID with their latest job.
+func (s *TaskService) ListTasksByConnection(ctx context.Context, connectionID uuid.UUID) ([]*ent.Task, error) {
 	query := s.client.Task.Query()
-	if remoteName != "" {
-		query = query.Where(task.RemoteNameEQ(remoteName))
+	if connectionID != uuid.Nil {
+		query = query.Where(task.ConnectionIDEQ(connectionID))
 	}
 
 	// 使用 WithJobs 配置子查询来获取每个 task 的最新 job
-	tasks, err := query.WithJobs(withLatestJobPredicate).All(ctx)
+	tasks, err := query.WithJobs(withLatestJobPredicate).WithConnection().All(ctx)
 
 	if err != nil {
 		return nil, errors.Join(errs.ErrSystem, err)
@@ -86,6 +93,7 @@ func (s *TaskService) ListTasksByRemote(ctx context.Context, remoteName string) 
 	return tasks, nil
 }
 
+// GetTask retrieves a task by ID.
 func (s *TaskService) GetTask(ctx context.Context, id uuid.UUID) (*ent.Task, error) {
 	t, err := s.client.Task.Get(ctx, id)
 	if err != nil {
@@ -97,6 +105,22 @@ func (s *TaskService) GetTask(ctx context.Context, id uuid.UUID) (*ent.Task, err
 	return t, nil
 }
 
+// GetTaskWithConnection retrieves a task by ID with its connection.
+func (s *TaskService) GetTaskWithConnection(ctx context.Context, id uuid.UUID) (*ent.Task, error) {
+	t, err := s.client.Task.Query().
+		Where(task.IDEQ(id)).
+		WithConnection().
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, errors.Join(errs.ErrNotFound, err)
+		}
+		return nil, errors.Join(errs.ErrSystem, err)
+	}
+	return t, nil
+}
+
+// GetTaskWithJobs retrieves a task by ID with its latest job.
 func (s *TaskService) GetTaskWithJobs(ctx context.Context, id uuid.UUID) (*ent.Task, error) {
 	t, err := s.client.Task.Query().
 		Where(task.IDEQ(id)).
@@ -111,11 +135,12 @@ func (s *TaskService) GetTaskWithJobs(ctx context.Context, id uuid.UUID) (*ent.T
 	return t, nil
 }
 
-func (s *TaskService) UpdateTask(ctx context.Context, id uuid.UUID, name, sourcePath, remoteName, remotePath, direction, schedule string, realtime bool, options map[string]interface{}) (*ent.Task, error) {
+// UpdateTask updates an existing task with the given parameters.
+func (s *TaskService) UpdateTask(ctx context.Context, id uuid.UUID, name, sourcePath string, connectionID uuid.UUID, remotePath, direction, schedule string, realtime bool, options map[string]interface{}) (*ent.Task, error) {
 	t, err := s.client.Task.UpdateOneID(id).
 		SetName(name).
 		SetSourcePath(sourcePath).
-		SetRemoteName(remoteName).
+		SetConnectionID(connectionID).
 		SetRemotePath(remotePath).
 		SetDirection(task.Direction(direction)).
 		SetSchedule(schedule).
@@ -134,6 +159,7 @@ func (s *TaskService) UpdateTask(ctx context.Context, id uuid.UUID, name, source
 	return t, nil
 }
 
+// DeleteTask deletes a task by ID.
 func (s *TaskService) DeleteTask(ctx context.Context, id uuid.UUID) error {
 	err := s.client.Task.DeleteOneID(id).Exec(ctx)
 	if err != nil {
@@ -144,3 +170,5 @@ func (s *TaskService) DeleteTask(ctx context.Context, id uuid.UUID) error {
 	}
 	return nil
 }
+
+var _ ports.TaskService = (*TaskService)(nil)

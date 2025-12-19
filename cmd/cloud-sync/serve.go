@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/api"
 
 	"github.com/xzzpig/rclone-sync/internal/core/config"
+	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/db"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 	"github.com/xzzpig/rclone-sync/internal/core/runner"
@@ -31,13 +33,14 @@ import (
 // serveCmd represents the serve command
 var serveCmd = &cobra.Command{
 	Use: "serve",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		// Initialize Config
 		config.InitConfig(cfgFile)
 
 		// Initialize Logger first
 		logger.InitLogger(logger.Environment(config.Cfg.App.Environment), logger.LogLevel(config.Cfg.Log.Level))
 		logger.L.Info("Starting cloud-sync server...")
+		rclone.SetupLogLevel(config.Cfg.Log.Level)
 
 		// Initialize i18n
 		if err := i18n.Init(); err != nil {
@@ -45,12 +48,23 @@ var serveCmd = &cobra.Command{
 		}
 		logger.L.Info("i18n initialized successfully")
 
-		// Initialize rclone config
-		rclone.InitConfig(config.Cfg.Rclone.ConfigPath)
-
 		// Initialize database
 		db.InitDB()
 		defer db.CloseDB()
+
+		// Initialize encryptor for connection storage
+		encryptor, err := crypto.NewEncryptor(config.Cfg.Security.EncryptionKey)
+		if err != nil {
+			logger.L.Fatal("Failed to initialize encryptor", zap.Error(err))
+		}
+
+		// Initialize connection service and DBStorage
+		connSvc := services.NewConnectionService(db.Client, encryptor)
+		dbStorage := rclone.NewDBStorage(connSvc)
+		dbStorage.Install()
+		logger.L.Info("DBStorage installed - rclone will use database for configuration")
+
+		// Note: rclone.InitConfig is no longer needed as DBStorage replaces it
 
 		// Initialize services
 		taskSvc := services.NewTaskService(db.Client)
@@ -84,12 +98,13 @@ var serveCmd = &cobra.Command{
 		logger.L.Info("Server starting", zap.String("address", addr))
 
 		srv := &http.Server{
-			Addr:    addr,
-			Handler: r,
+			Addr:              addr,
+			Handler:           r,
+			ReadHeaderTimeout: 10 * time.Second,
 		}
 
 		go func() {
-			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				logger.L.Fatal("Server failed to start", zap.Error(err))
 			}
 		}()

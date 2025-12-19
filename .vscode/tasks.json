@@ -2,12 +2,9 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"type": "go",
+			"type": "shell",
 			"label": "go: dev",
-			"command": "tool",
-			"args": [
-				"air"
-			],
+			"command": "air",
 			"runOptions": {
 				"runOn": "folderOpen"
 			}

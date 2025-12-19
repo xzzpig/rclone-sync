@@ -1,5 +1,5 @@
 import * as m from '@/paraglide/messages.js';
-import { createConnection, testConnection } from '@/api/connections';
+import { testUnsavedConnection } from '@/api/connections';
 import { HelpTooltip } from '@/components/common/HelpTooltip';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -21,9 +21,8 @@ import {
 } from '@/components/ui/text-field';
 import { extractErrorDetails, extractErrorMessage } from '@/lib/api';
 import type { RcloneOption } from '@/lib/types';
-import { useQueryClient } from '@tanstack/solid-query';
 import { createEffect, createMemo, createSignal, For, Show } from 'solid-js';
-import { createStore } from 'solid-js/store';
+import { createStore, unwrap } from 'solid-js/store';
 import IconAlertCircle from '~icons/lucide/alert-circle';
 import IconChevronDown from '~icons/lucide/chevron-down';
 
@@ -93,11 +92,16 @@ export const DynamicConfigForm = (props: {
   options: RcloneOption[];
   provider: string;
   onBack: () => void;
-  onSave: () => void;
+  /** Save handler - receives name and config */
+  onSave: (name: string | undefined, config: Record<string, string>) => Promise<void>;
   initialValues?: Record<string, string>;
   isEditing?: boolean;
   showBack?: boolean;
   loading?: boolean;
+  /** Hide the connection name field */
+  hideName?: boolean;
+  /** Custom text for save button */
+  saveButtonText?: string;
 }) => {
   const [formState, setFormState] = createStore<Record<string, string | undefined>>(
     props.initialValues ?? {}
@@ -106,7 +110,7 @@ export const DynamicConfigForm = (props: {
     Record<string, { message: string; type: 'error' | 'success'; details?: string } | undefined>
   >({});
   const [isTesting, setIsTesting] = createSignal(false);
-  const queryClient = useQueryClient();
+  const [isSaving, setIsSaving] = createSignal(false);
 
   const groupedData = createMemo(() => groupOptions(props.options));
 
@@ -122,7 +126,10 @@ export const DynamicConfigForm = (props: {
     setIsTesting(true);
     setErrors('testResult', undefined);
     try {
-      await testConnection(props.provider, { ...formState, type: props.provider });
+      // Build config without name field - use unwrap to get current snapshot
+      const currentFormState = unwrap(formState);
+      const { name: _, ...config } = currentFormState;
+      await testUnsavedConnection(props.provider, config as Record<string, string>);
       setErrors('testResult', { message: m.connection_testSuccess(), type: 'success' });
     } catch (err: unknown) {
       setErrors('testResult', {
@@ -136,46 +143,57 @@ export const DynamicConfigForm = (props: {
   };
 
   const handleSave = async () => {
-    const name = formState['name']; // Assuming a 'name' field exists
-    if (!name) {
+    setIsSaving(true);
+    setErrors('saveResult', undefined);
+
+    // Build config without name field - use unwrap to get current snapshot
+    const currentFormState = unwrap(formState);
+    const { name: nameValue, ...config } = currentFormState;
+
+    // Validate name if not hidden
+    if (!props.hideName && !nameValue) {
       setErrors('name', { message: m.connection_nameRequired(), type: 'error' });
+      setIsSaving(false);
       return;
     }
+
     try {
-      await createConnection(name, { ...formState, type: props.provider });
-      await queryClient.invalidateQueries({ queryKey: ['connections'] });
-      props.onSave();
+      await props.onSave(nameValue, config as Record<string, string>);
     } catch (err: unknown) {
       setErrors('saveResult', {
         message: extractErrorMessage(err) ?? m.connection_saveError(),
         details: extractErrorDetails(err),
         type: 'error',
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
   return (
     <Show when={!props.loading} fallback={<DynamicConfigFormSkeleton showBack={props.showBack} />}>
       <div class="space-y-4 p-4">
-        <TextField
-          value={formState['name'] ?? ''}
-          onChange={(v?: string) => handleInputChange('name', v)}
-          required
-          disabled={props.isEditing}
-        >
-          <TextFieldLabel for="connection-name">{m.connection_connectionName()}</TextFieldLabel>
-          <TextFieldInput
-            id="connection-name"
-            aria-required="true"
-            aria-invalid={!!errors.name}
-            aria-describedby={errors.name ? 'connection-name-error' : undefined}
-          />
-          <Show when={errors.name}>
-            <TextFieldErrorMessage id="connection-name-error" role="alert">
-              {errors.name?.message}
-            </TextFieldErrorMessage>
-          </Show>
-        </TextField>
+        <Show when={!props.hideName}>
+          <TextField
+            value={formState['name'] ?? ''}
+            onChange={(v?: string) => handleInputChange('name', v)}
+            required
+            disabled={props.isEditing}
+          >
+            <TextFieldLabel for="connection-name">{m.connection_connectionName()}</TextFieldLabel>
+            <TextFieldInput
+              id="connection-name"
+              aria-required="true"
+              aria-invalid={!!errors.name}
+              aria-describedby={errors.name ? 'connection-name-error' : undefined}
+            />
+            <Show when={errors.name}>
+              <TextFieldErrorMessage id="connection-name-error" role="alert">
+                {errors.name?.message}
+              </TextFieldErrorMessage>
+            </Show>
+          </TextField>
+        </Show>
 
         <For each={Object.entries(groupedData().grouped)}>
           {([groupName, opts]) => (
@@ -255,11 +273,14 @@ export const DynamicConfigForm = (props: {
             </Button>
             <Button
               onClick={handleSave}
+              disabled={isSaving()}
               aria-label={
-                props.isEditing ? 'Update connection configuration' : 'Create new connection'
+                props.saveButtonText ??
+                (props.isEditing ? 'Update connection configuration' : 'Create new connection')
               }
             >
-              {props.isEditing ? m.connection_update() : m.connection_createConnection()}
+              {props.saveButtonText ??
+                (props.isEditing ? m.connection_update() : m.connection_createConnection())}
             </Button>
           </div>
         </div>

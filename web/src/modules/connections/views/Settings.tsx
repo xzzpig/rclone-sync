@@ -1,5 +1,11 @@
 import * as m from '@/paraglide/messages.js';
-import { deleteConnection, getProviderOptions, getRemoteConfig } from '@/api/connections';
+import {
+  deleteConnection,
+  getConnection,
+  getConnectionConfig,
+  getProviderOptions,
+  updateConnection,
+} from '@/api/connections';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -22,31 +28,56 @@ const Settings: Component = () => {
   const params = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const connectionName = () => params.connectionName;
+  const connectionId = () => params.connectionId;
 
-  // 1. Fetch remote config
-  const configQuery = useQuery(() => ({
-    queryKey: ['remoteConfig', connectionName()],
-    queryFn: () => getRemoteConfig(connectionName()!),
-    enabled: !!connectionName(),
+  // Fetch connection info
+  const connectionQuery = useQuery(() => ({
+    queryKey: ['connection', connectionId()],
+    queryFn: () => getConnection(connectionId()!),
+    enabled: !!connectionId(),
   }));
 
-  // 2. Fetch provider options when config is available
+  // Fetch connection config
+  const configQuery = useQuery(() => ({
+    queryKey: ['connectionConfig', connectionId()],
+    queryFn: () => getConnectionConfig(connectionId()!),
+    enabled: !!connectionId(),
+  }));
+
+  // Fetch provider options when config is available
   const optionsQuery = useQuery(() => ({
     queryKey: ['providerOptions', configQuery.data?.type],
     queryFn: () => getProviderOptions(configQuery.data!.type),
     enabled: !!configQuery.data?.type,
   }));
 
+  const connectionName = () => connectionQuery.data?.name ?? connectionId() ?? '';
+
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = createSignal(false);
   const [isDeleting, setIsDeleting] = createSignal(false);
+
+  const handleSave = async (_name: string | undefined, config: Record<string, string>) => {
+    const id = connectionId();
+    if (!id) {
+      throw new Error('Connection ID is required');
+    }
+    await updateConnection(id, { config });
+    await queryClient.invalidateQueries({ queryKey: ['connections'] });
+    await queryClient.invalidateQueries({ queryKey: ['connectionConfig', id] });
+
+    // Show success toast
+    showToast({
+      title: m.toast_taskUpdated(),
+      description: m.toast_taskUpdatedDesc({ name: connectionName() }),
+    });
+  };
 
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
-      const name = connectionName();
-      if (name) {
-        await deleteConnection(name);
+      const id = connectionId();
+      if (id) {
+        await deleteConnection(id);
         await queryClient.invalidateQueries({ queryKey: ['connections'] });
         navigate('/');
       }
@@ -80,12 +111,7 @@ const Settings: Component = () => {
             isEditing={true}
             showBack={false}
             onBack={() => navigate('..')}
-            onSave={() => {
-              showToast({
-                title: m.toast_taskUpdated(),
-                description: m.toast_taskUpdatedDesc({ name: connectionName() ?? '' }),
-              });
-            }}
+            onSave={handleSave}
           />
         </CardContent>
       </Card>

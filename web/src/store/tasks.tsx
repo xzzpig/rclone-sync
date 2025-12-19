@@ -19,9 +19,9 @@ const initialState: TaskState = {
 };
 
 interface TaskActions {
-  loadTasks: (remoteName?: string) => Promise<void>;
+  loadTasks: (connectionId?: string) => Promise<void>;
   startGlobalSseSubscription: () => void;
-  getTaskStatus: (remoteName?: string) => TaskStatus;
+  getTaskStatus: (connectionId?: string) => TaskStatus;
   runTask: (id: string) => Promise<void>;
   createTask: (task: Omit<Task, 'id' | 'edges'>) => Promise<void>;
   updateTask: (id: string, updates: Partial<Task>) => Promise<void>;
@@ -35,10 +35,10 @@ export const TaskProvider: ParentComponent = (props) => {
   let sseClient: ReturnType<SSEClient['connect']> | null = null;
 
   const actions: TaskActions = {
-    loadTasks: async (remoteName?: string) => {
+    loadTasks: async (connectionId?: string) => {
       setState('isLoading', true);
       try {
-        const newTasks = await getTasks(remoteName ? { remote_name: remoteName } : undefined);
+        const newTasks = await getTasks(connectionId ? { connection_id: connectionId } : undefined);
 
         // Merge strategy: preserve SSE real-time updated jobs data
         setState('tasks', (oldTasks) => {
@@ -113,9 +113,9 @@ export const TaskProvider: ParentComponent = (props) => {
       });
     },
 
-    getTaskStatus: (remoteName?: string): TaskStatus => {
-      const relevantTasks = remoteName
-        ? state.tasks.filter((t) => t.remote_name === remoteName)
+    getTaskStatus: (connectionId?: string): TaskStatus => {
+      const relevantTasks = connectionId
+        ? state.tasks.filter((t) => t.connection_id === connectionId)
         : state.tasks;
 
       if (relevantTasks.length === 0) return 'idle';

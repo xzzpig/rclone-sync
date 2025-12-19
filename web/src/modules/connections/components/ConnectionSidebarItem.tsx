@@ -1,18 +1,18 @@
 import StatusIcon from '@/components/common/StatusIcon';
-import { Remote, TaskStatus } from '@/lib/types';
+import { Connection, TaskStatus } from '@/lib/types';
 import { A } from '@solidjs/router';
 import { Component } from 'solid-js';
 import IconHardDrive from '~icons/lucide/hard-drive';
 
 interface ConnectionSidebarItemProps {
-  connection: Remote;
+  connection: Connection;
   status: TaskStatus;
 }
 
 export const ConnectionSidebarItem: Component<ConnectionSidebarItemProps> = (props) => {
   return (
     <A
-      href={`/connections/${props.connection.name}`}
+      href={`/connections/${props.connection.id}`}
       class="group flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
       activeClass="bg-secondary text-foreground shadow-sm"
     >

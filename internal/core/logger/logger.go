@@ -1,3 +1,4 @@
+// Package logger provides logging utilities for the application.
 package logger
 
 import (
@@ -10,25 +11,35 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// L is the global logger instance.
 // TODO: replace with function with name
 var L *zap.Logger
 
+// Environment represents the application environment type.
 type Environment string
 
 const (
+	// EnvironmentDevelopment represents the development environment.
 	EnvironmentDevelopment Environment = "development"
-	EnvironmentProduction  Environment = "production"
+	// EnvironmentProduction represents the production environment.
+	EnvironmentProduction Environment = "production"
 )
 
+// LogLevel represents the logging level type.
 type LogLevel string
 
 const (
+	// LogLevelDebug represents the debug logging level.
 	LogLevelDebug LogLevel = "debug"
-	Info          LogLevel = "info"
-	Warn          LogLevel = "warn"
-	Error         LogLevel = "error"
+	// Info represents the info logging level.
+	Info LogLevel = "info"
+	// Warn represents the warn logging level.
+	Warn LogLevel = "warn"
+	// Error represents the error logging level.
+	Error LogLevel = "error"
 )
 
+// InitLogger initializes the global logger with the specified environment and log level.
 func InitLogger(environment Environment, logLevel LogLevel) {
 	var cfg zap.Config
 
@@ -46,7 +57,7 @@ func InitLogger(environment Environment, logLevel LogLevel) {
 		log.Printf("Failed to initialize zap logger: %v", err)
 		os.Exit(1)
 	}
-	defer L.Sync()
+	defer func() { _ = L.Sync() }()
 
 	// Redirect standard log to zap
 	zap.RedirectStdLog(L)

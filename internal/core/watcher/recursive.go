@@ -1,7 +1,7 @@
+// Package watcher provides file system watching functionality for realtime sync.
 package watcher
 
 import (
-	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/xzzpig/rclone-sync/internal/core/errs"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 	"go.uber.org/zap"
 )
@@ -31,6 +32,7 @@ type RecursiveWatcher struct {
 	done chan struct{}
 }
 
+// NewRecursiveWatcher creates a new RecursiveWatcher instance.
 func NewRecursiveWatcher() (*RecursiveWatcher, error) {
 	fsWatcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -51,14 +53,17 @@ func NewRecursiveWatcher() (*RecursiveWatcher, error) {
 	return rw, nil
 }
 
+// Events returns the channel for receiving file system events.
 func (rw *RecursiveWatcher) Events() chan fsnotify.Event {
 	return rw.events
 }
 
+// Errors returns the channel for receiving watcher errors.
 func (rw *RecursiveWatcher) Errors() chan error {
 	return rw.errors
 }
 
+// Close stops the watcher and releases resources.
 func (rw *RecursiveWatcher) Close() error {
 	close(rw.done)
 	return rw.fsWatcher.Close()
@@ -75,7 +80,7 @@ func (rw *RecursiveWatcher) Add(root string) error {
 		return err
 	}
 	if !info.IsDir() {
-		return errors.New("path is not a directory")
+		return errs.ConstError("path is not a directory")
 	}
 
 	// Walk and add all subdirectories
@@ -149,7 +154,7 @@ func (rw *RecursiveWatcher) removeDirLocked(path string) {
 	}
 
 	if count <= 1 {
-		rw.fsWatcher.Remove(path)
+		_ = rw.fsWatcher.Remove(path)
 		delete(rw.watchedDirs, path)
 		rw.logger.Debug("Removed watch", zap.String("path", path))
 	} else {

@@ -1,4 +1,5 @@
 import * as m from '@/paraglide/messages.js';
+import { getConnection } from '@/api/connections';
 import { listLocalFiles, listRemoteFiles } from '@/api/files';
 import { FileBrowser } from '@/components/common/FileBrowser';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { showToast } from '@/components/ui/toast';
 import { Task } from '@/lib/types';
+import { useQuery } from '@tanstack/solid-query';
 import { Component, createSignal, Show } from 'solid-js';
 import IconChevronLeft from '~icons/lucide/chevron-left';
 import IconChevronRight from '~icons/lucide/chevron-right';
@@ -19,7 +21,7 @@ import IconHardDrive from '~icons/lucide/hard-drive';
 import { TaskSettingsForm, TaskSettingsFormData } from './TaskSettingsForm';
 
 export interface CreateTaskWizardProps {
-  remoteName: string;
+  connectionId: string;
   open: boolean;
   onClose: () => void;
   onSubmit: (task: Omit<Task, 'id' | 'edges'>) => void | Promise<void>;
@@ -28,6 +30,15 @@ export interface CreateTaskWizardProps {
 type WizardStep = 'paths' | 'settings';
 
 export const CreateTaskWizard: Component<CreateTaskWizardProps> = (props) => {
+  // Fetch connection info to get the name for display
+  const connectionQuery = useQuery(() => ({
+    queryKey: ['connection', props.connectionId],
+    queryFn: () => getConnection(props.connectionId),
+    enabled: !!props.connectionId && props.open,
+  }));
+
+  const connectionName = () => connectionQuery.data?.name ?? props.connectionId;
+
   const [currentStep, setCurrentStep] = createSignal<WizardStep>('paths');
   const [sourcePath, setSourcePath] = createSignal('');
   const [remotePath, setRemotePath] = createSignal('');
@@ -76,9 +87,9 @@ export const CreateTaskWizard: Component<CreateTaskWizardProps> = (props) => {
     try {
       const data = formData();
       await props.onSubmit({
-        name: data.name ?? `${props.remoteName}-${new Date().getTime()}`,
+        name: data.name ?? `task-${new Date().getTime()}`,
         source_path: sourcePath(),
-        remote_name: props.remoteName,
+        connection_id: props.connectionId,
         remote_path: remotePath(),
         direction: data.direction,
         schedule: data.schedule,
@@ -151,8 +162,8 @@ export const CreateTaskWizard: Component<CreateTaskWizardProps> = (props) => {
                 <div class="min-h-0 flex-1">
                   <FileBrowser
                     initialPath="/"
-                    rootLabel={`${props.remoteName}:`}
-                    loadDirectory={(path) => listRemoteFiles(props.remoteName, path)}
+                    rootLabel={`${connectionName()}:`}
+                    loadDirectory={(path) => listRemoteFiles(props.connectionId, path)}
                     onSelect={setRemotePath}
                     class="h-full"
                   />

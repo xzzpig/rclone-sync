@@ -39,7 +39,7 @@ func TestRecursiveWatcher_RecursiveAdd(t *testing.T) {
 		SourcePath: rootDir,
 	}
 
-	mockTaskSvc.On("GetTask", mock.Anything, task.ID).Return(task, nil)
+	mockTaskSvc.On("GetTaskWithConnection", mock.Anything, task.ID).Return(task, nil)
 	mockTaskSvc.On("ListAllTasks", mock.Anything).Return([]*ent.Task{}, nil) // Add this line
 	// Expect StartTask to be called when we touch a file deep inside
 	mockRunner.On("StartTask", task, "realtime").Return(nil)
@@ -80,7 +80,7 @@ func TestRecursiveWatcher_DynamicAdd(t *testing.T) {
 		SourcePath: rootDir,
 	}
 
-	mockTaskSvc.On("GetTask", mock.Anything, task.ID).Return(task, nil)
+	mockTaskSvc.On("GetTaskWithConnection", mock.Anything, task.ID).Return(task, nil)
 	mockTaskSvc.On("ListAllTasks", mock.Anything).Return([]*ent.Task{}, nil) // Add this line
 	mockRunner.On("StartTask", task, "realtime").Return(nil)
 

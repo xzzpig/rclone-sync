@@ -79,9 +79,9 @@ function Tasks() {
   // Filter tasks for the current connection
   // Global SSE subscription in AppShell handles real-time updates
   const filteredTasks = () => {
-    const name = params.connectionName;
-    if (!name) return state.tasks;
-    return state.tasks.filter((task) => task.remote_name === name);
+    const id = params.connectionId;
+    if (!id) return state.tasks;
+    return state.tasks.filter((task) => task.connection_id === id);
   };
 
   const selectedTask = () => {
@@ -143,7 +143,7 @@ function Tasks() {
   const handleHistory = () => {
     const task = selectedTask();
     if (task) {
-      navigate(`/connections/${params.connectionName}/history?task_id=${task.id}`);
+      navigate(`/connections/${params.connectionId}/history?task_id=${task.id}`);
     }
   };
 
@@ -281,7 +281,7 @@ function Tasks() {
                                 class="rotate-90 md:rotate-0"
                               />
                               <PathDisplay
-                                path={`${task.remote_name}:${task.remote_path}`}
+                                path={`${task.edges?.connection?.name ?? '?'}:${task.remote_path}`}
                                 type="remote"
                                 class="flex-1"
                               />
@@ -347,7 +347,7 @@ function Tasks() {
         onSave={handleSaveTask}
       />
       <CreateTaskWizard
-        remoteName={params.connectionName ?? ''}
+        connectionId={params.connectionId ?? ''}
         open={isCreateDialogOpen()}
         onClose={() => setCreateDialogOpen(false)}
         onSubmit={handleCreateTask}

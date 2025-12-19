@@ -7,9 +7,23 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/core/services"
 	"github.com/xzzpig/rclone-sync/internal/i18n"
 	"github.com/xzzpig/rclone-sync/internal/rclone"
 )
+
+// FilesHandler handles file browsing requests
+type FilesHandler struct {
+	connService *services.ConnectionService
+}
+
+// NewFilesHandler creates a new FilesHandler
+func NewFilesHandler(connService *services.ConnectionService) *FilesHandler {
+	return &FilesHandler{
+		connService: connService,
+	}
+}
 
 // FileEntry represents a file or directory entry
 type FileEntry struct {
@@ -84,16 +98,22 @@ func ListLocalFiles(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-// ListRemoteFiles lists directories in a remote path
+// ListRemoteFiles lists directories in a remote path by connection ID
 // URL params:
-//   - name: The remote name (required)
+//   - id: The connection ID (required)
 //
 // Query params:
 //   - path: The directory path to list (required)
-func ListRemoteFiles(c *gin.Context) {
-	remoteName := c.Param("name")
-	if remoteName == "" {
-		HandleError(c, NewLocalizedError(c, http.StatusBadRequest, i18n.ErrMissingParameter, "remote name is required"))
+func (h *FilesHandler) ListRemoteFiles(c *gin.Context) {
+	idStr := c.Param("id")
+	if idStr == "" {
+		HandleError(c, NewLocalizedError(c, http.StatusBadRequest, i18n.ErrMissingParameter, "connection id is required"))
+		return
+	}
+
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		HandleError(c, NewLocalizedError(c, http.StatusBadRequest, i18n.ErrInvalidIDFormat, idStr))
 		return
 	}
 
@@ -103,8 +123,15 @@ func ListRemoteFiles(c *gin.Context) {
 		return
 	}
 
+	// Get connection by ID to retrieve the remote name
+	conn, err := h.connService.GetConnectionByID(c.Request.Context(), id)
+	if err != nil {
+		HandleError(c, NewLocalizedError(c, http.StatusNotFound, i18n.ErrConnectionNotFound, idStr))
+		return
+	}
+
 	// List remote directory using rclone
-	entries, err := rclone.ListRemoteDir(c.Request.Context(), remoteName, path)
+	entries, err := rclone.ListRemoteDir(c.Request.Context(), conn.Name, path)
 	if err != nil {
 		HandleError(c, err)
 		return

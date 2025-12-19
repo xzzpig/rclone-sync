@@ -3,8 +3,6 @@ package handlers_test
 import (
 	"context"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -13,6 +11,8 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/api"
 	apiContext "github.com/xzzpig/rclone-sync/internal/api/context"
 
+	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/db"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
@@ -24,13 +24,14 @@ import (
 
 // TestServer holds the components for API integration testing.
 type TestServer struct {
-	Server      *httptest.Server
-	Client      *ent.Client
-	TaskService *services.TaskService
-	JobService  *services.JobService
-	Runner      ports.Runner
-	AppDataDir  string
-	Cleanup     func()
+	Server            *httptest.Server
+	Client            *ent.Client
+	TaskService       *services.TaskService
+	JobService        *services.JobService
+	ConnectionService *services.ConnectionService
+	Runner            ports.Runner
+	AppDataDir        string
+	Cleanup           func()
 }
 
 // setupTestServer initializes a test server with an in-memory database and all services.
@@ -49,20 +50,22 @@ func setupTestServer(t *testing.T) *TestServer {
 	// Set the global client for the api package to use
 	db.Client = client
 
-	// 3. Create temporary directories and files
+	// 3. Create temporary directories
 	appDataDir := t.TempDir()
-
-	rcloneConfPath := filepath.Join(appDataDir, "rclone.conf")
-	confContent := `[local]
-type = local
-`
-	err = os.WriteFile(rcloneConfPath, []byte(confContent), 0644)
-	require.NoError(t, err)
-	rclone.InitConfig(rcloneConfPath)
 
 	// 4. Initialize services
 	jobService := services.NewJobService(client)
 	taskService := services.NewTaskService(client)
+
+	// Initialize encryption for ConnectionService
+	encryptor, err := crypto.NewEncryptor("test-encryption-key-32-bytes!!")
+	require.NoError(t, err)
+	connectionService := services.NewConnectionService(client, encryptor)
+
+	// Install DBStorage for rclone configuration
+	storage := rclone.NewDBStorage(connectionService)
+	storage.Install()
+
 	syncEngine := rclone.NewSyncEngine(jobService, appDataDir)
 	runner := runner.NewRunner(syncEngine)
 
@@ -90,14 +93,24 @@ type = local
 	}
 
 	return &TestServer{
-		Server:      server,
-		Client:      client,
-		TaskService: taskService,
-		JobService:  jobService,
-		Runner:      runner,
-		AppDataDir:  appDataDir,
-		Cleanup:     cleanup,
+		Server:            server,
+		Client:            client,
+		TaskService:       taskService,
+		JobService:        jobService,
+		ConnectionService: connectionService,
+		Runner:            runner,
+		AppDataDir:        appDataDir,
+		Cleanup:           cleanup,
 	}
+}
+
+// createTestConnection creates a test connection and returns its ID
+func createTestConnection(t *testing.T, ts *TestServer, name string) uuid.UUID {
+	conn, err := ts.ConnectionService.CreateConnection(context.Background(), name, "local", map[string]string{
+		"type": "local",
+	})
+	require.NoError(t, err)
+	return conn.ID
 }
 
 // mockWatcher is a mock implementation of ports.Watcher for testing

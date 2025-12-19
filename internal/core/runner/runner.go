@@ -1,3 +1,4 @@
+// Package runner provides task execution management for the application.
 package runner
 
 import (
@@ -6,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
+	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 	"github.com/xzzpig/rclone-sync/internal/core/ports"
 	"go.uber.org/zap"
@@ -16,6 +18,7 @@ type runInfo struct {
 	runID  uuid.UUID
 }
 
+// Runner manages the execution of sync tasks.
 type Runner struct {
 	syncEngine ports.SyncEngine
 	logger     *zap.Logger
@@ -24,6 +27,7 @@ type Runner struct {
 	wg         sync.WaitGroup
 }
 
+// NewRunner creates a new Runner instance.
 func NewRunner(syncEngine ports.SyncEngine) *Runner {
 	return &Runner{
 		syncEngine: syncEngine,
@@ -32,8 +36,10 @@ func NewRunner(syncEngine ports.SyncEngine) *Runner {
 	}
 }
 
+// Start initializes the runner (no-op currently, reserved for future use).
 func (r *Runner) Start() {}
 
+// Stop cancels all running tasks and waits for them to finish.
 func (r *Runner) Stop() {
 	r.logger.Info("Stopping runner, cancelling all tasks...")
 	r.mu.Lock()
@@ -51,7 +57,7 @@ func (r *Runner) Stop() {
 
 // StartTask starts a task execution asynchronously.
 // It cancels any existing execution of the same task before starting a new one.
-func (r *Runner) StartTask(task *ent.Task, trigger string) error {
+func (r *Runner) StartTask(task *ent.Task, trigger job.Trigger) error {
 	taskID := task.ID
 	runID := uuid.New()
 
@@ -81,10 +87,13 @@ func (r *Runner) StartTask(task *ent.Task, trigger string) error {
 			r.mu.Unlock()
 		}()
 
-		r.logger.Info("Starting task execution", zap.Stringer("task_id", taskID), zap.Stringer("run_id", runID), zap.String("trigger", trigger))
+		r.logger.Info("Starting task execution", zap.Stringer("task_id", taskID), zap.Stringer("run_id", runID), zap.Stringer("trigger", trigger))
 		// The error is already handled and logged within RunTask (e.g., job status updated).
 		// We don't need to log it again here.
-		_ = r.syncEngine.RunTask(ctx, task, trigger)
+		err := r.syncEngine.RunTask(ctx, task, trigger)
+		if err != nil {
+			r.logger.Error("Task execution failed", zap.Stringer("task_id", taskID), zap.Stringer("run_id", runID), zap.Error(err))
+		}
 	})
 	return nil
 }
@@ -109,3 +118,5 @@ func (r *Runner) IsRunning(taskID uuid.UUID) bool {
 	_, ok := r.running[taskID]
 	return ok
 }
+
+var _ ports.Runner = (*Runner)(nil)

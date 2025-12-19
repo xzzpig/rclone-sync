@@ -37,7 +37,6 @@ func TestGetConnectionEvents_EventFiltering(t *testing.T) {
 
 	// Create test event data with remote_name
 	testEvent1 := sse.Event{
-		Type: "job_progress",
 		Data: gin.H{
 			"remote_name": "testremote",
 			"progress":    50,
@@ -45,7 +44,6 @@ func TestGetConnectionEvents_EventFiltering(t *testing.T) {
 	}
 
 	testEvent2 := sse.Event{
-		Type: "job_progress",
 		Data: gin.H{
 			"remote_name": "other_remote",
 			"progress":    75,
@@ -54,7 +52,6 @@ func TestGetConnectionEvents_EventFiltering(t *testing.T) {
 
 	// Test with map[string]any instead of gin.H
 	testEvent3 := sse.Event{
-		Type: "job_progress",
 		Data: map[string]any{
 			"remote_name": "testremote",
 			"progress":    100,
@@ -63,7 +60,6 @@ func TestGetConnectionEvents_EventFiltering(t *testing.T) {
 
 	// Events without remote_name should pass through
 	testEvent4 := sse.Event{
-		Type: "system_event",
 		Data: gin.H{
 			"message": "system message",
 		},

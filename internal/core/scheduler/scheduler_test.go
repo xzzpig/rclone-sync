@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
+	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 	"github.com/xzzpig/rclone-sync/internal/core/scheduler"
 	"go.uber.org/zap"
@@ -22,8 +23,8 @@ type MockRunner struct {
 
 func (m *MockRunner) Start() { m.Called() }
 func (m *MockRunner) Stop()  { m.Called() }
-func (m *MockRunner) StartTask(task *ent.Task, trigger string) error {
-	args := m.Called(task, trigger)
+func (m *MockRunner) StartTask(task *ent.Task, trigger job.Trigger) error {
+	args := m.Called(task, string(trigger))
 	return args.Error(0)
 }
 func (m *MockRunner) StopTask(taskID uuid.UUID) error {
@@ -41,6 +42,11 @@ type MockTaskService struct {
 }
 
 func (m *MockTaskService) GetTask(ctx context.Context, id uuid.UUID) (*ent.Task, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(*ent.Task), args.Error(1)
+}
+
+func (m *MockTaskService) GetTaskWithConnection(ctx context.Context, id uuid.UUID) (*ent.Task, error) {
 	args := m.Called(ctx, id)
 	return args.Get(0).(*ent.Task), args.Error(1)
 }
@@ -71,8 +77,8 @@ func TestScheduler_Start_LoadsScheduledTasks(t *testing.T) {
 	tasks := []*ent.Task{task1, task2}
 
 	mockTaskSvc.On("ListAllTasks", mock.Anything).Return(tasks, nil)
-	// When cron triggers, scheduler will reload the task from DB using GetTask
-	mockTaskSvc.On("GetTask", mock.Anything, task1.ID).Return(task1, nil)
+	// When cron triggers, scheduler will reload the task from DB using GetTaskWithConnection
+	mockTaskSvc.On("GetTaskWithConnection", mock.Anything, task1.ID).Return(task1, nil)
 	// We expect StartTask to be called for the scheduled task.
 	// We use a WaitGroup or channel to handle the async nature of cron.
 	startedChan := make(chan bool, 1)
@@ -114,8 +120,8 @@ func TestScheduler_AddTask_And_RemoveTask(t *testing.T) {
 	err := s.AddTask(task)
 	assert.NoError(t, err)
 
-	// When cron triggers, scheduler will reload the task from DB using GetTask
-	mockTaskSvc.On("GetTask", mock.Anything, task.ID).Return(task, nil)
+	// When cron triggers, scheduler will reload the task from DB using GetTaskWithConnection
+	mockTaskSvc.On("GetTaskWithConnection", mock.Anything, task.ID).Return(task, nil)
 	// Expect it to run
 	startedChan := make(chan bool, 1)
 	mockRunner.On("StartTask", task, "schedule").Return(nil).Run(func(args mock.Arguments) {

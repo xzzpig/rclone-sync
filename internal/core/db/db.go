@@ -1,3 +1,4 @@
+// Package db provides database initialization and connection management.
 package db
 
 import (
@@ -11,11 +12,13 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 
 	entsql "entgo.io/ent/dialect/sql"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/mattn/go-sqlite3" // SQLite driver for database/sql
 )
 
+// Client is the global database client instance.
 var Client *ent.Client
 
+// InitDB initializes the database connection and runs migrations.
 func InitDB() {
 	var err error
 
@@ -47,8 +50,9 @@ func InitDB() {
 	}
 }
 
+// CloseDB closes the database connection.
 func CloseDB() {
 	if Client != nil {
-		Client.Close()
+		_ = Client.Close()
 	}
 }

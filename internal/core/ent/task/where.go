@@ -66,9 +66,9 @@ func SourcePath(v string) predicate.Task {
 	return predicate.Task(sql.FieldEQ(FieldSourcePath, v))
 }
 
-// RemoteName applies equality check predicate on the "remote_name" field. It's identical to RemoteNameEQ.
-func RemoteName(v string) predicate.Task {
-	return predicate.Task(sql.FieldEQ(FieldRemoteName, v))
+// ConnectionID applies equality check predicate on the "connection_id" field. It's identical to ConnectionIDEQ.
+func ConnectionID(v uuid.UUID) predicate.Task {
+	return predicate.Task(sql.FieldEQ(FieldConnectionID, v))
 }
 
 // RemotePath applies equality check predicate on the "remote_path" field. It's identical to RemotePathEQ.
@@ -226,69 +226,34 @@ func SourcePathContainsFold(v string) predicate.Task {
 	return predicate.Task(sql.FieldContainsFold(FieldSourcePath, v))
 }
 
-// RemoteNameEQ applies the EQ predicate on the "remote_name" field.
-func RemoteNameEQ(v string) predicate.Task {
-	return predicate.Task(sql.FieldEQ(FieldRemoteName, v))
+// ConnectionIDEQ applies the EQ predicate on the "connection_id" field.
+func ConnectionIDEQ(v uuid.UUID) predicate.Task {
+	return predicate.Task(sql.FieldEQ(FieldConnectionID, v))
 }
 
-// RemoteNameNEQ applies the NEQ predicate on the "remote_name" field.
-func RemoteNameNEQ(v string) predicate.Task {
-	return predicate.Task(sql.FieldNEQ(FieldRemoteName, v))
+// ConnectionIDNEQ applies the NEQ predicate on the "connection_id" field.
+func ConnectionIDNEQ(v uuid.UUID) predicate.Task {
+	return predicate.Task(sql.FieldNEQ(FieldConnectionID, v))
 }
 
-// RemoteNameIn applies the In predicate on the "remote_name" field.
-func RemoteNameIn(vs ...string) predicate.Task {
-	return predicate.Task(sql.FieldIn(FieldRemoteName, vs...))
+// ConnectionIDIn applies the In predicate on the "connection_id" field.
+func ConnectionIDIn(vs ...uuid.UUID) predicate.Task {
+	return predicate.Task(sql.FieldIn(FieldConnectionID, vs...))
 }
 
-// RemoteNameNotIn applies the NotIn predicate on the "remote_name" field.
-func RemoteNameNotIn(vs ...string) predicate.Task {
-	return predicate.Task(sql.FieldNotIn(FieldRemoteName, vs...))
+// ConnectionIDNotIn applies the NotIn predicate on the "connection_id" field.
+func ConnectionIDNotIn(vs ...uuid.UUID) predicate.Task {
+	return predicate.Task(sql.FieldNotIn(FieldConnectionID, vs...))
 }
 
-// RemoteNameGT applies the GT predicate on the "remote_name" field.
-func RemoteNameGT(v string) predicate.Task {
-	return predicate.Task(sql.FieldGT(FieldRemoteName, v))
+// ConnectionIDIsNil applies the IsNil predicate on the "connection_id" field.
+func ConnectionIDIsNil() predicate.Task {
+	return predicate.Task(sql.FieldIsNull(FieldConnectionID))
 }
 
-// RemoteNameGTE applies the GTE predicate on the "remote_name" field.
-func RemoteNameGTE(v string) predicate.Task {
-	return predicate.Task(sql.FieldGTE(FieldRemoteName, v))
-}
-
-// RemoteNameLT applies the LT predicate on the "remote_name" field.
-func RemoteNameLT(v string) predicate.Task {
-	return predicate.Task(sql.FieldLT(FieldRemoteName, v))
-}
-
-// RemoteNameLTE applies the LTE predicate on the "remote_name" field.
-func RemoteNameLTE(v string) predicate.Task {
-	return predicate.Task(sql.FieldLTE(FieldRemoteName, v))
-}
-
-// RemoteNameContains applies the Contains predicate on the "remote_name" field.
-func RemoteNameContains(v string) predicate.Task {
-	return predicate.Task(sql.FieldContains(FieldRemoteName, v))
-}
-
-// RemoteNameHasPrefix applies the HasPrefix predicate on the "remote_name" field.
-func RemoteNameHasPrefix(v string) predicate.Task {
-	return predicate.Task(sql.FieldHasPrefix(FieldRemoteName, v))
-}
-
-// RemoteNameHasSuffix applies the HasSuffix predicate on the "remote_name" field.
-func RemoteNameHasSuffix(v string) predicate.Task {
-	return predicate.Task(sql.FieldHasSuffix(FieldRemoteName, v))
-}
-
-// RemoteNameEqualFold applies the EqualFold predicate on the "remote_name" field.
-func RemoteNameEqualFold(v string) predicate.Task {
-	return predicate.Task(sql.FieldEqualFold(FieldRemoteName, v))
-}
-
-// RemoteNameContainsFold applies the ContainsFold predicate on the "remote_name" field.
-func RemoteNameContainsFold(v string) predicate.Task {
-	return predicate.Task(sql.FieldContainsFold(FieldRemoteName, v))
+// ConnectionIDNotNil applies the NotNil predicate on the "connection_id" field.
+func ConnectionIDNotNil() predicate.Task {
+	return predicate.Task(sql.FieldNotNull(FieldConnectionID))
 }
 
 // RemotePathEQ applies the EQ predicate on the "remote_path" field.
@@ -566,6 +531,29 @@ func HasJobs() predicate.Task {
 func HasJobsWith(preds ...predicate.Job) predicate.Task {
 	return predicate.Task(func(s *sql.Selector) {
 		step := newJobsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasConnection applies the HasEdge predicate on the "connection" edge.
+func HasConnection() predicate.Task {
+	return predicate.Task(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, ConnectionTable, ConnectionColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasConnectionWith applies the HasEdge predicate on the "connection" edge with a given conditions (other predicates).
+func HasConnectionWith(preds ...predicate.Connection) predicate.Task {
+	return predicate.Task(func(s *sql.Selector) {
+		step := newConnectionStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

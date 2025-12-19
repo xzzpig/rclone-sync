@@ -29,7 +29,7 @@ func NewScheduler(taskSvc ports.TaskService, runner ports.Runner, opts ...cron.O
 		cron:    cron.New(opts...), // Standard 5-field cron (minute, hour, day, month, weekday)
 		taskSvc: taskSvc,
 		runner:  runner,
-		logger:  logger.L.Named("scheduler"),
+		logger:  logger.Named("core.scheduler"),
 		jobMap:  make(map[string]cron.EntryID),
 	}
 }

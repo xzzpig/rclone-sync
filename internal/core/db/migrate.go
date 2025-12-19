@@ -9,8 +9,6 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/sqlite3"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
-	"github.com/xzzpig/rclone-sync/internal/core/config"
-	"github.com/xzzpig/rclone-sync/internal/core/logger"
 	"go.uber.org/zap"
 )
 
@@ -36,20 +34,23 @@ func ParseMigrationMode(s string) MigrationMode {
 }
 
 // migrateLogger implements migrate.Logger interface for golang-migrate.
-type migrateLogger struct{}
+type migrateLogger struct {
+	environment string
+}
 
 // Printf logs migration messages.
 func (l *migrateLogger) Printf(format string, v ...interface{}) {
-	logger.L.Info(fmt.Sprintf(format, v...))
+	log().Info(fmt.Sprintf(format, v...))
 }
 
 // Verbose returns true if verbose logging is enabled.
 func (l *migrateLogger) Verbose() bool {
-	return config.Cfg.App.Environment == "development"
+	return l.environment == "development"
 }
 
 // Migrate executes database migrations from embedded SQL files.
-func Migrate(db *sql.DB) error {
+// The environment parameter is used for logging verbosity control.
+func Migrate(db *sql.DB, environment string) error {
 	// 1. Create migration source from embed.FS (specify migrations subdirectory)
 	source, err := iofs.New(migrations, "migrations")
 	if err != nil {
@@ -69,18 +70,18 @@ func Migrate(db *sql.DB) error {
 	}
 
 	// 4. Set logger
-	m.Log = &migrateLogger{}
+	m.Log = &migrateLogger{environment: environment}
 
 	// 5. Execute migrations
 	if err := m.Up(); err != nil {
 		if errors.Is(err, migrate.ErrNoChange) {
-			logger.L.Info("No pending migrations")
+			log().Info("No pending migrations")
 			return nil
 		}
 		return fmt.Errorf("migration failed: %w", err)
 	}
 
-	logger.L.Info("Migrations completed successfully")
+	log().Info("Migrations completed successfully")
 	return nil
 }
 
@@ -175,17 +176,17 @@ func GetPendingMigrations(db *sql.DB) ([]uint, error) {
 func LogMigrationStatus(db *sql.DB) {
 	status, err := GetMigrationStatus(db)
 	if err != nil {
-		logger.L.Warn("Failed to get migration status", zap.Error(err))
+		log().Warn("Failed to get migration status", zap.Error(err))
 		return
 	}
 
 	pending, err := GetPendingMigrations(db)
 	if err != nil {
-		logger.L.Warn("Failed to get pending migrations", zap.Error(err))
+		log().Warn("Failed to get pending migrations", zap.Error(err))
 		return
 	}
 
-	logger.L.Info("Database migration status",
+	log().Info("Database migration status",
 		zap.Uint("current_version", status.Version),
 		zap.Bool("dirty", status.Dirty),
 		zap.Int("pending_count", len(pending)),

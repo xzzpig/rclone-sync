@@ -49,7 +49,7 @@ func NewSyncEngine(jobService ports.JobService, dataDir string) *SyncEngine {
 	workDir := filepath.Join(dataDir, "bisync_state")
 	return &SyncEngine{
 		jobService: jobService,
-		logger:     logger.L.Named("sync-engine"),
+		logger:     logger.Named("sync.engine"),
 		workDir:    workDir,
 		activeJobs: make(map[uuid.UUID]JobProgress),
 	}

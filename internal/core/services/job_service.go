@@ -26,7 +26,7 @@ type JobService struct {
 func NewJobService(client *ent.Client) *JobService {
 	return &JobService{
 		client: client,
-		logger: logger.L.Named("job-service"),
+		logger: logger.Named("service.job"),
 	}
 }
 

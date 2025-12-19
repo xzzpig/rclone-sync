@@ -2,32 +2,42 @@
 package api
 
 import (
-	"log"
-
-	"github.com/xzzpig/rclone-sync/internal/core/config"
-	"github.com/xzzpig/rclone-sync/internal/core/crypto"
-	"github.com/xzzpig/rclone-sync/internal/core/db"
-	"github.com/xzzpig/rclone-sync/internal/core/services"
+	"fmt"
 
 	"github.com/xzzpig/rclone-sync/internal/api/handlers"
+	"github.com/xzzpig/rclone-sync/internal/core/config"
+	"github.com/xzzpig/rclone-sync/internal/core/crypto"
+	"github.com/xzzpig/rclone-sync/internal/core/ent"
+	"github.com/xzzpig/rclone-sync/internal/core/logger"
+	"github.com/xzzpig/rclone-sync/internal/core/services"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
-// RegisterAPIRoutes registers all API routes to the given router group.
-func RegisterAPIRoutes(router *gin.RouterGroup) {
-	// Initialize Services and Handlers
-	client := db.Client
+// RouterDeps contains all dependencies required for setting up API routes.
+type RouterDeps struct {
+	Client *ent.Client
+	Config *config.Config
+}
 
+// routesLog returns a named logger for the api.routes package.
+func routesLog() *zap.Logger {
+	return logger.Named("api.routes")
+}
+
+// RegisterAPIRoutes registers all API routes to the given router group.
+func RegisterAPIRoutes(router *gin.RouterGroup, deps RouterDeps) error {
 	// Initialize encryptor
-	encryptor, err := crypto.NewEncryptor(config.Cfg.Security.EncryptionKey)
+	encryptor, err := crypto.NewEncryptor(deps.Config.Security.EncryptionKey)
 	if err != nil {
-		log.Fatalf("Failed to initialize encryptor: %v", err)
+		routesLog().Error("Failed to initialize encryptor", zap.Error(err))
+		return fmt.Errorf("failed to initialize encryptor: %w", err)
 	}
 
 	// Initialize services
-	taskService := services.NewTaskService(client)
-	connService := services.NewConnectionService(client, encryptor)
+	taskService := services.NewTaskService(deps.Client)
+	connService := services.NewConnectionService(deps.Client, encryptor)
 
 	// Initialize handlers
 	taskHandler := handlers.NewTaskHandler(taskService)
@@ -97,4 +107,6 @@ func RegisterAPIRoutes(router *gin.RouterGroup) {
 		imports.POST("/parse", importHandler.Parse)
 		imports.POST("/execute", importHandler.Execute)
 	}
+
+	return nil
 }

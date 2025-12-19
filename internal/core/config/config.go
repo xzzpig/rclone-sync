@@ -3,7 +3,6 @@ package config
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -35,11 +34,9 @@ type Config struct {
 	} `mapstructure:"security"`
 }
 
-// Cfg is the global configuration instance.
-var Cfg Config
-
-// InitConfig initializes the application configuration from file and environment variables.
-func InitConfig(cfgFile string) {
+// Load loads the application configuration from file and environment variables.
+// Returns the configuration and any error encountered.
+func Load(cfgFile string) (*Config, error) {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {
@@ -55,18 +52,19 @@ func InitConfig(cfgFile string) {
 	setDefaults()
 
 	if err := viper.ReadInConfig(); err != nil {
-		// Only exit if it's not a "config file not found" error
+		// Only return error if it's not a "config file not found" error
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			fmt.Println("Error reading config file:", err)
-			os.Exit(1)
+			return nil, fmt.Errorf("error reading config file: %w", err)
 		}
 		// Config file not found is acceptable; continue with defaults
 	}
 
-	if err := viper.Unmarshal(&Cfg); err != nil {
-		fmt.Println("Unable to decode into struct:", err)
-		os.Exit(1)
+	var cfg Config
+	if err := viper.Unmarshal(&cfg); err != nil {
+		return nil, fmt.Errorf("unable to decode into struct: %w", err)
 	}
+
+	return &cfg, nil
 }
 
 func setDefaults() {

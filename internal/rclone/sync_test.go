@@ -25,7 +25,7 @@ type MockJobService struct {
 
 func TestMain(m *testing.M) {
 	// Initialize logger for tests
-	if logger.L == nil {
+	{ // logger init block
 		logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug)
 	}
 	m.Run()

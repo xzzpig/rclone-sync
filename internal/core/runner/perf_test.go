@@ -15,7 +15,6 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 	"github.com/xzzpig/rclone-sync/internal/core/runner"
-	"go.uber.org/zap"
 )
 
 // MockSyncEngineForPerf is a performance-optimized mock for SyncEngine
@@ -29,14 +28,8 @@ func (m *MockSyncEngineForPerf) RunTask(ctx context.Context, task *ent.Task, tri
 }
 
 func setupPerfTest(t testing.TB) {
-	if logger.L == nil {
-		l, err := zap.NewDevelopment()
-		if err != nil {
-			t.Fatalf("failed to create logger: %v", err)
-		}
-		logger.L = l
-	}
-	_ = t // Suppress unused parameter warning
+	t.Helper()
+	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug)
 }
 
 func BenchmarkRunner_StartTask_Concurrent(b *testing.B) {

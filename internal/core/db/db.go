@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
@@ -15,62 +14,68 @@ import (
 	"go.uber.org/zap"
 )
 
-// Client is the global database client instance.
-var Client *ent.Client
+// log returns a named logger for the db package.
+func log() *zap.Logger {
+	return logger.Named("core.db")
+}
 
 // InitDBOptions contains options for database initialization.
 type InitDBOptions struct {
-	Path          string        // Database file path
+	DSN           string        // SQLite DSN connection string (e.g., "file:data.db?cache=shared&_fk=1")
 	MigrationMode MigrationMode // Migration mode (versioned or auto)
 	EnableDebug   bool          // Enable SQL debug logging
+	Environment   string        // Application environment (for migrations)
 }
 
 // InitDB initializes the database connection and runs migrations.
-func InitDB(opts InitDBOptions) {
-	var err error
-
+// Returns the ent client and any error encountered.
+func InitDB(opts InitDBOptions) (*ent.Client, error) {
 	// Open database connection
-	db, err := sql.Open("sqlite3", fmt.Sprintf("file:%s?cache=shared&_fk=1", opts.Path))
+	sqlDB, err := sql.Open("sqlite3", opts.DSN)
 	if err != nil {
-		log.Fatalf("failed opening connection to sqlite: %v", err)
+		return nil, fmt.Errorf("failed opening connection to sqlite: %w", err)
 	}
 
 	// Create ent driver
-	drv := entsql.OpenDB("sqlite3", db)
+	drv := entsql.OpenDB("sqlite3", sqlDB)
 
 	// Create ent client with optional debug logging
 	options := []ent.Option{ent.Driver(drv)}
 	if opts.EnableDebug {
 		options = append(options, ent.Debug())
 	}
-	Client = ent.NewClient(options...)
+	client := ent.NewClient(options...)
 
 	// Execute migrations based on mode
 	switch opts.MigrationMode {
 	case MigrationModeAuto:
-		logger.L.Info("Using auto migration mode (ent schema)")
-		if err := Client.Schema.Create(context.Background()); err != nil {
-			log.Fatalf("failed to run auto migration: %v", err)
+		log().Info("Using auto migration mode (ent schema)")
+		if err := client.Schema.Create(context.Background()); err != nil {
+			client.Close()
+			return nil, fmt.Errorf("failed to run auto migration: %w", err)
 		}
-		logger.L.Info("Auto migration completed successfully")
+		log().Info("Auto migration completed successfully")
 	default:
-		logger.L.Info("Using versioned migration mode", zap.String("mode", string(opts.MigrationMode)))
-		if err := Migrate(db); err != nil {
-			log.Fatalf("failed to run versioned migrations: %v", err)
+		log().Info("Using versioned migration mode", zap.String("mode", string(opts.MigrationMode)))
+		if err := Migrate(sqlDB, opts.Environment); err != nil {
+			client.Close()
+			return nil, fmt.Errorf("failed to run versioned migrations: %w", err)
 		}
 		// Log migration status
-		LogMigrationStatus(db)
+		LogMigrationStatus(sqlDB)
 	}
 
 	// Log initialization status
 	if opts.EnableDebug {
-		logger.L.Info("Database initialized with SQL query logging enabled")
+		log().Info("Database initialized with SQL query logging enabled")
 	}
+
+	return client, nil
 }
 
 // CloseDB closes the database connection.
-func CloseDB() {
-	if Client != nil {
-		_ = Client.Close()
+func CloseDB(client *ent.Client) {
+	if client != nil {
+		_ = client.Close()
 	}
 }

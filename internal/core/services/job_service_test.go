@@ -16,12 +16,11 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/ent/joblog"
 	"github.com/xzzpig/rclone-sync/internal/core/errs"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
-	"go.uber.org/zap"
 )
 
 func init() {
 	// Initialize logger for tests
-	logger.L = zap.NewNop()
+	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug)
 }
 
 func TestJobService(t *testing.T) {

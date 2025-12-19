@@ -20,9 +20,15 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/api/handlers"
 )
 
+// srvLog returns a named logger for the api.server package.
+func srvLog() *zap.Logger {
+	return logger.Named("api.server")
+}
+
 // SetupRouter creates and configures the Gin router with all middleware and routes.
-func SetupRouter(syncEngine *rclone.SyncEngine, taskRunner *runner.Runner, jobService ports.JobService, watcher ports.Watcher, scheduler ports.Scheduler) *gin.Engine {
-	if config.Cfg.App.Environment == "development" {
+func SetupRouter(deps RouterDeps, syncEngine *rclone.SyncEngine, taskRunner *runner.Runner, jobService ports.JobService, watcher ports.Watcher, scheduler ports.Scheduler) *gin.Engine {
+	cfg := deps.Config
+	if cfg.App.Environment == "development" {
 		gin.SetMode(gin.DebugMode)
 	} else {
 		gin.SetMode(gin.ReleaseMode)
@@ -31,7 +37,7 @@ func SetupRouter(syncEngine *rclone.SyncEngine, taskRunner *runner.Runner, jobSe
 	r := gin.New()
 
 	// Middleware
-	r.Use(ginLogger(logger.L))
+	r.Use(ginLogger(logger.Named("api.http")))
 	r.Use(gin.Recovery())
 	r.Use(context.Middleware(syncEngine, taskRunner, jobService, watcher, scheduler))
 	r.Use(context.LocaleMiddleware())    // Parse Accept-Language header
@@ -51,16 +57,18 @@ func SetupRouter(syncEngine *rclone.SyncEngine, taskRunner *runner.Runner, jobSe
 	})
 
 	// API Group
-	api := r.Group("/api")
+	apiGroup := r.Group("/api")
 	{
 		// Register routes here
-		RegisterAPIRoutes(api)
+		if err := RegisterAPIRoutes(apiGroup, deps); err != nil {
+			srvLog().Fatal("Failed to register API routes", zap.Error(err))
+		}
 		// sse.RegisterRoutes(api)
 	}
 
 	// Serve Frontend
-	if err := setupFrontendService(r); err != nil {
-		logger.L.Error("Failed to setup frontend service", zap.Error(err))
+	if err := setupFrontendService(r, cfg); err != nil {
+		srvLog().Error("Failed to setup frontend service", zap.Error(err))
 	}
 
 	return r
@@ -68,14 +76,14 @@ func SetupRouter(syncEngine *rclone.SyncEngine, taskRunner *runner.Runner, jobSe
 
 // setupFrontendService configures the frontend file serving for the router
 // and returns an error if setup fails
-func setupFrontendService(r *gin.Engine) error {
+func setupFrontendService(r *gin.Engine, cfg *config.Config) error {
 	// In development, we can also serve from the dist folder if it exists,
 	// which is useful for testing production build locally.
 	// But usually in dev mode we use the Vite dev server.
 	var fs http.FileSystem
 	var err error
 
-	if config.Cfg.App.Environment != "development" {
+	if cfg.App.Environment != "development" {
 		fs, err = ui.GetFileSystem()
 	} else {
 		// In development, try to serve from local dist folder directly
@@ -100,7 +108,7 @@ func setupFrontendService(r *gin.Engine) error {
 		// Try to open index.html
 		f, err = fs.Open("index.html")
 		if err != nil {
-			logger.L.Error("Failed to serve index.html", zap.Error(err))
+			srvLog().Error("Failed to serve index.html", zap.Error(err))
 			handlers.NotFoundHandler(c)
 			return
 		}

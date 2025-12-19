@@ -42,7 +42,7 @@ func GetBroker() *Broadcaster {
 func NewBroadcaster() *Broadcaster {
 	return &Broadcaster{
 		clients:   make(map[chan Event]bool),
-		logger:    logger.L.Named("sse-broker"),
+		logger:    logger.Named("api.sse"),
 		stopChan:  make(chan struct{}),
 		eventChan: make(chan Event, 100), // Buffered channel
 	}

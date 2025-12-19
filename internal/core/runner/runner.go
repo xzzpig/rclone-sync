@@ -31,7 +31,7 @@ type Runner struct {
 func NewRunner(syncEngine ports.SyncEngine) *Runner {
 	return &Runner{
 		syncEngine: syncEngine,
-		logger:     logger.L.Named("runner"),
+		logger:     logger.Named("core.runner"),
 		running:    make(map[uuid.UUID]runInfo),
 	}
 }

@@ -13,7 +13,6 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
-	"go.uber.org/zap"
 )
 
 // MockRunner is a mock for the Runner interface
@@ -66,14 +65,8 @@ func (m *MockTaskService) ListAllTasks(ctx context.Context) ([]*ent.Task, error)
 }
 
 func setupTest(t *testing.T) {
-	if logger.L == nil {
-		l, err := zap.NewDevelopment()
-		if err != nil {
-			t.Fatalf("failed to create logger: %v", err)
-		}
-		logger.L = l
-	}
-	_ = t // Suppress unused parameter warning
+	t.Helper()
+	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug)
 }
 
 func TestWatcher_Debounce(t *testing.T) {

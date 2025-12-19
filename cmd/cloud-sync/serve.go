@@ -34,72 +34,84 @@ import (
 var serveCmd = &cobra.Command{
 	Use: "serve",
 	Run: func(_ *cobra.Command, _ []string) {
-		// Initialize Config
-		config.InitConfig(cfgFile)
-
-		// Initialize Logger first
-		logger.InitLogger(logger.Environment(config.Cfg.App.Environment), logger.LogLevel(config.Cfg.Log.Level))
-		logger.L.Info("Starting cloud-sync server...")
-		rclone.SetupLogLevel(config.Cfg.Log.Level)
-
-		// Initialize i18n
-		if err := i18n.Init(); err != nil {
-			logger.L.Fatal("Failed to initialize i18n", zap.Error(err))
-		}
-		logger.L.Info("i18n initialized successfully")
-
-		// Initialize database with configured options
-		db.InitDB(db.InitDBOptions{
-			Path:          config.Cfg.Database.Path,
-			MigrationMode: db.ParseMigrationMode(config.Cfg.Database.MigrationMode),
-			EnableDebug:   config.Cfg.App.Environment == "development",
-		})
-		defer db.CloseDB()
-
-		// Initialize encryptor for connection storage
-		encryptor, err := crypto.NewEncryptor(config.Cfg.Security.EncryptionKey)
+		// 1. Load configuration
+		cfg, err := config.Load(cfgFile)
 		if err != nil {
-			logger.L.Fatal("Failed to initialize encryptor", zap.Error(err))
+			// Use default logger since config is not loaded yet
+			logger.Get().Fatal("Failed to load config", zap.Error(err))
 		}
 
-		// Initialize connection service and DBStorage
-		connSvc := services.NewConnectionService(db.Client, encryptor)
+		// 2. Initialize Logger
+		logger.InitLogger(logger.Environment(cfg.App.Environment), logger.LogLevel(cfg.Log.Level))
+		log := logger.Named("cmd.serve")
+		log.Info("Starting cloud-sync server...")
+		rclone.SetupLogLevel(cfg.Log.Level)
+
+		// 3. Initialize i18n
+		if err := i18n.Init(); err != nil {
+			log.Fatal("Failed to initialize i18n", zap.Error(err))
+		}
+		log.Info("i18n initialized successfully")
+
+		// 4. Initialize database with configured options
+		dbClient, err := db.InitDB(db.InitDBOptions{
+			DSN:           fmt.Sprintf("file:%s?cache=shared&_fk=1", cfg.Database.Path),
+			MigrationMode: db.ParseMigrationMode(cfg.Database.MigrationMode),
+			EnableDebug:   cfg.App.Environment == "development",
+			Environment:   cfg.App.Environment,
+		})
+		if err != nil {
+			log.Fatal("Failed to initialize database", zap.Error(err))
+		}
+		defer db.CloseDB(dbClient)
+
+		// 5. Initialize encryptor for connection storage
+		encryptor, err := crypto.NewEncryptor(cfg.Security.EncryptionKey)
+		if err != nil {
+			log.Fatal("Failed to initialize encryptor", zap.Error(err))
+		}
+
+		// 6. Initialize connection service and DBStorage
+		connSvc := services.NewConnectionService(dbClient, encryptor)
 		dbStorage := rclone.NewDBStorage(connSvc)
 		dbStorage.Install()
-		logger.L.Info("DBStorage installed - rclone will use database for configuration")
+		log.Info("DBStorage installed - rclone will use database for configuration")
 
 		// Note: rclone.InitConfig is no longer needed as DBStorage replaces it
 
-		// Initialize services
-		taskSvc := services.NewTaskService(db.Client)
-		jobSvc := services.NewJobService(db.Client)
-		syncEngine := rclone.NewSyncEngine(jobSvc, config.Cfg.App.DataDir)
+		// 7. Initialize services
+		taskSvc := services.NewTaskService(dbClient)
+		jobSvc := services.NewJobService(dbClient)
+		syncEngine := rclone.NewSyncEngine(jobSvc, cfg.App.DataDir)
 		taskRunner := runner.NewRunner(syncEngine)
 
 		// Reset any stuck jobs from previous crash/shutdown
 		if err := jobSvc.ResetStuckJobs(context.Background()); err != nil {
-			logger.L.Error("Failed to reset stuck jobs", zap.Error(err))
+			log.Error("Failed to reset stuck jobs", zap.Error(err))
 		}
 
-		// Initialize and start scheduler
+		// 8. Initialize and start scheduler
 		sched := scheduler.NewScheduler(taskSvc, taskRunner)
 		sched.Start()
 		defer sched.Stop()
 
-		// Initialize and start watcher
+		// 9. Initialize and start watcher
 		watch, err := watcher.NewWatcher(taskSvc, taskRunner)
 		if err != nil {
-			logger.L.Fatal("Failed to initialize watcher", zap.Error(err))
+			log.Fatal("Failed to initialize watcher", zap.Error(err))
 		}
 		watch.Start()
 		defer watch.Stop()
 
-		// Setup graceful shutdowncontext
-		// Start API Server
-		r := api.SetupRouter(syncEngine, taskRunner, jobSvc, watch, sched)
+		// 10. Setup router with dependencies
+		routerDeps := api.RouterDeps{
+			Client: dbClient,
+			Config: cfg,
+		}
+		r := api.SetupRouter(routerDeps, syncEngine, taskRunner, jobSvc, watch, sched)
 
-		addr := fmt.Sprintf("%s:%d", config.Cfg.Server.Host, config.Cfg.Server.Port)
-		logger.L.Info("Server starting", zap.String("address", addr))
+		addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
+		log.Info("Server starting", zap.String("address", addr))
 
 		srv := &http.Server{
 			Addr:              addr,
@@ -109,7 +121,7 @@ var serveCmd = &cobra.Command{
 
 		go func() {
 			if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				logger.L.Fatal("Server failed to start", zap.Error(err))
+				log.Fatal("Server failed to start", zap.Error(err))
 			}
 		}()
 
@@ -121,20 +133,20 @@ var serveCmd = &cobra.Command{
 		// kill -9 is syscall.SIGKILL but can't be catch, so don't need add it
 		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 		<-quit
-		logger.L.Info("Shutdown signal received, stopping server...")
+		log.Info("Shutdown signal received, stopping server...")
 
 		// The context is used to inform the server it has 5 seconds to finish
 		// the request it is currently handling
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := srv.Shutdown(ctx); err != nil {
-			logger.L.Fatal("Server forced to shutdown", zap.Error(err))
+			log.Fatal("Server forced to shutdown", zap.Error(err))
 		}
 
 		// Stop the task runner (this waits for tasks to finish/cancel)
 		taskRunner.Stop()
 
-		logger.L.Info("Server exiting")
+		log.Info("Server exiting")
 	},
 }
 

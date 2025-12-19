@@ -12,6 +12,7 @@ import (
 	apiContext "github.com/xzzpig/rclone-sync/internal/api/context"
 
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/core/config"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/db"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
@@ -39,16 +40,12 @@ func setupTestServer(t *testing.T) *TestServer {
 	// Init logger
 	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug)
 
-	// 2. Initialize in-memory database
-	client, err := ent.Open("sqlite3", "file:ent?mode=memory&cache=shared&_fk=1")
+	// 2. Initialize in-memory database using db.InitDB
+	client, err := db.InitDB(db.InitDBOptions{
+		DSN:           "file:ent?mode=memory&cache=shared&_fk=1",
+		MigrationMode: db.MigrationModeAuto,
+	})
 	require.NoError(t, err)
-
-	// Run migrations
-	err = client.Schema.Create(context.Background())
-	require.NoError(t, err)
-
-	// Set the global client for the api package to use
-	db.Client = client
 
 	// 3. Create temporary directories
 	appDataDir := t.TempDir()
@@ -67,7 +64,7 @@ func setupTestServer(t *testing.T) *TestServer {
 	storage.Install()
 
 	syncEngine := rclone.NewSyncEngine(jobService, appDataDir)
-	runner := runner.NewRunner(syncEngine)
+	runnerInstance := runner.NewRunner(syncEngine)
 
 	// Create mock watcher and scheduler for testing
 	mockWatcher := &mockWatcher{}
@@ -78,10 +75,17 @@ func setupTestServer(t *testing.T) *TestServer {
 	router := gin.New()
 
 	// Add TaskRunner middleware
-	router.Use(apiContext.Middleware(syncEngine, runner, jobService, mockWatcher, mockScheduler))
+	router.Use(apiContext.Middleware(syncEngine, runnerInstance, jobService, mockWatcher, mockScheduler))
+
+	// Create RouterDeps
+	routerDeps := api.RouterDeps{
+		Client: client,
+		Config: &config.Config{},
+	}
 
 	apiGroup := router.Group("/api")
-	api.RegisterAPIRoutes(apiGroup)
+	err = api.RegisterAPIRoutes(apiGroup, routerDeps)
+	require.NoError(t, err)
 
 	// 7. Create httptest server
 	server := httptest.NewServer(router)
@@ -98,7 +102,7 @@ func setupTestServer(t *testing.T) *TestServer {
 		TaskService:       taskService,
 		JobService:        jobService,
 		ConnectionService: connectionService,
-		Runner:            runner,
+		Runner:            runnerInstance,
 		AppDataDir:        appDataDir,
 		Cleanup:           cleanup,
 	}

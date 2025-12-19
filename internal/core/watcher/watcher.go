@@ -50,7 +50,7 @@ func newWatcher(taskSvc ports.TaskService, runner ports.Runner, fw FileWatcher) 
 		recWatcher: fw,
 		taskSvc:    taskSvc,
 		runner:     runner,
-		logger:     logger.L.Named("watcher"),
+		logger:     logger.Named("core.watcher"),
 		watchMap:   make(map[string]string),
 		debounce:   make(map[string]*time.Timer),
 	}

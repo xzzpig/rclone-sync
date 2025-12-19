@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
+	"github.com/xzzpig/rclone-sync/internal/core/db"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
@@ -40,16 +41,16 @@ func setupIntegrationTest(t *testing.T) *testContext {
 	t.Helper()
 
 	// Initialize logger
-	if logger.L == nil {
+	{ // logger init block
 		logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug)
 	}
 
-	// Use in-memory sqlite for testing
-	client, err := ent.Open("sqlite3", "file:ent?mode=memory&cache=shared&_fk=1")
+	// Use in-memory sqlite for testing with db.InitDB
+	client, err := db.InitDB(db.InitDBOptions{
+		DSN:           "file:ent?mode=memory&cache=shared&_fk=1",
+		MigrationMode: db.MigrationModeAuto,
+	})
 	require.NoError(t, err)
-
-	// Run migrations
-	require.NoError(t, client.Schema.Create(context.Background()))
 
 	// Create services
 	jobService := services.NewJobService(client)
@@ -135,16 +136,16 @@ func setupCancelTest(t *testing.T) *cancelTestContext {
 	t.Helper()
 
 	// Initialize logger
-	if logger.L == nil {
+	{ // logger init block
 		logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug)
 	}
 
-	// Use in-memory sqlite for testing
-	client, err := ent.Open("sqlite3", "file:ent_cancel?mode=memory&cache=shared&_fk=1")
+	// Use in-memory sqlite for testing with db.InitDB
+	client, err := db.InitDB(db.InitDBOptions{
+		DSN:           "file:ent_cancel?mode=memory&cache=shared&_fk=1",
+		MigrationMode: db.MigrationModeAuto,
+	})
 	require.NoError(t, err)
-
-	// Run migrations
-	require.NoError(t, client.Schema.Create(context.Background()))
 
 	// Create services
 	jobService := services.NewJobService(client)

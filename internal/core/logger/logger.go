@@ -5,15 +5,45 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"sync"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/exp/zapslog"
 	"go.uber.org/zap/zapcore"
 )
 
-// L is the global logger instance.
-// TODO: replace with function with name
-var L *zap.Logger
+// logger is the global logger instance, lazily initialized with a default Info-level logger.
+var (
+	logger     *zap.Logger
+	loggerOnce sync.Once
+)
+
+// initDefaultLogger initializes a default Info-level logger if none has been set.
+func initDefaultLogger() {
+	loggerOnce.Do(func() {
+		if logger == nil {
+			cfg := zap.NewProductionConfig()
+			cfg.Level.SetLevel(zapcore.InfoLevel)
+			var err error
+			logger, err = cfg.Build()
+			if err != nil {
+				// Fallback to nop logger if we can't create default
+				logger = zap.NewNop()
+			}
+		}
+	})
+}
+
+// Get returns the logger instance. If InitLogger hasn't been called, returns a default Info-level logger.
+func Get() *zap.Logger {
+	initDefaultLogger()
+	return logger
+}
+
+// Named returns a named logger. If Init hasn't been called, returns a named default logger.
+func Named(name string) *zap.Logger {
+	return Get().Named(name)
+}
 
 // Environment represents the application environment type.
 type Environment string
@@ -52,18 +82,18 @@ func InitLogger(environment Environment, logLevel LogLevel) {
 	cfg.Level.SetLevel(getZapLevel(string(logLevel)))
 
 	var err error
-	L, err = cfg.Build()
+	logger, err = cfg.Build()
 	if err != nil {
 		log.Printf("Failed to initialize zap logger: %v", err)
 		os.Exit(1)
 	}
-	defer func() { _ = L.Sync() }()
+	defer func() { _ = logger.Sync() }()
 
 	// Redirect standard log to zap
-	zap.RedirectStdLog(L)
+	zap.RedirectStdLog(logger)
 
 	// Redirect slog to zap (for rclone)
-	slogHandler := zapslog.NewHandler(L.Core())
+	slogHandler := zapslog.NewHandler(logger.Core())
 	slogLogger := slog.New(slogHandler)
 	slog.SetDefault(slogLogger)
 }

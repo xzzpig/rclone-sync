@@ -41,7 +41,7 @@ func NewRecursiveWatcher() (*RecursiveWatcher, error) {
 
 	rw := &RecursiveWatcher{
 		fsWatcher:   fsWatcher,
-		logger:      logger.L.Named("recursive_watcher"),
+		logger:      logger.Named("core.watcher"),
 		watchedDirs: make(map[string]int),
 		events:      make(chan fsnotify.Event),
 		errors:      make(chan error),

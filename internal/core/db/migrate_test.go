@@ -8,13 +8,11 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/xzzpig/rclone-sync/internal/core/config"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 )
 
 func init() {
-	// Initialize config and logger for tests
-	config.Cfg.App.Environment = "test"
+	// Initialize logger for tests
 	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug)
 }
 
@@ -44,7 +42,7 @@ func TestMigrate_FreshDatabase(t *testing.T) {
 	defer cleanup()
 
 	// Execute migrations on a fresh database
-	err := Migrate(db)
+	err := Migrate(db, "test")
 	require.NoError(t, err)
 
 	// Verify tables were created
@@ -62,11 +60,11 @@ func TestMigrate_NoChange(t *testing.T) {
 	defer cleanup()
 
 	// First migration
-	err := Migrate(db)
+	err := Migrate(db, "test")
 	require.NoError(t, err)
 
 	// Second migration should report no change
-	err = Migrate(db)
+	err = Migrate(db, "test")
 	require.NoError(t, err)
 }
 
@@ -86,7 +84,7 @@ func TestGetMigrationStatus_AfterMigration(t *testing.T) {
 	defer cleanup()
 
 	// Execute migrations
-	err := Migrate(db)
+	err := Migrate(db, "test")
 	require.NoError(t, err)
 
 	// Check status after migration
@@ -111,7 +109,7 @@ func TestGetPendingMigrations_AfterMigration(t *testing.T) {
 	defer cleanup()
 
 	// Execute migrations
-	err := Migrate(db)
+	err := Migrate(db, "test")
 	require.NoError(t, err)
 
 	// Check pending migrations after migration
@@ -125,7 +123,7 @@ func TestMigrate_DirtyDatabase(t *testing.T) {
 	defer cleanup()
 
 	// Execute migrations first
-	err := Migrate(db)
+	err := Migrate(db, "test")
 	require.NoError(t, err)
 
 	// Simulate dirty state
@@ -133,7 +131,7 @@ func TestMigrate_DirtyDatabase(t *testing.T) {
 	require.NoError(t, err)
 
 	// Try to migrate again - should fail due to dirty state
-	err = Migrate(db)
+	err = Migrate(db, "test")
 	assert.Error(t, err, "Migration should fail on dirty database")
 }
 
@@ -142,7 +140,7 @@ func TestLogMigrationStatus(t *testing.T) {
 	defer cleanup()
 
 	// Execute migrations
-	err := Migrate(db)
+	err := Migrate(db, "test")
 	require.NoError(t, err)
 
 	// This should not panic

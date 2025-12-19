@@ -1,10 +1,10 @@
 <!--
 SYNC IMPACT REPORT
-Version change: 1.1.0 -> 1.2.0
+Version change: 1.2.0 -> 1.2.1
 Modified principles: None
-Added sections: IX. Internationalization (i18n) Standards
+Added sections: None (Technical Constraints > Technology Stack updated with migration tools)
 Removed sections: None
-Templates requiring updates: ✅ None (no principle-specific references in templates)
+Templates requiring updates: ✅ None (no principle-specific references affected)
 Follow-up TODOs: None
 -->
 
@@ -56,6 +56,7 @@ All user-visible text MUST be externalized into translation resource files—har
 - Frontend: SolidJS with TypeScript
 - Styling: Tailwind CSS
 - Database: SQLite with Ent ORM
+- Database Migration: golang-migrate (runtime execution) + Atlas CLI (schema diff generation)
 - Sync Engine: rclone as Go library
 - Real-time Updates: Server-Sent Events (SSE)
 - File Watching: fsnotify
@@ -70,6 +71,7 @@ All user-visible text MUST be externalized into translation resource files—har
 - Web UI MUST remain responsive during long-running sync operations
 - First Contentful Paint (FCP) MUST be under 1.5s
 - Language switch MUST complete within 1 second without page reload
+- Database migration check MUST complete in under 1 second at application startup
 
 ### Security Requirements
 
@@ -101,4 +103,4 @@ All user-visible text MUST be externalized into translation resource files—har
 
 This constitution supersedes all other development practices. Amendments REQUIRE documentation, team approval, and migration plan. Versioning follows Semantic Versioning (MAJOR.MINOR.PATCH). All code reviews MUST verify compliance with these principles. Complexity MUST be justified with clear business value.
 
-**Version**: 1.2.0 | **Ratified**: 2025-12-04 | **Last Amended**: 2025-12-15
+**Version**: 1.2.1 | **Ratified**: 2025-12-04 | **Last Amended**: 2025-12-19

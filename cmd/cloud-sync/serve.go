@@ -48,8 +48,12 @@ var serveCmd = &cobra.Command{
 		}
 		logger.L.Info("i18n initialized successfully")
 
-		// Initialize database
-		db.InitDB()
+		// Initialize database with configured options
+		db.InitDB(db.InitDBOptions{
+			Path:          config.Cfg.Database.Path,
+			MigrationMode: db.ParseMigrationMode(config.Cfg.Database.MigrationMode),
+			EnableDebug:   config.Cfg.App.Environment == "development",
+		})
 		defer db.CloseDB()
 
 		// Initialize encryptor for connection storage

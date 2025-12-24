@@ -19,9 +19,6 @@ type Config struct {
 		Path          string `mapstructure:"path"`
 		MigrationMode string `mapstructure:"migration_mode"`
 	} `mapstructure:"database"`
-	Rclone struct {
-		ConfigPath string `mapstructure:"config_path"`
-	} `mapstructure:"rclone"`
 	Log struct {
 		Level string `mapstructure:"level"`
 	} `mapstructure:"log"`
@@ -72,7 +69,6 @@ func setDefaults() {
 	viper.SetDefault("server.host", "0.0.0.0")
 	viper.SetDefault("database.path", "cloud-sync.db")
 	viper.SetDefault("database.migration_mode", "versioned")
-	viper.SetDefault("rclone.config_path", "rclone.conf")
 	viper.SetDefault("log.level", "info")
 	viper.SetDefault("app.data_dir", "./app_data")
 	viper.SetDefault("app.environment", "production")

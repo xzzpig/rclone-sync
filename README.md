@@ -1,211 +1,179 @@
+<p align="center">
+  <img src="web/src/public/icon.svg" width="128" height="128" alt="Rclone Cloud Sync Manager Icon">
+</p>
+
 # Rclone Cloud Sync Manager
 
-A "Synology Cloud Sync"-like application built on top of `rclone`. This application allows you to manage rclone remotes, define sync tasks, and monitor their status through a modern web interface.
+A cloud sync management tool based on `rclone` development, designed to provide a user experience similar to "Synology Cloud Sync". Through a modern web interface, easily manage cloud storage connections, define sync tasks, and monitor sync status in real-time.
 
-## Features
+## ✨ Core Features
 
-- **Web Interface**: Manage remotes and tasks from a browser.
-- **Task Management**: Create, edit, and delete sync tasks.
-- **Scheduled Sync**: Run tasks automatically on a schedule (Cron syntax).
-- **Real-time Sync**: Monitor file system changes and sync automatically (File Watcher).
-- **Bidirectional Sync**: Keep two locations in sync using `rclone bisync` logic.
-- **Monitoring**: Real-time progress updates and job history logs.
-- **Cross-Platform**: Run on Linux, Windows, macOS (Single binary).
-- **GraphQL API**: Modern GraphQL API with real-time subscriptions.
+- **Modern Web Interface**: Clean and intuitive UI to easily manage all cloud connections and sync tasks.
+- **Multi-Cloud Storage Support**: Based on powerful `rclone`, supports dozens of cloud storage services such as Google Drive, S3, OneDrive, Dropbox, etc.
+- **Flexible Sync Modes**:
+  - **One-way Upload**: Local -> Cloud (Suitable for backup)
+  - **One-way Download**: Cloud -> Local (Suitable for fetching resources)
+  - **Two-way Sync**: Keep data on both ends consistent (Suitable for multi-end collaboration)
+- **Smart Trigger Mechanism**:
+  - **Real-time Sync**: Listen for file system changes and trigger sync immediately.
+  - **Scheduled Tasks**: Support custom schedules (Cron) for automatic execution.
+- **Visual Monitoring**:
+  - **Real-time Progress**: View current transfer files, speed, and remaining time.
+  - **Task History**: Detailed execution logs and result records for easy review.
+- **Secure and Reliable**:
+  - **Encrypted Storage**: Sensitive configuration information is encrypted and stored in the local database.
+  - **Data Security**: Strict sync logic prevents accidental data loss.
+- **Internationalization Support**: Natively supports **Simplified Chinese** and **English** interfaces.
+- **Cross-Platform**: Supports Linux, Windows, macOS.
 
-## Requirements
+## ☁️ Supported Cloud Storage
 
-- Go 1.21+ (for building)
-- Node.js & pnpm (for frontend development)
-- `rclone` (library is embedded, but some external config might be read)
-- Modern web browser
+Thanks to the powerful ecosystem of Rclone, this tool supports over 40 cloud storage services, including but not limited to:
 
-## Installation
+- **Public Cloud**: Google Drive, OneDrive, Dropbox, Box, pCloud
+- **Object Storage**: Amazon S3 (and compatible protocols like MinIO, Aliyun OSS, Tencent Cloud COS), Backblaze B2, Wasabi
+- **Standard Protocols**: WebDAV, FTP, SFTP, HTTP
+- **Local/Network**: Local Disk, SMB/CIFS (Windows Sharing)
 
-### From Source
+## 🚀 Installation and Running
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/xzzpig/rclone-sync.git
-   cd rclone-sync
-   ```
+### Method One: Download and Run Directly (Recommended)
 
-2. Build the frontend:
-   ```bash
-   cd web
-   pnpm install
-   pnpm build
-   cd ..
-   ```
+Please go to the [Releases](https://github.com/xzzpig/rclone-sync/releases) page to download the binary file for your system.
 
-3. Build the backend (with embedded frontend):
-   ```bash
-   # Make sure web/dist exists from previous step
-   go build -o cloud-sync ./cmd/cloud-sync
-   ```
+1.  Unzip the downloaded file.
+2.  Run in terminal or command line:
+    ```bash
+    # Linux / macOS
+    ./cloud-sync serve
 
-## Usage
+    # Windows
+    .\cloud-sync.exe serve
+    ```
+3.  Open your browser and visit `http://localhost:8080` to start using it.
 
-1. Start the server:
-   ```bash
-   ./cloud-sync serve
-   ```
+### Method Two: Build from Source
 
-2. Open your browser and navigate to:
-   ```
-   http://localhost:8080
-   ```
+If you are a developer or want to experience the latest features:
 
-3. (Optional) Provide a custom rclone config path:
-   ```bash
-   ./cloud-sync serve --config /path/to/rclone.conf
-   ```
+1.  **Clone Repository**:
+    ```bash
+    git clone https://github.com/xzzpig/rclone-sync.git
+    cd rclone-sync
+    ```
+2.  **Build and Run**:
+    ```bash
+    # Requires Go 1.25+ and Node.js installed
+    # Compile frontend
+    cd web && pnpm install && pnpm build && cd ..
+    # Compile backend
+    go build -o cloud-sync ./cmd/cloud-sync
+    # Run
+    ./cloud-sync serve
+    ```
 
-## API
+## 📖 User Guide
 
-### GraphQL Endpoint
+### 1. Connect Cloud Storage (Connections)
+When entering the system for the first time, please click the **"+"** icon in the sidebar to add a connection.
+- Select your cloud storage provider (e.g., Google Drive).
+- Complete the authorization process according to the wizard prompts.
+- After successful authorization, you will see the connection in the sidebar and can browse the files inside.
 
-The application exposes a GraphQL API at `/api/graphql`.
+### 2. Create Sync Task (Tasks)
+On the connection details page, click the **"New Task"** button.
+- **Local Path**: Select the folder on your computer that needs to be synced.
+- **Remote Path**: Select the folder in the cloud.
+- **Sync Direction**:
+    - **Upload**: Only push local changes to the cloud.
+    - **Download**: Only pull cloud changes to the local.
+    - **Bidirectional**: Keep both ends consistent; modifications on either end will sync to the other.
+- **Trigger Method**:
+    - **Manual**: Sync only when you click "Run".
+    - **Schedule**: Set scheduled tasks (e.g., "2 AM every day").
+    - **Real-time**: When enabled, automatically starts syncing when files change (with a short delay to optimize performance).
 
-- **HTTP**: `POST /api/graphql` - Send GraphQL queries and mutations
-- **WebSocket**: `GET /api/graphql` - Connect for GraphQL subscriptions (real-time updates)
-- **Playground**: `GET /api/graphql/playground` - Interactive GraphQL IDE (development only)
+### 3. Monitoring and Logs
+- **Dashboard**: In the task list, you can intuitively see the current status of each task (Idle, Syncing, Error).
+- **Task Details**: Click the task card to view detailed transfer speed, remaining file count, and historical run logs.
+- **History**: The system retains recent sync logs for easy troubleshooting of file transfer issues.
 
-#### Example Queries
+## ❓ Frequently Asked Questions (FAQ)
 
-**List all connections:**
-```graphql
-query {
-  connection {
-    list {
-      id
-      name
-      type
-      loadStatus
-    }
-  }
-}
-```
+**Q: Is real-time sync immediate?**
+A: To avoid frequent triggers, the system has a "debounce" delay of a few seconds. Sync will start a few seconds after you stop modifying files.
 
-**List all tasks:**
-```graphql
-query {
-  task {
-    list {
-      id
-      name
-      status
-      connection {
-        name
-      }
-    }
-  }
-}
-```
+**Q: Where is the configuration file stored?**
+A: By default, data is stored in the `app_data` folder in the program's running directory. You can modify this using the `--data-dir` parameter.
 
-**Create a new task:**
-```graphql
-mutation {
-  task {
-    create(input: {
-      connectionId: "conn-id"
-      name: "My Sync Task"
-      localPath: "/data/sync"
-      remotePath: "/"
-      direction: DOWNLOAD
-      mode: COPY
-    }) {
-      ... on Task {
-        id
-        name
-      }
-      ... on Error {
-        message
-        code
-      }
-    }
-  }
-}
-```
+**Q: How do I reset the administrator password?**
+A: The current version defaults to no login authentication (suitable for personal local use). If you need to deploy on the public network, please use Nginx or other reverse proxies for authentication protection.
 
-**Subscribe to job progress:**
-```graphql
-subscription {
-  jobProgress {
-    jobId
-    taskId
-    status
-    progress
-    speed
-    eta
-    currentFile
-    transferredBytes
-    totalBytes
-    transferredFiles
-    totalFiles
-    error
-  }
-}
-```
+## ⚙️ Configuration Instructions
 
-#### Schema Overview
+The program reads the `config.toml` file in the current directory by default when starting. You can also specify other paths using the command line parameter `--config`.
 
-The GraphQL schema provides the following main types:
-
-- **Connection**: Represents a cloud storage connection (e.g., Google Drive, S3)
-- **Task**: A sync task definition with source, destination, and sync settings
-- **Job**: An execution instance of a task with progress and logs
-- **JobLog**: Log entries for a job execution
-- **Provider**: Available storage provider types and their configuration options
-- **FileEntry**: File and directory entries for browsing local/remote paths
-
-For the complete schema, visit the GraphQL Playground at `/api/graphql/playground` in development mode.
-
-## Development
-
-### Backend
-
-Running in dev mode (without embedded frontend):
-
-```bash
-go run ./cmd/cloud-sync serve
-```
-
-### Frontend
-
-Running the frontend dev server:
-
-```bash
-cd web
-pnpm dev
-```
-
-### GraphQL Development
-
-Regenerate GraphQL code after schema changes:
-
-```bash
-go generate ./internal/api/graphql/...
-```
-
-## Configuration
-
-The application uses `config.toml` for configuration.
+Here is a complete configuration example and description:
 
 ```toml
 [app]
-environment = "production" # or "development"
-data_dir = "app_data"
+# Operating environment: "development" or "production"
+# In production mode, some debugging functions are disabled, and logs are more concise
+environment = "production"
+
+# Data storage directory
+# Used to store database files, log files, etc.
+# Default value: "./app_data"
+data_dir = "./app_data"
 
 [server]
+# Listening address
+# 0.0.0.0 allows LAN/Public access
+# 127.0.0.1 allows localhost access only
 host = "0.0.0.0"
+
+# Listening port
 port = 8080
 
-[rclone]
-config_path = "rclone.conf"
-log_level = "INFO" # DEBUG, INFO, NOTICE, ERROR
+[log]
+# Log level: "debug", "info", "warn", "error"
+# "info" is recommended for production environments
+level = "info"
+
+[database]
+# Database migration mode
+# "auto": Automatic migration (Suitable for development or simple upgrades)
+# "versioned": Versioned migration (Suitable for production environments, safer)
+migration_mode = "versioned"
+
+# Database file path (Relative to data_dir)
+# Default value: "cloud-sync.db"
+path = "cloud-sync.db"
+
+[security]
+# Encryption key for sensitive data in database, such as cloud storage credentials
+# Leave empty to disable encryption (not recommended for production)
+encryption_key = ""
 ```
 
-## License
+### Environment Variables
 
-MIT
+Configuration can also be set via environment variables with the prefix `CLOUDSYNC_`. Nested fields use `_` as a separator.
+
+Examples:
+- `CLOUDSYNC_SERVER_PORT=9090`
+- `CLOUDSYNC_APP_DATA_DIR=/data`
+- `CLOUDSYNC_LOG_LEVEL=debug`
+
+### Command Line Parameters
+
+In addition to the configuration file, you can also override some settings via command line parameters:
+
+- `--config`: Specify configuration file path (Default: `config.toml`)
+- `--data-dir`: Specify data storage directory (Overrides setting in config file)
+- `--port`: Specify listening port (Overrides setting in config file)
+- `--help`: View all available parameters
+
+## 📄 License
+
+MIT License

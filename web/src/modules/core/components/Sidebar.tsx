@@ -17,6 +17,7 @@ import IconImport from '~icons/lucide/import';
 import IconLayoutGrid from '~icons/lucide/layout-grid';
 import IconPlus from '~icons/lucide/plus';
 import IconSettings from '~icons/lucide/settings';
+import IconLogo from '@/public/icon.svg';
 
 const Sidebar: Component = () => {
   // Use GraphQL query for connections
@@ -35,9 +36,7 @@ const Sidebar: Component = () => {
     <nav class="flex size-full flex-col bg-card" role="navigation" aria-label="Main navigation">
       <div class="p-6 pb-2">
         <div class="mb-6 flex items-center gap-2 px-2">
-          <div class="flex size-8 items-center justify-center rounded-lg bg-primary text-lg font-bold text-primary-foreground">
-            C
-          </div>
+          <IconLogo class="size-8" />
           <h1 class="text-lg font-bold tracking-tight">{m.app_title()}</h1>
         </div>
 

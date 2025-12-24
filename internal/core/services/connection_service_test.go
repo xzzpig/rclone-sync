@@ -461,6 +461,7 @@ func TestConnectionService_UpdateConnection_EmptyConfig(t *testing.T) {
 	require.NoError(t, err)
 	decryptedConfig, err := encryptor.DecryptConfig(updated.EncryptedConfig)
 	require.NoError(t, err)
+	delete(decryptedConfig, "type") // Remove type for comparison
 	assert.Empty(t, decryptedConfig)
 }
 

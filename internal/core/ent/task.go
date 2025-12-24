@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/connection"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/task"
 )
@@ -29,7 +30,7 @@ type Task struct {
 	// RemotePath holds the value of the "remote_path" field.
 	RemotePath string `json:"remote_path,omitempty"`
 	// Direction holds the value of the "direction" field.
-	Direction task.Direction `json:"direction,omitempty"`
+	Direction model.SyncDirection `json:"direction,omitempty"`
 	// Schedule holds the value of the "schedule" field.
 	Schedule string `json:"schedule,omitempty"`
 	// Realtime holds the value of the "realtime" field.
@@ -141,7 +142,7 @@ func (_m *Task) assignValues(columns []string, values []any) error {
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field direction", values[i])
 			} else if value.Valid {
-				_m.Direction = task.Direction(value.String)
+				_m.Direction = model.SyncDirection(value.String)
 			}
 		case task.FieldSchedule:
 			if value, ok := values[i].(*sql.NullString); !ok {

@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/joblog"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/predicate"
@@ -30,14 +31,28 @@ func (_u *JobLogUpdate) Where(ps ...predicate.JobLog) *JobLogUpdate {
 	return _u
 }
 
+// SetJobID sets the "job_id" field.
+func (_u *JobLogUpdate) SetJobID(v uuid.UUID) *JobLogUpdate {
+	_u.mutation.SetJobID(v)
+	return _u
+}
+
+// SetNillableJobID sets the "job_id" field if the given value is not nil.
+func (_u *JobLogUpdate) SetNillableJobID(v *uuid.UUID) *JobLogUpdate {
+	if v != nil {
+		_u.SetJobID(*v)
+	}
+	return _u
+}
+
 // SetLevel sets the "level" field.
-func (_u *JobLogUpdate) SetLevel(v joblog.Level) *JobLogUpdate {
+func (_u *JobLogUpdate) SetLevel(v model.LogLevel) *JobLogUpdate {
 	_u.mutation.SetLevel(v)
 	return _u
 }
 
 // SetNillableLevel sets the "level" field if the given value is not nil.
-func (_u *JobLogUpdate) SetNillableLevel(v *joblog.Level) *JobLogUpdate {
+func (_u *JobLogUpdate) SetNillableLevel(v *model.LogLevel) *JobLogUpdate {
 	if v != nil {
 		_u.SetLevel(*v)
 	}
@@ -79,13 +94,13 @@ func (_u *JobLogUpdate) ClearPath() *JobLogUpdate {
 }
 
 // SetWhat sets the "what" field.
-func (_u *JobLogUpdate) SetWhat(v joblog.What) *JobLogUpdate {
+func (_u *JobLogUpdate) SetWhat(v model.LogAction) *JobLogUpdate {
 	_u.mutation.SetWhat(v)
 	return _u
 }
 
 // SetNillableWhat sets the "what" field if the given value is not nil.
-func (_u *JobLogUpdate) SetNillableWhat(v *joblog.What) *JobLogUpdate {
+func (_u *JobLogUpdate) SetNillableWhat(v *model.LogAction) *JobLogUpdate {
 	if v != nil {
 		_u.SetWhat(*v)
 	}
@@ -116,12 +131,6 @@ func (_u *JobLogUpdate) AddSize(v int64) *JobLogUpdate {
 // ClearSize clears the value of the "size" field.
 func (_u *JobLogUpdate) ClearSize() *JobLogUpdate {
 	_u.mutation.ClearSize()
-	return _u
-}
-
-// SetJobID sets the "job" edge to the Job entity by ID.
-func (_u *JobLogUpdate) SetJobID(id uuid.UUID) *JobLogUpdate {
-	_u.mutation.SetJobID(id)
 	return _u
 }
 
@@ -271,14 +280,28 @@ type JobLogUpdateOne struct {
 	mutation *JobLogMutation
 }
 
+// SetJobID sets the "job_id" field.
+func (_u *JobLogUpdateOne) SetJobID(v uuid.UUID) *JobLogUpdateOne {
+	_u.mutation.SetJobID(v)
+	return _u
+}
+
+// SetNillableJobID sets the "job_id" field if the given value is not nil.
+func (_u *JobLogUpdateOne) SetNillableJobID(v *uuid.UUID) *JobLogUpdateOne {
+	if v != nil {
+		_u.SetJobID(*v)
+	}
+	return _u
+}
+
 // SetLevel sets the "level" field.
-func (_u *JobLogUpdateOne) SetLevel(v joblog.Level) *JobLogUpdateOne {
+func (_u *JobLogUpdateOne) SetLevel(v model.LogLevel) *JobLogUpdateOne {
 	_u.mutation.SetLevel(v)
 	return _u
 }
 
 // SetNillableLevel sets the "level" field if the given value is not nil.
-func (_u *JobLogUpdateOne) SetNillableLevel(v *joblog.Level) *JobLogUpdateOne {
+func (_u *JobLogUpdateOne) SetNillableLevel(v *model.LogLevel) *JobLogUpdateOne {
 	if v != nil {
 		_u.SetLevel(*v)
 	}
@@ -320,13 +343,13 @@ func (_u *JobLogUpdateOne) ClearPath() *JobLogUpdateOne {
 }
 
 // SetWhat sets the "what" field.
-func (_u *JobLogUpdateOne) SetWhat(v joblog.What) *JobLogUpdateOne {
+func (_u *JobLogUpdateOne) SetWhat(v model.LogAction) *JobLogUpdateOne {
 	_u.mutation.SetWhat(v)
 	return _u
 }
 
 // SetNillableWhat sets the "what" field if the given value is not nil.
-func (_u *JobLogUpdateOne) SetNillableWhat(v *joblog.What) *JobLogUpdateOne {
+func (_u *JobLogUpdateOne) SetNillableWhat(v *model.LogAction) *JobLogUpdateOne {
 	if v != nil {
 		_u.SetWhat(*v)
 	}
@@ -357,12 +380,6 @@ func (_u *JobLogUpdateOne) AddSize(v int64) *JobLogUpdateOne {
 // ClearSize clears the value of the "size" field.
 func (_u *JobLogUpdateOne) ClearSize() *JobLogUpdateOne {
 	_u.mutation.ClearSize()
-	return _u
-}
-
-// SetJobID sets the "job" edge to the Job entity by ID.
-func (_u *JobLogUpdateOne) SetJobID(id uuid.UUID) *JobLogUpdateOne {
-	_u.mutation.SetJobID(id)
 	return _u
 }
 

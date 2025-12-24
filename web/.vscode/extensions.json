@@ -5,6 +5,7 @@
     "antfu.iconify",
     "dbaeumer.vscode-eslint",
     "esbenp.prettier-vscode",
-    "inlang.vs-code-extension"
+    "inlang.vs-code-extension",
+    "graphql.vscode-graphql-syntax"
   ]
 }

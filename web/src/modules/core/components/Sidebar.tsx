@@ -1,4 +1,4 @@
-import { getConnections } from '@/api/connections';
+import { ConnectionsListQuery } from '@/api/graphql/queries/connections';
 import LanguageSwitcher from '@/components/common/LanguageSwitcher';
 import ModeToggle from '@/components/common/ModeToggle';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { ImportWizard } from '@/modules/connections/components/ImportWizard/Impo
 import * as m from '@/paraglide/messages.js';
 import { useTasks } from '@/store/tasks';
 import { A } from '@solidjs/router';
-import { useQuery } from '@tanstack/solid-query';
+import { createQuery } from '@urql/solid';
 import { Component, For, createSignal } from 'solid-js';
 import IconCloud from '~icons/lucide/cloud';
 import IconImport from '~icons/lucide/import';
@@ -19,11 +19,14 @@ import IconPlus from '~icons/lucide/plus';
 import IconSettings from '~icons/lucide/settings';
 
 const Sidebar: Component = () => {
-  const connectionsQuery = useQuery(() => ({
-    queryKey: ['connections'],
-    queryFn: getConnections,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  }));
+  // Use GraphQL query for connections
+  const [connectionsResult] = createQuery({
+    query: ConnectionsListQuery,
+    variables: { pagination: { limit: 100, offset: 0 } },
+  });
+
+  const connections = () => connectionsResult.data?.connection?.list?.items ?? [];
+
   const [isDialogOpen, setIsDialogOpen] = createSignal(false);
   const [isImportOpen, setIsImportOpen] = createSignal(false);
   const [, actions] = useTasks();
@@ -84,13 +87,13 @@ const Sidebar: Component = () => {
         </div>
 
         <div class="space-y-1">
-          {connectionsQuery.isLoading ? (
+          {connectionsResult.fetching ? (
             <div class="space-y-2 px-2">
               <ListSkeleton count={3} />
             </div>
           ) : (
             <For
-              each={connectionsQuery.data}
+              each={connections()}
               fallback={
                 <div class="rounded-lg border-2 border-dashed border-muted-foreground/20 px-2 py-8 text-center">
                   <IconCloud class="mx-auto mb-2 size-8 text-muted-foreground/40" />

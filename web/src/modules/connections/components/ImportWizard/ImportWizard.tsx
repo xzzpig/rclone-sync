@@ -1,4 +1,6 @@
-import { executeImport, parseImport } from '@/api/connections';
+import { IMPORT_PARSE, IMPORT_EXECUTE } from '@/api/graphql/queries/import';
+import { ConnectionsListQuery } from '@/api/graphql/queries/connections';
+import { client } from '@/api/graphql/client';
 import {
   Dialog,
   DialogContent,
@@ -8,7 +10,6 @@ import {
 } from '@/components/ui/dialog';
 import type { ImportPreviewItem, ImportResult } from '@/lib/types';
 import * as m from '@/paraglide/messages';
-import { useQueryClient } from '@tanstack/solid-query';
 import { Component, createSignal, Match, Switch } from 'solid-js';
 import { Step1Input } from './Step1Input';
 import { Step2Preview } from './Step2Preview';
@@ -22,8 +23,6 @@ interface ImportWizardProps {
 type Step = 1 | 2 | 3;
 
 export const ImportWizard: Component<ImportWizardProps> = (props) => {
-  const queryClient = useQueryClient();
-
   const [step, setStep] = createSignal<Step>(1);
   const [loading, setLoading] = createSignal(false);
   const [previewItems, setPreviewItems] = createSignal<ImportPreviewItem[]>([]);
@@ -43,39 +42,70 @@ export const ImportWizard: Component<ImportWizardProps> = (props) => {
     props.onClose();
   };
 
-  // Step 1: 解析配置内容
+  // Step 1: 解析配置内容 using GraphQL
   const handleParseContent = async (inputContent: string) => {
     setLoading(true);
     setError(null);
 
     try {
-      const parseResult = await parseImport(inputContent);
+      const parseResult = await client.mutation(IMPORT_PARSE, {
+        input: { content: inputContent },
+      });
 
-      if (parseResult.connections.length === 0) {
-        setError(m.import_noValidConnections());
+      if (parseResult.error) {
+        throw new Error(parseResult.error.message);
+      }
+
+      const data = parseResult.data?.import?.parse;
+
+      // Check if it's an error response
+      if (data?.__typename === 'ImportParseError') {
+        const errorMsg = data.line ? `Line ${data.line}: ${data.error}` : data.error;
+        setError(errorMsg);
         return;
       }
 
-      // 检查内部重复
-      if (parseResult.validation?.internal_duplicates?.length) {
-        setError(
-          m.import_duplicateNames({ names: parseResult.validation.internal_duplicates.join(', ') })
-        );
-        return;
+      // It's a success response
+      if (data?.__typename === 'ImportParseSuccess') {
+        const connections = data.connections ?? [];
+
+        if (connections.length === 0) {
+          setError(m.import_noValidConnections());
+          return;
+        }
+
+        // Check for internal duplicates (same name appearing multiple times)
+        const nameCount: Record<string, number> = {};
+        for (const conn of connections) {
+          nameCount[conn.name] = (nameCount[conn.name] || 0) + 1;
+        }
+        const duplicates = Object.entries(nameCount)
+          .filter(([_, count]) => count > 1)
+          .map(([name]) => name);
+
+        if (duplicates.length > 0) {
+          setError(m.import_duplicateNames({ names: duplicates.join(', ') }));
+          return;
+        }
+
+        // Fetch existing connections to check for conflicts
+        const existingResult = await client.query(ConnectionsListQuery, {});
+        const existingItems = existingResult.data?.connection?.list?.items ?? [];
+        const existingNames = new Set(existingItems.map((c) => c.name));
+
+        // 转换为前端 ImportPreviewItem
+        const items: ImportPreviewItem[] = connections.map((conn) => ({
+          name: conn.name,
+          type: conn.type,
+          config: (conn.config ?? {}) as Record<string, string>,
+          selected: !existingNames.has(conn.name), // 默认选中非冲突项
+          isConflict: existingNames.has(conn.name),
+          isDuplicate: false,
+        }));
+
+        setPreviewItems(items);
+        setStep(2);
       }
-
-      // 转换为前端 ImportPreviewItem
-      const conflictSet = new Set(parseResult.validation?.conflicts ?? []);
-
-      const items: ImportPreviewItem[] = parseResult.connections.map((conn) => ({
-        ...conn,
-        selected: !conflictSet.has(conn.name), // 默认选中非冲突项
-        isConflict: conflictSet.has(conn.name),
-        isDuplicate: false,
-      }));
-
-      setPreviewItems(items);
-      setStep(2);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : m.import_parseFailed());
     } finally {
@@ -83,7 +113,7 @@ export const ImportWizard: Component<ImportWizardProps> = (props) => {
     }
   };
 
-  // Step 2: 确认选择后执行导入
+  // Step 2: 确认选择后执行导入 using GraphQL
   const handleConfirmSelection = async (items: ImportPreviewItem[]) => {
     setLoading(true);
     setError(null);
@@ -101,19 +131,32 @@ export const ImportWizard: Component<ImportWizardProps> = (props) => {
         config: item.editedConfig ?? item.config,
       }));
 
-      const importResult = await executeImport({
-        connections,
-        overwrite: hasOverwrite,
+      const importResult = await client.mutation(IMPORT_EXECUTE, {
+        input: {
+          connections,
+          overwrite: hasOverwrite,
+        },
       });
 
-      setResult(importResult);
+      if (importResult.error) {
+        throw new Error(importResult.error.message);
+      }
+
+      const data = importResult.data?.import?.execute;
+      const importedCount = data?.connections?.length ?? 0;
+      const skippedCount = data?.skippedCount ?? 0;
+
+      // Convert to ImportResult format expected by Step3Confirm
+      setResult({
+        imported: importedCount,
+        skipped: skippedCount,
+        failed: 0, // GraphQL API doesn't have failed concept in current schema
+        errors: [],
+      });
       setStep(3);
 
-      // 刷新连接列表
-      await queryClient.invalidateQueries({ queryKey: ['connections'] });
-      // 刷新单个连接查询（用于 Settings 页面等）
-      await queryClient.invalidateQueries({ queryKey: ['connection'] });
-      await queryClient.invalidateQueries({ queryKey: ['connectionConfig'] });
+      // 刷新连接列表 - invalidate GraphQL cache
+      client.query(ConnectionsListQuery, {}, { requestPolicy: 'network-only' });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : m.import_failed());
     } finally {

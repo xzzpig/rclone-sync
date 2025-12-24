@@ -1,5 +1,3 @@
-import * as m from '@/paraglide/messages.js';
-import { Button } from '@/components/ui/button';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -7,12 +5,22 @@ import {
   BreadcrumbList,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
+import { Button } from '@/components/ui/button';
 import { TextField, TextFieldInput } from '@/components/ui/text-field';
 import { ApiError } from '@/lib/api';
-import { FileEntry } from '@/lib/types';
+import type { FileEntry } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { useQuery } from '@tanstack/solid-query';
-import { Component, createEffect, createSignal, For, Show } from 'solid-js';
+import * as m from '@/paraglide/messages.js';
+import {
+  Component,
+  createEffect,
+  createResource,
+  createSignal,
+  For,
+  Match,
+  Show,
+  Switch,
+} from 'solid-js';
 import IconFolder from '~icons/lucide/folder';
 import IconRefreshCw from '~icons/lucide/refresh-cw';
 
@@ -20,7 +28,7 @@ export interface FileBrowserProps {
   initialPath?: string;
   rootLabel?: string;
   icon?: Component<{ class?: string }>;
-  loadDirectory: (path: string) => Promise<FileEntry[]>;
+  loadDirectory: (path: string, refresh?: boolean) => Promise<FileEntry[]>;
   onSelect: (path: string) => void;
   class?: string;
 }
@@ -36,13 +44,14 @@ export const FileBrowser: Component<FileBrowserProps> = (props) => {
   const [inputPath, setInputPath] = createSignal(defaultPath);
   const [selectedPath, setSelectedPath] = createSignal<string | null>(null);
 
-  // Use createQuery for caching file list
-  const query = useQuery(() => ({
-    queryKey: ['files', props.rootLabel, currentPath()],
-    queryFn: () => props.loadDirectory(currentPath()),
-    staleTime: 1000 * 60 * 5, // 5 minutes cache
-    retry: 1,
-  }));
+  // Use createResource for fetching file list
+  const [files, { refetch }] = createResource<
+    FileEntry[],
+    { path: string; load: FileBrowserProps['loadDirectory'] }
+  >(
+    () => ({ path: currentPath(), load: props.loadDirectory }),
+    ({ path, load }, { refetching }) => load(path, !!refetching)
+  );
 
   // Sync inputPath with currentPath
   createEffect(() => {
@@ -54,7 +63,7 @@ export const FileBrowser: Component<FileBrowserProps> = (props) => {
   };
 
   const handleEntryClick = (entry: FileEntry) => {
-    if (entry.is_dir) {
+    if (entry.isDir) {
       // Normalize the path to avoid double slashes
       let normalizedPath = entry.path;
 
@@ -147,61 +156,61 @@ export const FileBrowser: Component<FileBrowserProps> = (props) => {
           variant="ghost"
           size="sm"
           class="shrink-0"
-          onClick={() => query.refetch()}
-          disabled={query.isFetching}
+          onClick={() => refetch()}
+          disabled={files.loading}
           title={m.common_refresh()}
         >
-          <IconRefreshCw class={cn('w-4 h-4', query.isFetching && 'animate-spin')} />
+          <IconRefreshCw class={cn('w-4 h-4', files.loading && 'animate-spin')} />
         </Button>
       </div>
 
       {/* File List */}
       <div class="flex-1 overflow-y-auto">
-        <Show when={query.isPending}>
-          <div class="flex h-32 items-center justify-center">
-            <div class="text-sm text-muted-foreground">{m.common_loading()}</div>
-          </div>
-        </Show>
-
-        <Show when={query.isError}>
-          <div class="flex h-32 items-center justify-center">
-            <div class="text-sm text-destructive">
-              {query.error instanceof ApiError
-                ? (query.error.details ?? query.error.message)
-                : query.error instanceof Error
-                  ? query.error.message
-                  : m.file_browser_load_error()}
+        <Switch>
+          <Match when={files.loading}>
+            <div class="flex h-32 items-center justify-center">
+              <div class="text-sm text-muted-foreground">{m.common_loading()}</div>
             </div>
-          </div>
-        </Show>
-
-        <Show when={query.isSuccess}>
-          <div class="divide-y">
-            <For each={query.data}>
-              {(entry) => (
-                <div
-                  class={cn(
-                    'flex items-center gap-3 px-4 py-3 hover:bg-accent cursor-pointer transition-colors',
-                    selectedPath() === entry.path && 'bg-accent'
-                  )}
-                  onClick={() => {
-                    setSelectedPath(entry.path);
-                    handleEntryClick(entry);
-                  }}
-                >
-                  <IconFolder class="size-5 shrink-0 text-blue-500" />
-                  <span class="flex-1 truncate">{entry.name}</span>
-                </div>
-              )}
-            </For>
-
-            <Show when={(query.data?.length ?? 0) === 0}>
-              <div class="px-4 py-8 text-center text-sm text-muted-foreground">
-                {m.file_browser_empty()}
+          </Match>
+          <Match when={files.error}>
+            <div class="flex h-32 items-center justify-center">
+              <div class="text-sm text-destructive">
+                {files.error instanceof ApiError
+                  ? (files.error.details ?? files.error.message)
+                  : files.error instanceof Error
+                    ? files.error.message
+                    : m.file_browser_load_error()}
               </div>
-            </Show>
-          </div>
-        </Show>
+            </div>
+          </Match>
+          <Match when={files()}>
+            <div class="divide-y">
+              <For each={files()}>
+                {(entry) => (
+                  <div
+                    class={cn(
+                      'flex items-center gap-3 px-4 py-3 hover:bg-accent cursor-pointer transition-colors',
+                      selectedPath() === entry.path && 'bg-accent'
+                    )}
+                    onClick={() => {
+                      setSelectedPath(entry.path);
+                      handleEntryClick(entry);
+                    }}
+                  >
+                    <IconFolder class="size-5 shrink-0 text-blue-500" />
+                    <span class="flex-1 truncate">{entry.name}</span>
+                  </div>
+                )}
+              </For>
+
+              <Show when={(files()?.length ?? 0) === 0}>
+                <div class="px-4 py-8 text-center text-sm text-muted-foreground">
+                  {m.file_browser_empty()}
+                </div>
+              </Show>
+            </div>
+          </Match>
+        </Switch>
       </div>
 
       {/* Selection Bar */}

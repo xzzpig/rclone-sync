@@ -9,6 +9,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
@@ -49,11 +50,11 @@ func TestTaskService(t *testing.T) {
 
 	t.Run("CreateTask", func(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
-			task, err := service.CreateTask(ctx, "Test Task", "/local/path", testConnID, "/remote/path", "bidirectional", "", false, nil)
+			task, err := service.CreateTask(ctx, "Test Task", "/local/path", testConnID, "/remote/path", string(model.SyncDirectionBidirectional), "", false, nil)
 			require.NoError(t, err)
 			assert.NotNil(t, task)
 			assert.Equal(t, "Test Task", task.Name)
-			assert.Equal(t, "bidirectional", string(task.Direction))
+			assert.Equal(t, string(model.SyncDirectionBidirectional), string(task.Direction))
 		})
 	})
 
@@ -67,24 +68,24 @@ func TestTaskService(t *testing.T) {
 
 	t.Run("ListTasksByConnection", func(t *testing.T) {
 		// Create a task for testing
-		testTask, err := service.CreateTask(ctx, "Task For Connection Test", "/local", testConnID, "/remote", "bidirectional", "", false, nil)
+		testTask, err := service.CreateTask(ctx, "Task For Connection Test", "/local", testConnID, "/remote", string(model.SyncDirectionBidirectional), "", false, nil)
 		require.NoError(t, err)
 
 		// Create a job service to create jobs
 		jobService := NewJobService(client)
 
 		// Create multiple jobs for the task with different start times
-		job1, err := jobService.CreateJob(ctx, testTask.ID, "manual")
+		job1, err := jobService.CreateJob(ctx, testTask.ID, model.JobTriggerManual)
 		require.NoError(t, err)
 
 		// Update job1 to have a specific start time
 		_, err = client.Job.UpdateOneID(job1.ID).
-			SetStatus(job.StatusSuccess).
+			SetStatus(model.JobStatusSuccess).
 			Save(ctx)
 		require.NoError(t, err)
 
 		// Create a second job (which should have a later start time)
-		job2, err := jobService.CreateJob(ctx, testTask.ID, "schedule")
+		job2, err := jobService.CreateJob(ctx, testTask.ID, model.JobTriggerSchedule)
 		require.NoError(t, err)
 
 		t.Run("ReturnsLatestJobForEachTask", func(t *testing.T) {
@@ -111,7 +112,7 @@ func TestTaskService(t *testing.T) {
 
 		t.Run("FiltersByConnectionID", func(t *testing.T) {
 			// Create another task with a different connection
-			otherTask, err := service.CreateTask(ctx, "Task For Other Connection", "/local2", testConnID2, "/remote2", "bidirectional", "", false, nil)
+			otherTask, err := service.CreateTask(ctx, "Task For Other Connection", "/local2", testConnID2, "/remote2", string(model.SyncDirectionBidirectional), "", false, nil)
 			require.NoError(t, err)
 
 			// Query for testConnID only
@@ -170,7 +171,7 @@ func TestTaskService(t *testing.T) {
 		})
 
 		t.Run("NotFound", func(t *testing.T) {
-			_, err := service.UpdateTask(ctx, uuid.New(), "New Name", "s", testConnID, "rp", "bidirectional", "", false, nil)
+			_, err := service.UpdateTask(ctx, uuid.New(), "New Name", "s", testConnID, "rp", string(model.SyncDirectionBidirectional), "", false, nil)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, errs.ErrNotFound)
 		})
@@ -178,7 +179,7 @@ func TestTaskService(t *testing.T) {
 
 	t.Run("DeleteTask", func(t *testing.T) {
 		// Create a task to delete to avoid interfering with other tests sequences if any
-		tToDelete, err := service.CreateTask(ctx, "To Delete", "/l", testConnID, "/r", "bidirectional", "", false, nil)
+		tToDelete, err := service.CreateTask(ctx, "To Delete", "/l", testConnID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
 		require.NoError(t, err)
 
 		t.Run("Success", func(t *testing.T) {
@@ -198,16 +199,16 @@ func TestTaskService(t *testing.T) {
 
 		t.Run("WithAssociatedJobs", func(t *testing.T) {
 			// Create a new task for this test
-			taskWithJobs, err := service.CreateTask(ctx, "Task With Jobs", "/path", testConnID, "/remote", "bidirectional", "", false, nil)
+			taskWithJobs, err := service.CreateTask(ctx, "Task With Jobs", "/path", testConnID, "/remote", string(model.SyncDirectionBidirectional), "", false, nil)
 			require.NoError(t, err)
 
 			// Create a job service to create jobs
 			jobService := NewJobService(client)
 
 			// Create multiple jobs associated with the task
-			job1, err := jobService.CreateJob(ctx, taskWithJobs.ID, "manual")
+			job1, err := jobService.CreateJob(ctx, taskWithJobs.ID, model.JobTriggerManual)
 			require.NoError(t, err)
-			job2, err := jobService.CreateJob(ctx, taskWithJobs.ID, "schedule")
+			job2, err := jobService.CreateJob(ctx, taskWithJobs.ID, model.JobTriggerSchedule)
 			require.NoError(t, err)
 
 			// Verify jobs exist before deletion
@@ -242,12 +243,12 @@ func TestTaskService(t *testing.T) {
 
 	t.Run("GetTaskWithJobs", func(t *testing.T) {
 		// Setup: Task with multiple jobs
-		taskWithJobs, err := service.CreateTask(ctx, "Task With Jobs", "/l", testConnID, "/r", "bidirectional", "", false, nil)
+		taskWithJobs, err := service.CreateTask(ctx, "Task With Jobs", "/l", testConnID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
 		require.NoError(t, err)
 
 		jobService := NewJobService(client)
 		// Old job
-		j1, err := jobService.CreateJob(ctx, taskWithJobs.ID, "manual")
+		j1, err := jobService.CreateJob(ctx, taskWithJobs.ID, model.JobTriggerManual)
 		require.NoError(t, err)
 		// Manually update StartTime to be older
 		_, err = client.Job.UpdateOne(j1).SetStartTime(j1.StartTime.Add(-2 * time.Hour)).Save(ctx)
@@ -255,7 +256,7 @@ func TestTaskService(t *testing.T) {
 
 		// Newer job
 		time.Sleep(10 * time.Millisecond)
-		j2, err := jobService.CreateJob(ctx, taskWithJobs.ID, "schedule")
+		j2, err := jobService.CreateJob(ctx, taskWithJobs.ID, model.JobTriggerSchedule)
 		require.NoError(t, err)
 
 		// Test
@@ -274,7 +275,7 @@ func TestTaskService(t *testing.T) {
 
 	t.Run("GetTaskWithConnection", func(t *testing.T) {
 		// Create a task
-		testTask, err := service.CreateTask(ctx, "Task With Connection", "/local", testConnID, "/remote", "upload", "", false, nil)
+		testTask, err := service.CreateTask(ctx, "Task With Connection", "/local", testConnID, "/remote", string(model.SyncDirectionUpload), "", false, nil)
 		require.NoError(t, err)
 
 		t.Run("Success", func(t *testing.T) {
@@ -299,13 +300,13 @@ func TestTaskService(t *testing.T) {
 	t.Run("CreateTask_ConstraintError", func(t *testing.T) {
 		// Create a task with a specific name
 		taskName := "Unique Task Name"
-		_, err := service.CreateTask(ctx, taskName, "/source", testConnID, "/dest", "bidirectional", "", false, nil)
+		_, err := service.CreateTask(ctx, taskName, "/source", testConnID, "/dest", string(model.SyncDirectionBidirectional), "", false, nil)
 		require.NoError(t, err)
 
 		// Try to create another task with the same name (if unique constraint exists)
 		// Note: This depends on whether the schema enforces unique task names
 		// If there's no unique constraint, this test may need adjustment
-		_, err = service.CreateTask(ctx, taskName, "/source2", testConnID, "/dest2", "upload", "", false, nil)
+		_, err = service.CreateTask(ctx, taskName, "/source2", testConnID, "/dest2", string(model.SyncDirectionUpload), "", false, nil)
 		if err != nil {
 			// If there IS a unique constraint on task names
 			assert.ErrorIs(t, err, errs.ErrAlreadyExists)
@@ -318,10 +319,10 @@ func TestTaskService(t *testing.T) {
 
 	t.Run("UpdateTask_ConstraintError", func(t *testing.T) {
 		// Create two tasks
-		task1, err := service.CreateTask(ctx, "Update Task 1", "/s1", testConnID, "/d1", "bidirectional", "", false, nil)
+		task1, err := service.CreateTask(ctx, "Update Task 1", "/s1", testConnID, "/d1", string(model.SyncDirectionBidirectional), "", false, nil)
 		require.NoError(t, err)
 
-		task2, err := service.CreateTask(ctx, "Update Task 2", "/s2", testConnID, "/d2", "upload", "", false, nil)
+		task2, err := service.CreateTask(ctx, "Update Task 2", "/s2", testConnID, "/d2", string(model.SyncDirectionUpload), "", false, nil)
 		require.NoError(t, err)
 
 		// Try to update task2 to have the same name as task1 (if unique constraint exists)
@@ -342,26 +343,26 @@ func TestTaskService(t *testing.T) {
 
 	t.Run("ListAllTasks_WithLatestJobs", func(t *testing.T) {
 		// Create a fresh task with multiple jobs
-		freshTask, err := service.CreateTask(ctx, "Task for ListAll Test", "/src", testConnID, "/dst", "bidirectional", "", false, nil)
+		freshTask, err := service.CreateTask(ctx, "Task for ListAll Test", "/src", testConnID, "/dst", string(model.SyncDirectionBidirectional), "", false, nil)
 		require.NoError(t, err)
 
 		jobService := NewJobService(client)
 
 		// Create multiple jobs with different start times
-		oldJob, err := jobService.CreateJob(ctx, freshTask.ID, "manual")
+		oldJob, err := jobService.CreateJob(ctx, freshTask.ID, model.JobTriggerManual)
 		require.NoError(t, err)
 		// Make it older
 		_, err = client.Job.UpdateOne(oldJob).SetStartTime(time.Now().Add(-3 * time.Hour)).Save(ctx)
 		require.NoError(t, err)
 
 		time.Sleep(10 * time.Millisecond)
-		middleJob, err := jobService.CreateJob(ctx, freshTask.ID, "schedule")
+		middleJob, err := jobService.CreateJob(ctx, freshTask.ID, model.JobTriggerSchedule)
 		require.NoError(t, err)
 		_, err = client.Job.UpdateOne(middleJob).SetStartTime(time.Now().Add(-1 * time.Hour)).Save(ctx)
 		require.NoError(t, err)
 
 		time.Sleep(10 * time.Millisecond)
-		latestJob, err := jobService.CreateJob(ctx, freshTask.ID, "manual")
+		latestJob, err := jobService.CreateJob(ctx, freshTask.ID, model.JobTriggerManual)
 		require.NoError(t, err)
 
 		// List all tasks
@@ -403,7 +404,7 @@ func TestTaskService_EdgeCases(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("CreateTask_WithNilOptions", func(t *testing.T) {
-		task, err := service.CreateTask(ctx, "Nil Options Task", "/src", testConn.ID, "/dst", "bidirectional", "", false, nil)
+		task, err := service.CreateTask(ctx, "Nil Options Task", "/src", testConn.ID, "/dst", string(model.SyncDirectionBidirectional), "", false, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, task)
 		assert.Nil(t, task.Options)
@@ -414,21 +415,21 @@ func TestTaskService_EdgeCases(t *testing.T) {
 			"exclude":   []string{"*.tmp", "*.log"},
 			"bandwidth": 1024,
 		}
-		task, err := service.CreateTask(ctx, "Task With Options", "/src", testConn.ID, "/dst", "upload", "", false, options)
+		task, err := service.CreateTask(ctx, "Task With Options", "/src", testConn.ID, "/dst", string(model.SyncDirectionUpload), "", false, options)
 		assert.NoError(t, err)
 		assert.NotNil(t, task)
 		assert.NotNil(t, task.Options)
 	})
 
 	t.Run("CreateTask_WithSchedule", func(t *testing.T) {
-		task, err := service.CreateTask(ctx, "Scheduled Task", "/src", testConn.ID, "/dst", "download", "0 */6 * * *", false, nil)
+		task, err := service.CreateTask(ctx, "Scheduled Task", "/src", testConn.ID, "/dst", string(model.SyncDirectionDownload), "0 */6 * * *", false, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, task)
 		assert.Equal(t, "0 */6 * * *", task.Schedule)
 	})
 
 	t.Run("CreateTask_WithRealtime", func(t *testing.T) {
-		task, err := service.CreateTask(ctx, "Realtime Task", "/src", testConn.ID, "/dst", "bidirectional", "", true, nil)
+		task, err := service.CreateTask(ctx, "Realtime Task", "/src", testConn.ID, "/dst", string(model.SyncDirectionBidirectional), "", true, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, task)
 		assert.True(t, task.Realtime)
@@ -436,7 +437,7 @@ func TestTaskService_EdgeCases(t *testing.T) {
 
 	t.Run("UpdateTask_ChangeAllFields", func(t *testing.T) {
 		// Create initial task
-		task, err := service.CreateTask(ctx, "Initial Task", "/old-src", testConn.ID, "/old-dst", "upload", "0 0 * * *", false, nil)
+		task, err := service.CreateTask(ctx, "Initial Task", "/old-src", testConn.ID, "/old-dst", string(model.SyncDirectionUpload), "0 0 * * *", false, nil)
 		require.NoError(t, err)
 
 		// Update all fields
@@ -448,7 +449,7 @@ func TestTaskService_EdgeCases(t *testing.T) {
 			"/new-src",
 			testConn.ID,
 			"/new-dst",
-			"download",
+			string(model.SyncDirectionDownload),
 			"0 12 * * *",
 			true,
 			newOptions,
@@ -457,7 +458,7 @@ func TestTaskService_EdgeCases(t *testing.T) {
 		assert.Equal(t, "Updated Task", updated.Name)
 		assert.Equal(t, "/new-src", updated.SourcePath)
 		assert.Equal(t, "/new-dst", updated.RemotePath)
-		assert.Equal(t, "download", string(updated.Direction))
+		assert.Equal(t, string(model.SyncDirectionDownload), string(updated.Direction))
 		assert.Equal(t, "0 12 * * *", updated.Schedule)
 		assert.True(t, updated.Realtime)
 		assert.NotNil(t, updated.Options)
@@ -473,5 +474,289 @@ func TestTaskService_EdgeCases(t *testing.T) {
 		tasks, err := service.ListTasksByConnection(ctx, emptyConn.ID)
 		assert.NoError(t, err)
 		assert.Empty(t, tasks)
+	})
+}
+
+// Tests for ListTasksPaginated
+func TestTaskService_ListTasksPaginated(t *testing.T) {
+	client := enttest.Open(t, "sqlite3", "file:ent?mode=memory&cache=shared&_fk=1")
+	defer client.Close()
+
+	service := NewTaskService(client)
+	ctx := context.Background()
+
+	// Create test connection
+	encryptor, err := crypto.NewEncryptor("test-secret-key-32-bytes-long!!")
+	require.NoError(t, err)
+	connService := NewConnectionService(client, encryptor)
+	testConn, err := connService.CreateConnection(ctx, "paginated-tasks-conn", "local", map[string]string{
+		"type": "local",
+	})
+	require.NoError(t, err)
+
+	// Initially empty
+	tasks, total, err := service.ListTasksPaginated(ctx, 10, 0)
+	require.NoError(t, err)
+	assert.Empty(t, tasks)
+	assert.Equal(t, 0, total)
+
+	// Create multiple tasks
+	for i := 0; i < 5; i++ {
+		_, err := service.CreateTask(ctx, "Paginated Task "+uuid.NewString()[:8], "/src", testConn.ID, "/dst", string(model.SyncDirectionBidirectional), "", false, nil)
+		require.NoError(t, err)
+		time.Sleep(time.Millisecond) // Ensure different creation times
+	}
+
+	t.Run("FirstPage", func(t *testing.T) {
+		tasks, total, err := service.ListTasksPaginated(ctx, 2, 0)
+		require.NoError(t, err)
+		assert.Len(t, tasks, 2)
+		assert.Equal(t, 5, total)
+	})
+
+	t.Run("SecondPage", func(t *testing.T) {
+		tasks, total, err := service.ListTasksPaginated(ctx, 2, 2)
+		require.NoError(t, err)
+		assert.Len(t, tasks, 2)
+		assert.Equal(t, 5, total)
+	})
+
+	t.Run("LastPage", func(t *testing.T) {
+		tasks, total, err := service.ListTasksPaginated(ctx, 2, 4)
+		require.NoError(t, err)
+		assert.Len(t, tasks, 1)
+		assert.Equal(t, 5, total)
+	})
+
+	t.Run("OffsetBeyondTotal", func(t *testing.T) {
+		tasks, total, err := service.ListTasksPaginated(ctx, 10, 100)
+		require.NoError(t, err)
+		assert.Empty(t, tasks)
+		assert.Equal(t, 5, total)
+	})
+
+	t.Run("LargeLimit", func(t *testing.T) {
+		tasks, total, err := service.ListTasksPaginated(ctx, 100, 0)
+		require.NoError(t, err)
+		assert.Len(t, tasks, 5)
+		assert.Equal(t, 5, total)
+	})
+
+	t.Run("OrderedByCreatedAtDesc", func(t *testing.T) {
+		tasks, _, err := service.ListTasksPaginated(ctx, 5, 0)
+		require.NoError(t, err)
+		require.Len(t, tasks, 5)
+
+		// Verify tasks are ordered by created_at descending
+		for i := 1; i < len(tasks); i++ {
+			assert.True(t, tasks[i].CreatedAt.Before(tasks[i-1].CreatedAt) || tasks[i].CreatedAt.Equal(tasks[i-1].CreatedAt),
+				"Tasks should be ordered by created_at descending")
+		}
+	})
+}
+
+// Tests for ListTasksByConnectionPaginated
+func TestTaskService_ListTasksByConnectionPaginated(t *testing.T) {
+	client := enttest.Open(t, "sqlite3", "file:ent?mode=memory&cache=shared&_fk=1")
+	defer client.Close()
+
+	service := NewTaskService(client)
+	ctx := context.Background()
+
+	// Create test connections
+	encryptor, err := crypto.NewEncryptor("test-secret-key-32-bytes-long!!")
+	require.NoError(t, err)
+	connService := NewConnectionService(client, encryptor)
+
+	conn1, err := connService.CreateConnection(ctx, "paginated-conn-1", "local", map[string]string{"type": "local"})
+	require.NoError(t, err)
+
+	conn2, err := connService.CreateConnection(ctx, "paginated-conn-2", "local", map[string]string{"type": "local"})
+	require.NoError(t, err)
+
+	// Create tasks for conn1
+	for i := 0; i < 5; i++ {
+		_, err := service.CreateTask(ctx, "Conn1 Task "+uuid.NewString()[:8], "/src", conn1.ID, "/dst", string(model.SyncDirectionBidirectional), "", false, nil)
+		require.NoError(t, err)
+		time.Sleep(time.Millisecond)
+	}
+
+	// Create tasks for conn2
+	for i := 0; i < 3; i++ {
+		_, err := service.CreateTask(ctx, "Conn2 Task "+uuid.NewString()[:8], "/src", conn2.ID, "/dst", string(model.SyncDirectionUpload), "", false, nil)
+		require.NoError(t, err)
+	}
+
+	t.Run("FiltersByConnectionID", func(t *testing.T) {
+		tasks, total, err := service.ListTasksByConnectionPaginated(ctx, conn1.ID, 10, 0)
+		require.NoError(t, err)
+		assert.Len(t, tasks, 5)
+		assert.Equal(t, 5, total)
+
+		// Verify all tasks belong to conn1
+		for _, task := range tasks {
+			assert.Equal(t, conn1.ID, task.ConnectionID)
+		}
+	})
+
+	t.Run("DifferentConnection", func(t *testing.T) {
+		tasks, total, err := service.ListTasksByConnectionPaginated(ctx, conn2.ID, 10, 0)
+		require.NoError(t, err)
+		assert.Len(t, tasks, 3)
+		assert.Equal(t, 3, total)
+
+		// Verify all tasks belong to conn2
+		for _, task := range tasks {
+			assert.Equal(t, conn2.ID, task.ConnectionID)
+		}
+	})
+
+	t.Run("Pagination", func(t *testing.T) {
+		tasks, total, err := service.ListTasksByConnectionPaginated(ctx, conn1.ID, 2, 0)
+		require.NoError(t, err)
+		assert.Len(t, tasks, 2)
+		assert.Equal(t, 5, total)
+
+		tasks2, total, err := service.ListTasksByConnectionPaginated(ctx, conn1.ID, 2, 2)
+		require.NoError(t, err)
+		assert.Len(t, tasks2, 2)
+		assert.Equal(t, 5, total)
+
+		// Verify different tasks
+		assert.NotEqual(t, tasks[0].ID, tasks2[0].ID)
+	})
+
+	t.Run("EmptyConnection", func(t *testing.T) {
+		emptyConn, err := connService.CreateConnection(ctx, "empty-paginated-conn", "local", map[string]string{"type": "local"})
+		require.NoError(t, err)
+
+		tasks, total, err := service.ListTasksByConnectionPaginated(ctx, emptyConn.ID, 10, 0)
+		require.NoError(t, err)
+		assert.Empty(t, tasks)
+		assert.Equal(t, 0, total)
+	})
+
+	t.Run("OrderedByCreatedAtDesc", func(t *testing.T) {
+		tasks, _, err := service.ListTasksByConnectionPaginated(ctx, conn1.ID, 5, 0)
+		require.NoError(t, err)
+		require.Len(t, tasks, 5)
+
+		// Verify tasks are ordered by created_at descending
+		for i := 1; i < len(tasks); i++ {
+			assert.True(t, tasks[i].CreatedAt.Before(tasks[i-1].CreatedAt) || tasks[i].CreatedAt.Equal(tasks[i-1].CreatedAt),
+				"Tasks should be ordered by created_at descending")
+		}
+	})
+}
+
+// Tests for ListJobsByTaskPaginated
+func TestTaskService_ListJobsByTaskPaginated(t *testing.T) {
+	client := enttest.Open(t, "sqlite3", "file:ent?mode=memory&cache=shared&_fk=1")
+	defer client.Close()
+
+	service := NewTaskService(client)
+	jobService := NewJobService(client)
+	ctx := context.Background()
+
+	// Create test connection
+	encryptor, err := crypto.NewEncryptor("test-secret-key-32-bytes-long!!")
+	require.NoError(t, err)
+	connService := NewConnectionService(client, encryptor)
+	testConn, err := connService.CreateConnection(ctx, "jobs-by-task-conn", "local", map[string]string{
+		"type": "local",
+	})
+	require.NoError(t, err)
+
+	// Create task
+	task, err := service.CreateTask(ctx, "Jobs By Task Test", "/src", testConn.ID, "/dst", string(model.SyncDirectionBidirectional), "", false, nil)
+	require.NoError(t, err)
+
+	// Initially no jobs
+	jobs, total, err := service.ListJobsByTaskPaginated(ctx, task.ID, 10, 0)
+	require.NoError(t, err)
+	assert.Empty(t, jobs)
+	assert.Equal(t, 0, total)
+
+	// Create multiple jobs
+	for i := 0; i < 5; i++ {
+		_, err := jobService.CreateJob(ctx, task.ID, model.JobTriggerManual)
+		require.NoError(t, err)
+		time.Sleep(time.Millisecond) // Ensure different start times
+	}
+
+	t.Run("FirstPage", func(t *testing.T) {
+		jobs, total, err := service.ListJobsByTaskPaginated(ctx, task.ID, 2, 0)
+		require.NoError(t, err)
+		assert.Len(t, jobs, 2)
+		assert.Equal(t, 5, total)
+	})
+
+	t.Run("SecondPage", func(t *testing.T) {
+		jobs, total, err := service.ListJobsByTaskPaginated(ctx, task.ID, 2, 2)
+		require.NoError(t, err)
+		assert.Len(t, jobs, 2)
+		assert.Equal(t, 5, total)
+	})
+
+	t.Run("LastPage", func(t *testing.T) {
+		jobs, total, err := service.ListJobsByTaskPaginated(ctx, task.ID, 2, 4)
+		require.NoError(t, err)
+		assert.Len(t, jobs, 1)
+		assert.Equal(t, 5, total)
+	})
+
+	t.Run("OffsetBeyondTotal", func(t *testing.T) {
+		jobs, total, err := service.ListJobsByTaskPaginated(ctx, task.ID, 10, 100)
+		require.NoError(t, err)
+		assert.Empty(t, jobs)
+		assert.Equal(t, 5, total)
+	})
+
+	t.Run("LargeLimit", func(t *testing.T) {
+		jobs, total, err := service.ListJobsByTaskPaginated(ctx, task.ID, 100, 0)
+		require.NoError(t, err)
+		assert.Len(t, jobs, 5)
+		assert.Equal(t, 5, total)
+	})
+
+	t.Run("OrderedByStartTimeDesc", func(t *testing.T) {
+		jobs, _, err := service.ListJobsByTaskPaginated(ctx, task.ID, 5, 0)
+		require.NoError(t, err)
+		require.Len(t, jobs, 5)
+
+		// Verify jobs are ordered by start_time descending
+		for i := 1; i < len(jobs); i++ {
+			assert.True(t, jobs[i].StartTime.Before(jobs[i-1].StartTime) || jobs[i].StartTime.Equal(jobs[i-1].StartTime),
+				"Jobs should be ordered by start_time descending")
+		}
+	})
+
+	t.Run("DifferentTask", func(t *testing.T) {
+		// Create another task with different jobs
+		task2, err := service.CreateTask(ctx, "Jobs By Task Test 2", "/src2", testConn.ID, "/dst2", string(model.SyncDirectionUpload), "", false, nil)
+		require.NoError(t, err)
+
+		for i := 0; i < 3; i++ {
+			_, err := jobService.CreateJob(ctx, task2.ID, model.JobTriggerSchedule)
+			require.NoError(t, err)
+		}
+
+		// Verify jobs are filtered by task
+		jobs1, total1, err := service.ListJobsByTaskPaginated(ctx, task.ID, 10, 0)
+		require.NoError(t, err)
+		assert.Len(t, jobs1, 5)
+		assert.Equal(t, 5, total1)
+
+		jobs2, total2, err := service.ListJobsByTaskPaginated(ctx, task2.ID, 10, 0)
+		require.NoError(t, err)
+		assert.Len(t, jobs2, 3)
+		assert.Equal(t, 3, total2)
+
+		// Verify no overlap
+		for _, j1 := range jobs1 {
+			for _, j2 := range jobs2 {
+				assert.NotEqual(t, j1.ID, j2.ID)
+			}
+		}
 	})
 }

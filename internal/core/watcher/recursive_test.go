@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 )
 
@@ -42,7 +43,7 @@ func TestRecursiveWatcher_RecursiveAdd(t *testing.T) {
 	mockTaskSvc.On("GetTaskWithConnection", mock.Anything, task.ID).Return(task, nil)
 	mockTaskSvc.On("ListAllTasks", mock.Anything).Return([]*ent.Task{}, nil) // Add this line
 	// Expect StartTask to be called when we touch a file deep inside
-	mockRunner.On("StartTask", task, "realtime").Return(nil)
+	mockRunner.On("StartTask", task, model.JobTriggerRealtime).Return(nil)
 
 	w, err := NewWatcher(mockTaskSvc, mockRunner)
 	assert.NoError(t, err)
@@ -63,7 +64,7 @@ func TestRecursiveWatcher_RecursiveAdd(t *testing.T) {
 	// Wait for debounce (2.2s to be safe)
 	time.Sleep(2500 * time.Millisecond)
 
-	mockRunner.AssertCalled(t, "StartTask", task, "realtime")
+	mockRunner.AssertCalled(t, "StartTask", task, model.JobTriggerRealtime)
 }
 
 func TestRecursiveWatcher_DynamicAdd(t *testing.T) {
@@ -82,7 +83,7 @@ func TestRecursiveWatcher_DynamicAdd(t *testing.T) {
 
 	mockTaskSvc.On("GetTaskWithConnection", mock.Anything, task.ID).Return(task, nil)
 	mockTaskSvc.On("ListAllTasks", mock.Anything).Return([]*ent.Task{}, nil) // Add this line
-	mockRunner.On("StartTask", task, "realtime").Return(nil)
+	mockRunner.On("StartTask", task, model.JobTriggerRealtime).Return(nil)
 
 	w, err := NewWatcher(mockTaskSvc, mockRunner)
 	assert.NoError(t, err)
@@ -110,12 +111,8 @@ func TestRecursiveWatcher_DynamicAdd(t *testing.T) {
 	// Wait for debounce
 	time.Sleep(2500 * time.Millisecond)
 
-	// We expect 2 calls? Maybe one for mkdir and one for writefile if debounce didn't catch both?
-	// But debounce resets timer, so if events happen within 2s, only one trigger.
-	// The mkdir happened, then 500ms wait, then file write. Total time < 2s.
-	// Actually Wait 500ms is < 2s debounce. So timer is just reset.
-	// It should trigger ONCE after the file write + 2s.
-	mockRunner.AssertCalled(t, "StartTask", task, "realtime")
+	// Same here
+	mockRunner.AssertCalled(t, "StartTask", task, model.JobTriggerRealtime)
 }
 
 func TestRecursiveWatcher_RefCount(t *testing.T) {

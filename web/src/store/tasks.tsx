@@ -1,13 +1,20 @@
+import { client, onWsReconnect } from '@/api/graphql/client';
+import { JOB_PROGRESS_SUBSCRIPTION } from '@/api/graphql/queries/subscriptions';
+import {
+  TaskCreateMutation,
+  TaskDeleteMutation,
+  TaskRunMutation,
+  TaskUpdateMutation,
+  TasksListQuery,
+} from '@/api/graphql/queries/tasks';
+import type { CreateTaskInput, StatusType, TaskListItem, UpdateTaskInput } from '@/lib/types';
 import * as m from '@/paraglide/messages.js';
-import { createTask, deleteTask, getTasks, runTask, updateTask } from '@/api/tasks';
-import { extractErrorMessage } from '@/lib/api';
-import { SSEClient } from '@/lib/sse';
-import { JobProgressEvent, Task, TaskStatus } from '@/lib/types';
-import { ParentComponent, createContext, onCleanup, useContext } from 'solid-js';
+import { createSubscription } from '@urql/solid';
+import { ParentComponent, createContext, createEffect, useContext } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
 
 interface TaskState {
-  tasks: Task[];
+  tasks: TaskListItem[];
   isLoading: boolean;
   error: unknown | null;
 }
@@ -20,11 +27,10 @@ const initialState: TaskState = {
 
 interface TaskActions {
   loadTasks: (connectionId?: string) => Promise<void>;
-  startGlobalSseSubscription: () => void;
-  getTaskStatus: (connectionId?: string) => TaskStatus;
+  getTaskStatus: (connectionId?: string) => StatusType;
   runTask: (id: string) => Promise<void>;
-  createTask: (task: Omit<Task, 'id' | 'edges'>) => Promise<void>;
-  updateTask: (id: string, updates: Partial<Task>) => Promise<void>;
+  createTask: (input: CreateTaskInput) => Promise<void>;
+  updateTask: (id: string, input: UpdateTaskInput) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
 }
 
@@ -32,33 +38,68 @@ const TaskContext = createContext<[TaskState, TaskActions]>();
 
 export const TaskProvider: ParentComponent = (props) => {
   const [state, setState] = createStore<TaskState>(initialState);
-  let sseClient: ReturnType<SSEClient['connect']> | null = null;
+
+  // GraphQL subscription for job progress using @urql/solid
+  const [subscriptionResult] = createSubscription({
+    query: JOB_PROGRESS_SUBSCRIPTION,
+    variables: {},
+  });
+
+  // Handle subscription data updates
+  createEffect(() => {
+    const data = subscriptionResult.data?.jobProgress;
+    if (!data) return;
+
+    setState(
+      produce((s) => {
+        const taskIndex = s.tasks.findIndex((t) => t.id === data.taskId);
+        if (taskIndex !== -1) {
+          const task = s.tasks[taskIndex];
+          // Update the task's latest job with subscription data
+          task.latestJob = {
+            id: data.jobId,
+            status: data.status,
+            startTime: data.startTime,
+            endTime: data.endTime,
+            filesTransferred: data.filesTransferred,
+            bytesTransferred: data.bytesTransferred,
+          };
+          console.info('Updated task from GraphQL subscription:', task.id);
+        }
+      })
+    );
+  });
 
   const actions: TaskActions = {
-    loadTasks: async (connectionId?: string) => {
+    loadTasks: async (_connectionId?: string) => {
       setState('isLoading', true);
       try {
-        const newTasks = await getTasks(connectionId ? { connection_id: connectionId } : undefined);
+        const result = await client.query(
+          TasksListQuery,
+          { pagination: { limit: 1000, offset: 0 } },
+          { requestPolicy: 'network-only' }
+        );
 
-        // Merge strategy: preserve SSE real-time updated jobs data
+        if (result.error) {
+          throw new Error(result.error.message);
+        }
+
+        const items = result.data?.task?.list?.items ?? [];
+
+        // Update tasks with new data, preserving subscription updates if more recent
         setState('tasks', (oldTasks) => {
-          // Create a map of id -> task to preserve old data
           const taskMap = new Map(oldTasks.map((t) => [t.id, t]));
 
-          // Merge new tasks
-          newTasks.forEach((newTask) => {
+          items.forEach((newTask) => {
             const oldTask = taskMap.get(newTask.id);
-            if (oldTask && oldTask.edges?.jobs && oldTask.edges.jobs.length > 0) {
-              // If task exists with jobs data, merge and preserve old jobs
+            if (oldTask?.latestJob?.id === newTask.latestJob?.id && oldTask?.latestJob) {
+              // Same job - preserve subscription data (more real-time)
               taskMap.set(newTask.id, {
                 ...newTask,
-                edges: {
-                  ...newTask.edges,
-                  jobs: oldTask.edges.jobs,
-                },
+                latestJob: oldTask.latestJob,
               });
             } else {
-              // New task or no jobs data, use new data
+              // New job or no existing data - use query data
               taskMap.set(newTask.id, newTask);
             }
           });
@@ -75,101 +116,99 @@ export const TaskProvider: ParentComponent = (props) => {
       }
     },
 
-    startGlobalSseSubscription: () => {
-      if (sseClient) {
-        sseClient.close();
-      }
-
-      // Use the global SSE endpoint
-      const client = new SSEClient('/api/events?event=job_progress');
-      sseClient = client.connect();
-
-      sseClient.on('job_progress', (data: JobProgressEvent) => {
-        if (!data || !data.task_id) return;
-
-        setState(
-          produce((s) => {
-            const taskIndex = s.tasks.findIndex((t) => t.id === data.task_id);
-            if (taskIndex !== -1) {
-              const task = s.tasks[taskIndex];
-              if (!task.edges) {
-                task.edges = {};
-              }
-              task.edges.jobs ??= [];
-
-              const jobIndex = task.edges.jobs.findIndex((j) => j.id === data.id);
-              if (jobIndex !== -1) {
-                // Update existing job
-                task.edges.jobs[jobIndex] = { ...task.edges.jobs[jobIndex], ...data };
-              } else {
-                // Add new job
-                task.edges.jobs.unshift(data);
-              }
-              s.tasks = [...s.tasks];
-              console.info('Updated task from global SSE:', task);
-            }
-          })
-        );
-      });
-    },
-
-    getTaskStatus: (connectionId?: string): TaskStatus => {
+    getTaskStatus: (connectionId?: string): StatusType => {
       const relevantTasks = connectionId
-        ? state.tasks.filter((t) => t.connection_id === connectionId)
+        ? state.tasks.filter((t) => t.connection?.id === connectionId)
         : state.tasks;
 
-      if (relevantTasks.length === 0) return 'idle';
+      if (relevantTasks.length === 0) return 'IDLE';
 
-      const getStatus = (task: Task) => task.edges?.jobs?.[0]?.status;
+      const getStatus = (task: TaskListItem) => task.latestJob?.status;
 
-      const isRunning = (s?: string) => s && ['running', 'processing', 'queued'].includes(s);
-      const isFailed = (s?: string) => s && ['failed', 'error'].includes(s);
-      const isSuccess = (s?: string) => s && ['success', 'finished', 'done'].includes(s);
+      // GraphQL returns uppercase enum values: PENDING, RUNNING, SUCCESS, FAILED, CANCELLED
+      const isRunning = (s?: string) => s && ['RUNNING', 'PENDING'].includes(s);
+      const isFailed = (s?: string) => s && ['FAILED'].includes(s);
+      const isSuccess = (s?: string) => s && ['SUCCESS'].includes(s);
 
-      if (relevantTasks.some((t) => isRunning(getStatus(t)))) return 'running';
-      if (relevantTasks.some((t) => isFailed(getStatus(t)))) return 'failed';
-      if (relevantTasks.every((t) => isSuccess(getStatus(t)))) return 'success';
+      if (relevantTasks.some((t) => isRunning(getStatus(t)))) return 'RUNNING';
+      if (relevantTasks.some((t) => isFailed(getStatus(t)))) return 'FAILED';
+      if (relevantTasks.every((t) => isSuccess(getStatus(t)))) return 'SUCCESS';
 
-      return 'idle';
+      return 'IDLE';
     },
 
     runTask: async (id: string) => {
       try {
-        await runTask(id);
-        // The SSE event will update the task status
+        const result = await client.mutation(TaskRunMutation, { taskId: id });
+        if (result.error) {
+          throw new Error(result.error.message);
+        }
+
+        // Update local state with the new job
+        const job = result.data?.task?.run;
+        if (job) {
+          setState(
+            produce((s) => {
+              const taskIndex = s.tasks.findIndex((t) => t.id === id);
+              if (taskIndex !== -1) {
+                s.tasks[taskIndex].latestJob = {
+                  id: job.id,
+                  status: job.status,
+                  startTime: job.startTime,
+                  endTime: null,
+                  filesTransferred: 0,
+                  bytesTransferred: 0,
+                };
+              }
+            })
+          );
+        }
       } catch (err) {
         console.error('Failed to run task:', err);
         throw err;
       }
     },
 
-    createTask: async (task: Omit<Task, 'id' | 'edges'>) => {
+    createTask: async (input) => {
       try {
-        const newTask = await createTask(task);
-        setState('tasks', (tasks) => [...tasks, newTask]);
+        const result = await client.mutation(TaskCreateMutation, { input });
+
+        if (result.error) {
+          throw new Error(result.error.message);
+        }
+
+        // Reload tasks to get the full task data with connection
+        await actions.loadTasks();
       } catch (err: unknown) {
         console.error('Failed to create task:', err);
-        // Use ApiError if available, otherwise extract from error
-        const errorMessage = extractErrorMessage(err) ?? m.error_unknownError();
+        const errorMessage = err instanceof Error ? err.message : m.error_unknownError();
         throw new Error(errorMessage);
       }
     },
 
-    updateTask: async (id: string, updates: Partial<Task>) => {
+    updateTask: async (id: string, input) => {
       try {
-        const updatedTask = await updateTask(id, updates);
-        setState('tasks', (tasks) => tasks.map((t) => (t.id === id ? updatedTask : t)));
+        const result = await client.mutation(TaskUpdateMutation, { id, input });
+
+        if (result.error) {
+          throw new Error(result.error.message);
+        }
+
+        // Reload tasks to get the updated data with connection
+        await actions.loadTasks();
       } catch (err: unknown) {
         console.error('Failed to update task:', err);
-        // Use ApiError if available, otherwise extract from error
-        const errorMessage = extractErrorMessage(err) ?? m.error_unknownError();
+        const errorMessage = err instanceof Error ? err.message : m.error_unknownError();
         throw new Error(errorMessage);
       }
     },
 
     deleteTask: async (id: string) => {
       try {
-        await deleteTask(id);
+        const result = await client.mutation(TaskDeleteMutation, { id });
+        if (result.error) {
+          throw new Error(result.error.message);
+        }
         setState('tasks', (t) => t.filter((task) => task.id !== id));
       } catch (err) {
         console.error('Failed to delete task:', err);
@@ -177,11 +216,12 @@ export const TaskProvider: ParentComponent = (props) => {
     },
   };
 
-  onCleanup(() => {
-    if (sseClient) {
-      sseClient.close();
-      sseClient = null;
-    }
+  // Listen for WebSocket reconnection events to reload tasks
+  onWsReconnect(() => {
+    console.info('WebSocket reconnected, reloading tasks...');
+    // Clear old tasks first to avoid stale subscription data being preserved
+    setState('tasks', []);
+    actions.loadTasks();
   });
 
   return <TaskContext.Provider value={[state, actions]}>{props.children}</TaskContext.Provider>;

@@ -3,6 +3,8 @@ package schema
 import (
 	"time"
 
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
+
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
@@ -20,11 +22,12 @@ func (Job) Fields() []ent.Field {
 	return []ent.Field{
 		field.UUID("id", uuid.UUID{}).
 			Default(uuid.New),
+		field.UUID("task_id", uuid.UUID{}),
 		field.Enum("status").
-			Values("pending", "running", "success", "failed", "cancelled").
-			Default("pending"),
+			GoType(model.JobStatus("")).
+			Default(string(model.JobStatusPending)),
 		field.Enum("trigger").
-			Values("manual", "schedule", "realtime"),
+			GoType(model.JobTrigger("")),
 		field.Time("start_time").
 			Default(time.Now),
 		field.Time("end_time").
@@ -44,7 +47,8 @@ func (Job) Edges() []ent.Edge {
 		edge.From("task", Task.Type).
 			Ref("jobs").
 			Unique().
-			Required(),
+			Required().
+			Field("task_id"),
 		edge.To("logs", JobLog.Type).
 			Annotations(entsql.OnDelete(entsql.Cascade)),
 	}

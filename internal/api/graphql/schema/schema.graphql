@@ -1,0 +1,118 @@
+# GraphQL Schema: Rclone Cloud Sync Manager
+# Feature Branch: 007-graphql-migration
+# Date: 2025-12-20
+
+# Schema 设计采用命名空间模式，按实体拆分 Query 和 Mutation
+# 各模块使用 extend 来扩展根类型
+
+# =============================================================================
+# DIRECTIVES (gqlgen built-in)
+# =============================================================================
+
+directive @goField(
+	forceResolver: Boolean
+	name: String
+	omittable: Boolean
+) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
+
+directive @goModel(
+	model: String
+	models: [String!]
+) on OBJECT | INPUT_OBJECT | SCALAR | ENUM | INTERFACE | UNION
+
+directive @goEnum(
+	value: String
+) on ENUM_VALUE
+
+directive @goTag(
+	key: String!
+	value: String!
+) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
+
+directive @goExtraField(
+	name: String!
+	type: String!
+	overrideTags: String
+	description: String
+) repeatable on OBJECT | INPUT_OBJECT
+
+# =============================================================================
+# SCALARS
+# =============================================================================
+
+"""
+ISO 8601 日期时间格式
+"""
+scalar DateTime
+
+"""
+任意 JSON 对象
+"""
+scalar JSON
+
+"""
+64位整数（用于字节数等大数值）
+"""
+scalar BigInt
+
+"""
+字符串键值对（map[string]string）
+用于 rclone 配置参数，所有值必须为字符串
+"""
+scalar StringMap
+
+# =============================================================================
+# PAGINATION TYPES
+# =============================================================================
+
+"""
+分页输入
+"""
+input PaginationInput {
+	"""
+	每页数量（默认 20）
+	"""
+	limit: Int = 20
+	"""
+	偏移量（默认 0）
+	"""
+	offset: Int = 0
+}
+
+"""
+偏移量分页信息
+"""
+type OffsetPageInfo {
+	"""
+	当前页大小
+	"""
+	limit: Int!
+	"""
+	当前偏移量
+	"""
+	offset: Int!
+	"""
+	是否有下一页
+	"""
+	hasNextPage: Boolean!
+	"""
+	是否有上一页
+	"""
+	hasPreviousPage: Boolean!
+}
+
+# =============================================================================
+# ROOT TYPES (空实现，由各模块 extend 扩展)
+# =============================================================================
+
+type Query
+
+type Mutation
+
+type Subscription
+
+schema {
+	query: Query
+	mutation: Mutation
+	subscription: Subscription
+}

@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/task"
 )
@@ -19,10 +20,12 @@ type Job struct {
 	config `json:"-"`
 	// ID of the ent.
 	ID uuid.UUID `json:"id,omitempty"`
+	// TaskID holds the value of the "task_id" field.
+	TaskID uuid.UUID `json:"task_id,omitempty"`
 	// Status holds the value of the "status" field.
-	Status job.Status `json:"status,omitempty"`
+	Status model.JobStatus `json:"status,omitempty"`
 	// Trigger holds the value of the "trigger" field.
-	Trigger job.Trigger `json:"trigger,omitempty"`
+	Trigger model.JobTrigger `json:"trigger,omitempty"`
 	// StartTime holds the value of the "start_time" field.
 	StartTime time.Time `json:"start_time,omitempty"`
 	// EndTime holds the value of the "end_time" field.
@@ -36,7 +39,6 @@ type Job struct {
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the JobQuery when eager-loading is set.
 	Edges        JobEdges `json:"edges"`
-	task_jobs    *uuid.UUID
 	selectValues sql.SelectValues
 }
 
@@ -82,10 +84,8 @@ func (*Job) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullString)
 		case job.FieldStartTime, job.FieldEndTime:
 			values[i] = new(sql.NullTime)
-		case job.FieldID:
+		case job.FieldID, job.FieldTaskID:
 			values[i] = new(uuid.UUID)
-		case job.ForeignKeys[0]: // task_jobs
-			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		default:
 			values[i] = new(sql.UnknownType)
 		}
@@ -107,17 +107,23 @@ func (_m *Job) assignValues(columns []string, values []any) error {
 			} else if value != nil {
 				_m.ID = *value
 			}
+		case job.FieldTaskID:
+			if value, ok := values[i].(*uuid.UUID); !ok {
+				return fmt.Errorf("unexpected type %T for field task_id", values[i])
+			} else if value != nil {
+				_m.TaskID = *value
+			}
 		case job.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
 			} else if value.Valid {
-				_m.Status = job.Status(value.String)
+				_m.Status = model.JobStatus(value.String)
 			}
 		case job.FieldTrigger:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field trigger", values[i])
 			} else if value.Valid {
-				_m.Trigger = job.Trigger(value.String)
+				_m.Trigger = model.JobTrigger(value.String)
 			}
 		case job.FieldStartTime:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -148,13 +154,6 @@ func (_m *Job) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field errors", values[i])
 			} else if value.Valid {
 				_m.Errors = value.String
-			}
-		case job.ForeignKeys[0]:
-			if value, ok := values[i].(*sql.NullScanner); !ok {
-				return fmt.Errorf("unexpected type %T for field task_jobs", values[i])
-			} else if value.Valid {
-				_m.task_jobs = new(uuid.UUID)
-				*_m.task_jobs = *value.S.(*uuid.UUID)
 			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
@@ -202,6 +201,9 @@ func (_m *Job) String() string {
 	var builder strings.Builder
 	builder.WriteString("Job(")
 	builder.WriteString(fmt.Sprintf("id=%v, ", _m.ID))
+	builder.WriteString("task_id=")
+	builder.WriteString(fmt.Sprintf("%v", _m.TaskID))
+	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Status))
 	builder.WriteString(", ")

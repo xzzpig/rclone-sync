@@ -9,6 +9,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 )
 
 const (
@@ -48,7 +49,7 @@ const (
 	// It exists in this package in order to avoid circular dependency with the "job" package.
 	JobsInverseTable = "jobs"
 	// JobsColumn is the table column denoting the jobs relation/edge.
-	JobsColumn = "task_jobs"
+	JobsColumn = "task_id"
 	// ConnectionTable is the table that holds the connection relation/edge.
 	ConnectionTable = "tasks"
 	// ConnectionInverseTable is the table name for the Connection entity.
@@ -102,27 +103,12 @@ var (
 	DefaultID func() uuid.UUID
 )
 
-// Direction defines the type for the "direction" enum field.
-type Direction string
-
-// DirectionBidirectional is the default value of the Direction enum.
-const DefaultDirection = DirectionBidirectional
-
-// Direction values.
-const (
-	DirectionUpload        Direction = "upload"
-	DirectionDownload      Direction = "download"
-	DirectionBidirectional Direction = "bidirectional"
-)
-
-func (d Direction) String() string {
-	return string(d)
-}
+const DefaultDirection model.SyncDirection = "BIDIRECTIONAL"
 
 // DirectionValidator is a validator for the "direction" field enum values. It is called by the builders before save.
-func DirectionValidator(d Direction) error {
-	switch d {
-	case DirectionUpload, DirectionDownload, DirectionBidirectional:
+func DirectionValidator(d model.SyncDirection) error {
+	switch d.String() {
+	case "UPLOAD", "DOWNLOAD", "BIDIRECTIONAL":
 		return nil
 	default:
 		return fmt.Errorf("task: invalid enum value for direction field: %q", d)

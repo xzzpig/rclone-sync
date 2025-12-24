@@ -1,0 +1,1214 @@
+# GraphQL Schema: Rclone Cloud Sync Manager
+# Feature Branch: 007-graphql-migration
+# Date: 2025-12-20
+
+# Schema 设计采用命名空间模式，按实体拆分 Query 和 Mutation
+
+# =============================================================================
+# DIRECTIVES (gqlgen built-in)
+# =============================================================================
+
+directive @goField(
+    forceResolver: Boolean
+    name: String
+    omittable: Boolean
+) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
+
+directive @goModel(
+    model: String
+    models: [String!]
+) on OBJECT | INPUT_OBJECT | SCALAR | ENUM | INTERFACE | UNION
+
+directive @goEnum(
+    value: String
+) on ENUM_VALUE
+
+directive @goTag(
+    key: String!
+    value: String!
+) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
+
+directive @goExtraField(
+    name: String!
+    type: String!
+    overrideTags: String
+    description: String
+) repeatable on OBJECT | INPUT_OBJECT
+
+# =============================================================================
+# SCALARS
+# =============================================================================
+
+"""
+ISO 8601 日期时间格式
+"""
+scalar DateTime
+
+"""
+任意 JSON 对象
+"""
+scalar JSON
+
+"""
+64位整数（用于字节数等大数值）
+"""
+scalar BigInt
+
+"""
+字符串键值对（map[string]string）
+用于 rclone 配置参数，所有值必须为字符串
+"""
+scalar StringMap
+
+# =============================================================================
+# ENUMS
+# =============================================================================
+
+"""
+同步方向
+"""
+enum SyncDirection {
+    """
+    本地上传到远程
+    """
+    UPLOAD
+    """
+    远程下载到本地
+    """
+    DOWNLOAD
+    """
+    双向同步
+    """
+    BIDIRECTIONAL
+}
+
+"""
+作业执行状态
+"""
+enum JobStatus {
+    """
+    等待执行
+    """
+    PENDING
+    """
+    执行中
+    """
+    RUNNING
+    """
+    成功完成
+    """
+    SUCCESS
+    """
+    执行失败
+    """
+    FAILED
+    """
+    已取消
+    """
+    CANCELLED
+}
+
+"""
+作业触发方式
+"""
+enum JobTrigger {
+    """
+    手动触发
+    """
+    MANUAL
+    """
+    定时触发
+    """
+    SCHEDULE
+    """
+    实时触发（文件变更）
+    """
+    REALTIME
+}
+
+"""
+日志级别
+"""
+enum LogLevel {
+    INFO
+    WARNING
+    ERROR
+}
+
+"""
+日志操作类型
+"""
+enum LogAction {
+    """
+    上传文件
+    """
+    UPLOAD
+    """
+    下载文件
+    """
+    DOWNLOAD
+    """
+    删除文件
+    """
+    DELETE
+    """
+    移动文件
+    """
+    MOVE
+    """
+    错误
+    """
+    ERROR
+    """
+    未知操作
+    """
+    UNKNOWN
+}
+
+"""
+连接加载状态
+"""
+enum ConnectionLoadStatus {
+    """
+    已加载
+    """
+    LOADED
+    """
+    加载中
+    """
+    LOADING
+    """
+    加载失败
+    """
+    ERROR
+}
+
+"""
+冲突解决策略（仅用于双向同步）
+"""
+enum ConflictResolution {
+    """
+    保留较新文件，重命名较旧文件
+    """
+    NEWER
+    """
+    保留本地文件，删除远程
+    """
+    LOCAL
+    """
+    保留远程文件，删除本地
+    """
+    REMOTE
+    """
+    保留两者，添加冲突后缀
+    """
+    BOTH
+}
+
+# =============================================================================
+# CORE TYPES
+# =============================================================================
+
+"""
+任务同步选项
+"""
+type TaskSyncOptions {
+    """
+    冲突解决策略（默认 NEWER，仅用于双向同步）
+    """
+    conflictResolution: ConflictResolution
+}
+
+"""
+同步任务
+"""
+type Task @goExtraField(name: "ConnectionID", type: "github.com/google/uuid.UUID") {
+    """
+    UUID 主键
+    """
+    id: ID!
+    """
+    任务名称
+    """
+    name: String!
+    """
+    本地源路径
+    """
+    sourcePath: String!
+    """
+    远程目标路径
+    """
+    remotePath: String!
+    """
+    同步方向
+    """
+    direction: SyncDirection!
+    """
+    Cron 调度表达式
+    """
+    schedule: String
+    """
+    是否启用实时同步
+    """
+    realtime: Boolean!
+    """
+    同步选项（JSON → 类型转换）
+    """
+    options: TaskSyncOptions @goField(forceResolver: true)
+    """
+    创建时间
+    """
+    createdAt: DateTime!
+    """
+    更新时间
+    """
+    updatedAt: DateTime!
+    """
+    关联的远程连接（ent edge）
+    """
+    connection: Connection! @goField(forceResolver: true)
+    """
+    作业历史（分页查询）
+    """
+    jobs(pagination: PaginationInput): JobConnection! @goField(forceResolver: true)
+    """
+    最近一次作业（计算字段）
+    """
+    latestJob: Job @goField(forceResolver: true)
+}
+
+"""
+远程存储连接
+"""
+type Connection {
+    """
+    UUID 主键
+    """
+    id: ID!
+    """
+    连接名称（系统唯一）
+    """
+    name: String!
+    """
+    提供者类型（如 onedrive, s3, drive）
+    """
+    type: String!
+    """
+    配置参数（解密后，需要解密处理）
+    """
+    config: StringMap! @goField(forceResolver: true)
+    """
+    加载状态（运行时状态）
+    """
+    loadStatus: ConnectionLoadStatus! @goField(forceResolver: true)
+    """
+    加载错误信息（运行时状态，仅当 loadStatus 为 ERROR 时有值）
+    """
+    loadError: String @goField(forceResolver: true)
+    """
+    创建时间
+    """
+    createdAt: DateTime!
+    """
+    更新时间
+    """
+    updatedAt: DateTime!
+    """
+    使用此连接的任务（分页查询）
+    """
+    tasks(pagination: PaginationInput): TaskConnection! @goField(forceResolver: true)
+    """
+    配额信息（调用 rclone about API）
+    """
+    quota: ConnectionQuota @goField(forceResolver: true)
+}
+
+"""
+连接配额信息
+"""
+type ConnectionQuota {
+    """
+    总空间（字节）
+    """
+    total: BigInt!
+    """
+    已使用空间（字节）
+    """
+    used: BigInt!
+    """
+    可用空间（字节）
+    """
+    free: BigInt!
+}
+
+"""
+作业执行记录
+"""
+type Job @goExtraField(name: "TaskID", type: "github.com/google/uuid.UUID") {
+    """
+    UUID 主键
+    """
+    id: ID!
+    """
+    执行状态
+    """
+    status: JobStatus!
+    """
+    触发方式
+    """
+    trigger: JobTrigger!
+    """
+    开始时间
+    """
+    startTime: DateTime!
+    """
+    结束时间
+    """
+    endTime: DateTime
+    """
+    已传输文件数
+    """
+    filesTransferred: Int!
+    """
+    已传输字节数
+    """
+    bytesTransferred: BigInt!
+    """
+    错误信息
+    """
+    errors: String
+    """
+    关联的任务（ent edge）
+    """
+    task: Task! @goField(forceResolver: true)
+    """
+    执行日志（分页查询）
+    """
+    logs(pagination: PaginationInput): JobLogConnection! @goField(forceResolver: true)
+}
+
+"""
+作业日志条目
+"""
+type JobLog @goExtraField(name: "JobID", type: "github.com/google/uuid.UUID") {
+    """
+    自增主键
+    """
+    id: Int!
+    """
+    日志级别
+    """
+    level: LogLevel!
+    """
+    日志时间
+    """
+    time: DateTime!
+    """
+    文件路径
+    """
+    path: String!
+    """
+    操作类型
+    """
+    what: LogAction!
+    """
+    文件大小（字节）
+    """
+    size: BigInt!
+    """
+    关联的作业（ent edge）
+    """
+    job: Job! @goField(forceResolver: true)
+}
+
+"""
+存储提供者
+"""
+type Provider {
+    """
+    提供者名称（如 onedrive, s3）
+    """
+    name: String!
+    """
+    描述
+    """
+    description: String!
+    """
+    前缀标识
+    """
+    prefix: String!
+    """
+    配置选项列表
+    """
+    options: [ProviderOption!]!
+}
+
+"""
+提供者配置选项
+"""
+type ProviderOption {
+    """
+    选项名称
+    """
+    name: String!
+    """
+    帮助文本
+    """
+    help: String!
+    """
+    是否必填
+    """
+    required: Boolean!
+    """
+    是否密码字段
+    """
+    isPassword: Boolean!
+    """
+    默认值
+    """
+    default: String
+    """
+    示例值列表
+    """
+    examples: [OptionExample!]
+    """
+    是否高级选项
+    """
+    advanced: Boolean!
+    """
+    选项分组
+    """
+    groups: String
+    """
+    是否独占选择（使用下拉框而非输入框）
+    """
+    exclusive: Boolean!
+    """
+    选项数据类型
+    """
+    type: String!
+}
+
+"""
+选项示例
+"""
+type OptionExample {
+    """
+    示例值
+    """
+    value: String!
+    """
+    帮助说明
+    """
+    help: String
+}
+
+"""
+文件/目录条目
+"""
+type FileEntry {
+    """
+    文件名
+    """
+    name: String!
+    """
+    完整路径
+    """
+    path: String!
+    """
+    是否为目录
+    """
+    isDir: Boolean!
+}
+
+# =============================================================================
+# PAGINATION TYPES
+# =============================================================================
+
+"""
+分页输入
+"""
+input PaginationInput {
+    """
+    每页数量（默认 20）
+    """
+    limit: Int = 20
+    """
+    偏移量（默认 0）
+    """
+    offset: Int = 0
+}
+
+"""
+偏移量分页信息
+"""
+type OffsetPageInfo {
+    """
+    当前页大小
+    """
+    limit: Int!
+    """
+    当前偏移量
+    """
+    offset: Int!
+    """
+    是否有下一页
+    """
+    hasNextPage: Boolean!
+    """
+    是否有上一页
+    """
+    hasPreviousPage: Boolean!
+}
+
+"""
+任务分页连接
+"""
+type TaskConnection {
+    """
+    任务列表
+    """
+    items: [Task!]!
+    """
+    总数
+    """
+    totalCount: Int!
+    """
+    分页信息
+    """
+    pageInfo: OffsetPageInfo!
+}
+
+"""
+连接分页连接
+"""
+type ConnectionConnection {
+    """
+    连接列表
+    """
+    items: [Connection!]!
+    """
+    总数
+    """
+    totalCount: Int!
+    """
+    分页信息
+    """
+    pageInfo: OffsetPageInfo!
+}
+
+"""
+作业分页连接
+"""
+type JobConnection {
+    """
+    作业列表
+    """
+    items: [Job!]!
+    """
+    总数
+    """
+    totalCount: Int!
+    """
+    分页信息
+    """
+    pageInfo: OffsetPageInfo!
+}
+
+"""
+日志分页连接
+"""
+type JobLogConnection {
+    """
+    日志列表
+    """
+    items: [JobLog!]!
+    """
+    总数
+    """
+    totalCount: Int!
+    """
+    分页信息
+    """
+    pageInfo: OffsetPageInfo!
+}
+
+# =============================================================================
+# INPUT TYPES
+# =============================================================================
+
+"""
+任务同步选项输入
+"""
+input TaskSyncOptionsInput {
+    """
+    冲突解决策略（默认 NEWER，仅用于双向同步）
+    """
+    conflictResolution: ConflictResolution
+}
+
+"""
+创建任务输入
+"""
+input CreateTaskInput {
+    """
+    任务名称
+    """
+    name: String!
+    """
+    本地源路径
+    """
+    sourcePath: String!
+    """
+    关联连接 ID
+    """
+    connectionId: ID!
+    """
+    远程目标路径
+    """
+    remotePath: String!
+    """
+    同步方向
+    """
+    direction: SyncDirection!
+    """
+    Cron 调度表达式
+    """
+    schedule: String
+    """
+    是否启用实时同步
+    """
+    realtime: Boolean = false
+    """
+    同步选项
+    """
+    options: TaskSyncOptionsInput
+}
+
+"""
+更新任务输入
+"""
+input UpdateTaskInput {
+    """
+    任务名称
+    """
+    name: String
+    """
+    本地源路径
+    """
+    sourcePath: String
+    """
+    关联连接 ID
+    """
+    connectionId: ID
+    """
+    远程目标路径
+    """
+    remotePath: String
+    """
+    同步方向
+    """
+    direction: SyncDirection
+    """
+    Cron 调度表达式
+    """
+    schedule: String
+    """
+    是否启用实时同步
+    """
+    realtime: Boolean
+    """
+    同步选项
+    """
+    options: TaskSyncOptionsInput
+}
+
+"""
+创建连接输入
+"""
+input CreateConnectionInput {
+    """
+    连接名称
+    """
+    name: String!
+    """
+    提供者类型
+    """
+    type: String!
+    """
+    配置参数
+    """
+    config: StringMap!
+}
+
+"""
+更新连接输入
+"""
+input UpdateConnectionInput {
+    """
+    连接名称
+    """
+    name: String
+    """
+    配置参数
+    """
+    config: StringMap
+}
+
+"""
+测试连接输入（未保存的配置）
+"""
+input TestConnectionInput {
+    """
+    提供者类型
+    """
+    type: String!
+    """
+    配置参数
+    """
+    config: StringMap!
+}
+
+"""
+导入解析输入
+"""
+input ImportParseInput {
+    """
+    rclone 配置文件内容
+    """
+    content: String!
+}
+
+"""
+导入执行输入
+"""
+input ImportExecuteInput {
+    """
+    要导入的连接列表
+    """
+    connections: [ImportConnectionInput!]!
+}
+
+"""
+导入连接输入
+"""
+input ImportConnectionInput {
+    """
+    连接名称
+    """
+    name: String!
+    """
+    提供者类型
+    """
+    type: String!
+    """
+    配置参数
+    """
+    config: StringMap!
+}
+
+# =============================================================================
+# RESULT TYPES
+# =============================================================================
+
+"""
+连接测试成功
+"""
+type ConnectionTestSuccess {
+    """
+    成功消息（已本地化）
+    """
+    message: String!
+}
+
+"""
+连接测试失败
+"""
+type ConnectionTestFailure {
+    """
+    错误消息（已本地化）
+    """
+    error: String!
+}
+
+"""
+测试连接结果
+"""
+union TestConnectionResult = ConnectionTestSuccess | ConnectionTestFailure
+
+"""
+解析出的连接
+"""
+type ParsedConnection {
+    """
+    连接名称
+    """
+    name: String!
+    """
+    提供者类型
+    """
+    type: String!
+    """
+    配置参数
+    """
+    config: StringMap!
+}
+
+"""
+导入解析成功
+"""
+type ImportParseSuccess {
+    """
+    解析出的连接列表
+    """
+    connections: [ParsedConnection!]!
+}
+
+"""
+导入解析错误
+"""
+type ImportParseError {
+    """
+    错误消息（已本地化）
+    """
+    error: String!
+    """
+    错误行号
+    """
+    line: Int
+}
+
+"""
+导入解析结果
+"""
+union ImportParseResult = ImportParseSuccess | ImportParseError
+
+"""
+导入执行结果
+"""
+type ImportExecuteResult {
+    """
+    成功导入的连接列表
+    """
+    connections: [Connection!]!
+    """
+    跳过的连接数（名称冲突）
+    """
+    skippedCount: Int!
+}
+
+# =============================================================================
+# SUBSCRIPTION EVENT TYPES
+# =============================================================================
+
+"""
+作业进度事件
+"""
+type JobProgressEvent {
+    """
+    作业 ID
+    """
+    jobId: ID!
+    """
+    关联的任务 ID
+    """
+    taskId: ID!
+    """
+    关联的连接 ID
+    """
+    connectionId: ID!
+    """
+    当前状态
+    """
+    status: JobStatus!
+    """
+    已传输文件数
+    """
+    filesTransferred: Int!
+    """
+    已传输字节数
+    """
+    bytesTransferred: BigInt!
+    """
+    开始时间
+    """
+    startTime: DateTime!
+    """
+    结束时间
+    """
+    endTime: DateTime
+}
+
+# =============================================================================
+# NAMESPACED QUERY TYPES
+# =============================================================================
+
+"""
+任务查询命名空间
+"""
+type TaskQuery {
+    """
+    获取任务列表
+    """
+    list(pagination: PaginationInput): TaskConnection! @goField(forceResolver: true)
+    """
+    获取单个任务
+    """
+    get(id: ID!): Task @goField(forceResolver: true)
+}
+
+"""
+连接查询命名空间
+"""
+type ConnectionQuery {
+    """
+    获取连接列表
+    """
+    list(pagination: PaginationInput): ConnectionConnection! @goField(forceResolver: true)
+    """
+    获取单个连接
+    """
+    get(id: ID!): Connection @goField(forceResolver: true)
+}
+
+"""
+作业查询命名空间
+"""
+type JobQuery {
+    """
+    获取作业列表
+    """
+    list(
+        """
+        按任务 ID 过滤
+        """
+        taskId: ID
+        """
+        按连接 ID 过滤
+        """
+        connectionId: ID
+        """
+        分页参数
+        """
+        pagination: PaginationInput
+    ): JobConnection! @goField(forceResolver: true)
+    """
+    获取单个作业
+    """
+    get(id: ID!): Job
+    """
+    获取作业进度
+    """
+    progress(id: ID!): JobProgressEvent @goField(forceResolver: true)
+}
+
+"""
+日志查询命名空间
+"""
+type LogQuery {
+    """
+    获取日志列表
+    """
+    list(
+        """
+        按连接 ID 过滤（必填）
+        """
+        connectionId: ID!
+        """
+        按任务 ID 过滤
+        """
+        taskId: ID
+        """
+        按作业 ID 过滤
+        """
+        jobId: ID
+        """
+        按日志级别过滤
+        """
+        level: LogLevel
+        """
+        分页参数
+        """
+        pagination: PaginationInput
+    ): JobLogConnection! @goField(forceResolver: true)
+}
+
+"""
+提供者查询命名空间
+"""
+type ProviderQuery {
+    """
+    获取所有存储提供者
+    """
+    list: [Provider!]! @goField(forceResolver: true)
+    """
+    获取单个提供者的配置选项
+    """
+    get(name: String!): Provider @goField(forceResolver: true)
+}
+
+"""
+文件查询命名空间
+"""
+type FileQuery {
+    """
+    列出本地目录内容
+    """
+    local(
+        """
+        目录路径
+        """
+        path: String!
+    ): [FileEntry!]! @goField(forceResolver: true)
+    """
+    列出远程目录内容
+    """
+    remote(
+        """
+        连接 ID
+        """
+        connectionId: ID!
+        """
+        目录路径
+        """
+        path: String!
+    ): [FileEntry!]! @goField(forceResolver: true)
+}
+
+# =============================================================================
+# NAMESPACED MUTATION TYPES
+# =============================================================================
+
+"""
+任务变更命名空间
+"""
+type TaskMutation {
+    """
+    创建任务（失败抛出 GraphQL error）
+    """
+    create(input: CreateTaskInput!): Task! @goField(forceResolver: true)
+    """
+    更新任务（失败抛出 GraphQL error）
+    """
+    update(id: ID!, input: UpdateTaskInput!): Task! @goField(forceResolver: true)
+    """
+    删除任务（失败抛出 GraphQL error）
+    """
+    delete(id: ID!): Task! @goField(forceResolver: true)
+    """
+    运行任务（创建并启动作业，失败抛出 GraphQL error）
+    """
+    run(taskId: ID!): Job! @goField(forceResolver: true)
+}
+
+"""
+连接变更命名空间
+"""
+type ConnectionMutation {
+    """
+    创建连接（失败抛出 GraphQL error）
+    """
+    create(input: CreateConnectionInput!): Connection! @goField(forceResolver: true)
+    """
+    更新连接（失败抛出 GraphQL error）
+    """
+    update(id: ID!, input: UpdateConnectionInput!): Connection! @goField(forceResolver: true)
+    """
+    删除连接（失败抛出 GraphQL error）
+    """
+    delete(id: ID!): Connection! @goField(forceResolver: true)
+    """
+    测试已保存的连接（测试失败是预期业务结果，用 union 表示）
+    """
+    test(id: ID!): TestConnectionResult! @goField(forceResolver: true)
+    """
+    测试未保存的连接配置（测试失败是预期业务结果，用 union 表示）
+    """
+    testUnsaved(input: TestConnectionInput!): TestConnectionResult! @goField(forceResolver: true)
+}
+
+"""
+导入变更命名空间
+"""
+type ImportMutation {
+    """
+    解析 rclone 配置文件（解析失败是预期业务结果，用 union 表示）
+    """
+    parse(input: ImportParseInput!): ImportParseResult! @goField(forceResolver: true)
+    """
+    执行导入（失败抛出 GraphQL error）
+    """
+    execute(input: ImportExecuteInput!): ImportExecuteResult! @goField(forceResolver: true)
+}
+
+# =============================================================================
+# ROOT TYPES
+# =============================================================================
+
+type Query {
+    """
+    任务相关查询（命名空间）
+    """
+    task: TaskQuery! @goField(forceResolver: true)
+    """
+    连接相关查询（命名空间）
+    """
+    connection: ConnectionQuery! @goField(forceResolver: true)
+    """
+    作业相关查询（命名空间）
+    """
+    job: JobQuery! @goField(forceResolver: true)
+    """
+    日志相关查询（命名空间）
+    """
+    log: LogQuery! @goField(forceResolver: true)
+    """
+    提供者相关查询（命名空间）
+    """
+    provider: ProviderQuery! @goField(forceResolver: true)
+    """
+    文件相关查询（命名空间）
+    """
+    file: FileQuery! @goField(forceResolver: true)
+}
+
+type Mutation {
+    """
+    任务相关变更（命名空间）
+    """
+    task: TaskMutation! @goField(forceResolver: true)
+    """
+    连接相关变更（命名空间）
+    """
+    connection: ConnectionMutation! @goField(forceResolver: true)
+    """
+    导入相关变更（命名空间）
+    """
+    import: ImportMutation! @goField(forceResolver: true)
+}
+
+type Subscription {
+    """
+    订阅作业进度事件
+
+    - 无参数：订阅所有作业进度（全局订阅）
+    - taskId：仅订阅指定任务的作业
+    - connectionId：仅订阅指定连接相关的作业
+    """
+    jobProgress(
+        """
+        按任务 ID 过滤
+        """
+        taskId: ID
+        """
+        按连接 ID 过滤
+        """
+        connectionId: ID
+    ): JobProgressEvent!
+}
+
+schema {
+    query: Query
+    mutation: Mutation
+    subscription: Subscription
+}

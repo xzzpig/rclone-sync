@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
 
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
-	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 )
 
@@ -31,7 +31,7 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func (m *MockJobService) CreateJob(ctx context.Context, taskID uuid.UUID, trigger job.Trigger) (*ent.Job, error) {
+func (m *MockJobService) CreateJob(ctx context.Context, taskID uuid.UUID, trigger model.JobTrigger) (*ent.Job, error) {
 	args := m.Called(ctx, taskID, trigger)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -125,7 +125,7 @@ func TestPollStatsLogic(t *testing.T) {
 	jobID := uuid.New()
 
 	// 2. Setup SyncEngine
-	engine := NewSyncEngine(mockJobService, t.TempDir())
+	engine := NewSyncEngine(mockJobService, nil, t.TempDir())
 	engine.logger = zap.NewNop() // Setup logger
 
 	// Inject job into activeJobs (normally done in RunTask)
@@ -159,7 +159,7 @@ func TestPollStatsLogic(t *testing.T) {
 func TestGetJobProgress(t *testing.T) {
 	// Setup
 	mockJobService := new(MockJobService)
-	engine := NewSyncEngine(mockJobService, t.TempDir())
+	engine := NewSyncEngine(mockJobService, nil, t.TempDir())
 
 	// Test case 1: Job ID exists in activeJobs
 	jobID1 := uuid.New()
@@ -265,14 +265,14 @@ func TestGetConflictResolutionFromOptions(t *testing.T) {
 // TestFailJob tests the failJob method
 func TestFailJob(t *testing.T) {
 	mockJobService := new(MockJobService)
-	engine := NewSyncEngine(mockJobService, t.TempDir())
+	engine := NewSyncEngine(mockJobService, nil, t.TempDir())
 	engine.logger = zap.NewNop()
 
 	jobID := uuid.New()
 	testErr := assert.AnError
 
 	// Expect UpdateJobStatus to be called
-	mockJobService.On("UpdateJobStatus", mock.Anything, jobID, "failed", testErr.Error()).
+	mockJobService.On("UpdateJobStatus", mock.Anything, jobID, string(model.JobStatusFailed), testErr.Error()).
 		Return((*ent.Job)(nil), nil).Once()
 
 	ctx := context.Background()

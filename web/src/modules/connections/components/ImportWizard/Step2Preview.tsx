@@ -1,13 +1,14 @@
-import { testUnsavedConnection } from '@/api/connections';
+import { ConnectionTestUnsavedMutation } from '@/api/graphql/queries/connections';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { TextField, TextFieldInput } from '@/components/ui/text-field';
 import type { ImportPreviewItem } from '@/lib/types';
 import * as m from '@/paraglide/messages';
+import { createMutation } from '@urql/solid';
 import { Component, createSignal, For, Show } from 'solid-js';
+import IconAlertTriangle from '~icons/lucide/alert-triangle';
 import IconArrowLeft from '~icons/lucide/arrow-left';
 import IconArrowRight from '~icons/lucide/arrow-right';
-import IconAlertTriangle from '~icons/lucide/alert-triangle';
 import IconCheck from '~icons/lucide/check';
 import IconLoader from '~icons/lucide/loader-2';
 import IconPencil from '~icons/lucide/pencil';
@@ -35,6 +36,9 @@ export const Step2Preview: Component<Step2PreviewProps> = (props) => {
   const [testStatuses, setTestStatuses] = createSignal<Record<string, ItemTestStatus>>({});
   const [editingItem, setEditingItem] = createSignal<ImportPreviewItem | null>(null);
   const [editingIndex, setEditingIndex] = createSignal<number | null>(null);
+
+  // GraphQL mutation for testing unsaved connection
+  const [, executeTestUnsaved] = createMutation(ConnectionTestUnsavedMutation);
 
   const openEditDialog = (index: number) => {
     setEditingItem(props.items[index]);
@@ -86,7 +90,17 @@ export const Step2Preview: Component<Step2PreviewProps> = (props) => {
     }));
 
     try {
-      await testUnsavedConnection(item.type, item.editedConfig ?? item.config);
+      const result = await executeTestUnsaved({
+        input: {
+          type: item.type,
+          config: item.editedConfig ?? item.config,
+        },
+      });
+
+      if (result.error) {
+        throw new Error(result.error.message);
+      }
+
       setTestStatuses((prev) => ({
         ...prev,
         [key]: { status: 'success' },

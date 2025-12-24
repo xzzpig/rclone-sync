@@ -25,7 +25,6 @@ type JobLogQuery struct {
 	inters     []Interceptor
 	predicates []predicate.JobLog
 	withJob    *JobQuery
-	withFKs    bool
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -300,12 +299,12 @@ func (_q *JobLogQuery) WithJob(opts ...func(*JobQuery)) *JobLogQuery {
 // Example:
 //
 //	var v []struct {
-//		Level joblog.Level `json:"level,omitempty"`
+//		JobID uuid.UUID `json:"job_id,omitempty"`
 //		Count int `json:"count,omitempty"`
 //	}
 //
 //	client.JobLog.Query().
-//		GroupBy(joblog.FieldLevel).
+//		GroupBy(joblog.FieldJobID).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
 func (_q *JobLogQuery) GroupBy(field string, fields ...string) *JobLogGroupBy {
@@ -323,11 +322,11 @@ func (_q *JobLogQuery) GroupBy(field string, fields ...string) *JobLogGroupBy {
 // Example:
 //
 //	var v []struct {
-//		Level joblog.Level `json:"level,omitempty"`
+//		JobID uuid.UUID `json:"job_id,omitempty"`
 //	}
 //
 //	client.JobLog.Query().
-//		Select(joblog.FieldLevel).
+//		Select(joblog.FieldJobID).
 //		Scan(ctx, &v)
 func (_q *JobLogQuery) Select(fields ...string) *JobLogSelect {
 	_q.ctx.Fields = append(_q.ctx.Fields, fields...)
@@ -371,18 +370,11 @@ func (_q *JobLogQuery) prepareQuery(ctx context.Context) error {
 func (_q *JobLogQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*JobLog, error) {
 	var (
 		nodes       = []*JobLog{}
-		withFKs     = _q.withFKs
 		_spec       = _q.querySpec()
 		loadedTypes = [1]bool{
 			_q.withJob != nil,
 		}
 	)
-	if _q.withJob != nil {
-		withFKs = true
-	}
-	if withFKs {
-		_spec.Node.Columns = append(_spec.Node.Columns, joblog.ForeignKeys...)
-	}
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*JobLog).scanValues(nil, columns)
 	}
@@ -414,10 +406,7 @@ func (_q *JobLogQuery) loadJob(ctx context.Context, query *JobQuery, nodes []*Jo
 	ids := make([]uuid.UUID, 0, len(nodes))
 	nodeids := make(map[uuid.UUID][]*JobLog)
 	for i := range nodes {
-		if nodes[i].job_logs == nil {
-			continue
-		}
-		fk := *nodes[i].job_logs
+		fk := nodes[i].JobID
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}
@@ -434,7 +423,7 @@ func (_q *JobLogQuery) loadJob(ctx context.Context, query *JobQuery, nodes []*Jo
 	for _, n := range neighbors {
 		nodes, ok := nodeids[n.ID]
 		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "job_logs" returned %v`, n.ID)
+			return fmt.Errorf(`unexpected foreign-key "job_id" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
@@ -467,6 +456,9 @@ func (_q *JobLogQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != joblog.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
+		}
+		if _q.withJob != nil {
+			_spec.Node.AddColumnOnce(joblog.FieldJobID)
 		}
 	}
 	if ps := _q.predicates; len(ps) > 0 {

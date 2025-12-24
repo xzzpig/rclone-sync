@@ -1,0 +1,250 @@
+# GraphQL Schema: Connection 相关类型定义
+
+# =============================================================================
+# ENUMS
+# =============================================================================
+
+"""
+连接加载状态
+"""
+enum ConnectionLoadStatus {
+	"""
+	已加载
+	"""
+	LOADED
+	"""
+	加载中
+	"""
+	LOADING
+	"""
+	加载失败
+	"""
+	ERROR
+}
+
+# =============================================================================
+# TYPES
+# =============================================================================
+
+"""
+远程存储连接
+"""
+type Connection {
+	"""
+	UUID 主键
+	"""
+	id: ID!
+	"""
+	连接名称（系统唯一）
+	"""
+	name: String!
+	"""
+	提供者类型（如 onedrive, s3, drive）
+	"""
+	type: String!
+	"""
+	配置参数（解密后，需要解密处理）
+	"""
+	config: StringMap! @goField(forceResolver: true)
+	"""
+	加载状态（运行时状态）
+	"""
+	loadStatus: ConnectionLoadStatus! @goField(forceResolver: true)
+	"""
+	加载错误信息（运行时状态，仅当 loadStatus 为 ERROR 时有值）
+	"""
+	loadError: String @goField(forceResolver: true)
+	"""
+	创建时间
+	"""
+	createdAt: DateTime!
+	"""
+	更新时间
+	"""
+	updatedAt: DateTime!
+	"""
+	使用此连接的任务（分页查询）
+	"""
+	tasks(pagination: PaginationInput): TaskConnection! @goField(forceResolver: true)
+	"""
+	配额信息（调用 rclone about API）
+	"""
+	quota: ConnectionQuota @goField(forceResolver: true)
+}
+
+"""
+连接配额信息
+"""
+type ConnectionQuota {
+	"""
+	总空间（字节）
+	"""
+	total: BigInt!
+	"""
+	已使用空间（字节）
+	"""
+	used: BigInt!
+	"""
+	可用空间（字节）
+	"""
+	free: BigInt!
+}
+
+"""
+连接分页连接
+"""
+type ConnectionConnection {
+	"""
+	连接列表
+	"""
+	items: [Connection!]!
+	"""
+	总数
+	"""
+	totalCount: Int!
+	"""
+	分页信息
+	"""
+	pageInfo: OffsetPageInfo!
+}
+
+# =============================================================================
+# INPUT TYPES
+# =============================================================================
+
+"""
+创建连接输入
+"""
+input CreateConnectionInput {
+	"""
+	连接名称
+	"""
+	name: String!
+	"""
+	提供者类型
+	"""
+	type: String!
+	"""
+	配置参数
+	"""
+	config: StringMap!
+}
+
+"""
+更新连接输入
+"""
+input UpdateConnectionInput {
+	"""
+	连接名称
+	"""
+	name: String
+	"""
+	配置参数
+	"""
+	config: StringMap
+}
+
+"""
+测试连接输入（未保存的配置）
+"""
+input TestConnectionInput {
+	"""
+	提供者类型
+	"""
+	type: String!
+	"""
+	配置参数
+	"""
+	config: StringMap!
+}
+
+# =============================================================================
+# RESULT TYPES
+# =============================================================================
+
+"""
+连接测试成功
+"""
+type ConnectionTestSuccess {
+	"""
+	成功消息（已本地化）
+	"""
+	message: String!
+}
+
+"""
+连接测试失败
+"""
+type ConnectionTestFailure {
+	"""
+	错误消息（已本地化）
+	"""
+	error: String!
+}
+
+"""
+测试连接结果
+"""
+union TestConnectionResult = ConnectionTestSuccess | ConnectionTestFailure
+
+# =============================================================================
+# NAMESPACED TYPES
+# =============================================================================
+
+"""
+连接查询命名空间
+"""
+type ConnectionQuery {
+	"""
+	获取连接列表
+	"""
+	list(pagination: PaginationInput): ConnectionConnection! @goField(forceResolver: true)
+	"""
+	获取单个连接
+	"""
+	get(id: ID!): Connection @goField(forceResolver: true)
+}
+
+"""
+连接变更命名空间
+"""
+type ConnectionMutation {
+	"""
+	创建连接（失败抛出 GraphQL error）
+	"""
+	create(input: CreateConnectionInput!): Connection! @goField(forceResolver: true)
+	"""
+	更新连接（失败抛出 GraphQL error）
+	"""
+	update(id: ID!, input: UpdateConnectionInput!): Connection! @goField(forceResolver: true)
+	"""
+	删除连接（失败抛出 GraphQL error）
+	"""
+	delete(id: ID!): Connection! @goField(forceResolver: true)
+	"""
+	测试已保存的连接（测试失败是预期业务结果，用 union 表示）
+	"""
+	test(id: ID!): TestConnectionResult! @goField(forceResolver: true)
+	"""
+	测试未保存的连接配置（测试失败是预期业务结果，用 union 表示）
+	"""
+	testUnsaved(input: TestConnectionInput!): TestConnectionResult! @goField(forceResolver: true)
+}
+
+# =============================================================================
+# EXTEND ROOT TYPES
+# =============================================================================
+
+extend type Query {
+	"""
+	连接相关查询（命名空间）
+	"""
+	connection: ConnectionQuery! @goField(forceResolver: true)
+}
+
+extend type Mutation {
+	"""
+	连接相关变更（命名空间）
+	"""
+	connection: ConnectionMutation! @goField(forceResolver: true)
+}

@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
@@ -615,13 +616,13 @@ func TestConnectionService_DeleteConnection_CascadeDeleteTasks(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create multiple tasks associated with this connection
-	task1, err := taskService.CreateTask(ctx, "task1", "/source1", conn.ID, "/dest1", "bidirectional", "0 0 * * *", false, nil)
+	task1, err := taskService.CreateTask(ctx, "task1", "/source1", conn.ID, "/dest1", string(model.SyncDirectionBidirectional), "0 0 * * *", false, nil)
 	require.NoError(t, err)
 
-	task2, err := taskService.CreateTask(ctx, "task2", "/source2", conn.ID, "/dest2", "upload", "0 1 * * *", false, nil)
+	task2, err := taskService.CreateTask(ctx, "task2", "/source2", conn.ID, "/dest2", string(model.SyncDirectionUpload), "0 1 * * *", false, nil)
 	require.NoError(t, err)
 
-	task3, err := taskService.CreateTask(ctx, "task3", "/source3", conn.ID, "/dest3", "download", "0 2 * * *", false, nil)
+	task3, err := taskService.CreateTask(ctx, "task3", "/source3", conn.ID, "/dest3", string(model.SyncDirectionDownload), "0 2 * * *", false, nil)
 	require.NoError(t, err)
 
 	// Verify tasks exist
@@ -674,7 +675,7 @@ func TestConnectionService_HasAssociatedTasks(t *testing.T) {
 	assert.False(t, hasTasks)
 
 	// Create a task
-	_, err = taskService.CreateTask(ctx, "task1", "/source", conn.ID, "/dest", "bidirectional", "0 0 * * *", false, nil)
+	_, err = taskService.CreateTask(ctx, "task1", "/source", conn.ID, "/dest", string(model.SyncDirectionBidirectional), "0 0 * * *", false, nil)
 	require.NoError(t, err)
 
 	// Now should have tasks
@@ -702,10 +703,10 @@ func TestConnectionService_DeleteConnection_MultipleConnections(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create tasks for each connection
-	task1, err := taskService.CreateTask(ctx, "task1", "/s1", conn1.ID, "/d1", "bidirectional", "0 0 * * *", false, nil)
+	task1, err := taskService.CreateTask(ctx, "task1", "/s1", conn1.ID, "/d1", string(model.SyncDirectionBidirectional), "0 0 * * *", false, nil)
 	require.NoError(t, err)
 
-	task2, err := taskService.CreateTask(ctx, "task2", "/s2", conn2.ID, "/d2", "bidirectional", "0 0 * * *", false, nil)
+	task2, err := taskService.CreateTask(ctx, "task2", "/s2", conn2.ID, "/d2", string(model.SyncDirectionBidirectional), "0 0 * * *", false, nil)
 	require.NoError(t, err)
 
 	// Delete conn1
@@ -1013,4 +1014,130 @@ func TestConnectionService_HasAssociatedTasks_NotFound(t *testing.T) {
 	_, err := service.HasAssociatedTasks(ctx, uuid.New())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
+}
+
+// Tests for ListConnectionsPaginated
+func TestConnectionService_ListConnectionsPaginated(t *testing.T) {
+	client := setupTestDB(t)
+	defer client.Close()
+
+	encryptor := setupTestEncryptor(t)
+	service := NewConnectionService(client, encryptor)
+
+	ctx := context.Background()
+
+	// Initially empty
+	conns, total, err := service.ListConnectionsPaginated(ctx, 10, 0)
+	require.NoError(t, err)
+	assert.Empty(t, conns)
+	assert.Equal(t, 0, total)
+
+	// Create multiple connections
+	for i := 0; i < 5; i++ {
+		config := map[string]string{"type": "local"}
+		_, err := service.CreateConnection(ctx, "conn-paginated-"+uuid.NewString()[:8], "local", config)
+		require.NoError(t, err)
+	}
+
+	t.Run("FirstPage", func(t *testing.T) {
+		conns, total, err := service.ListConnectionsPaginated(ctx, 2, 0)
+		require.NoError(t, err)
+		assert.Len(t, conns, 2)
+		assert.Equal(t, 5, total)
+	})
+
+	t.Run("SecondPage", func(t *testing.T) {
+		conns, total, err := service.ListConnectionsPaginated(ctx, 2, 2)
+		require.NoError(t, err)
+		assert.Len(t, conns, 2)
+		assert.Equal(t, 5, total)
+	})
+
+	t.Run("LastPage", func(t *testing.T) {
+		conns, total, err := service.ListConnectionsPaginated(ctx, 2, 4)
+		require.NoError(t, err)
+		assert.Len(t, conns, 1)
+		assert.Equal(t, 5, total)
+	})
+
+	t.Run("OffsetBeyondTotal", func(t *testing.T) {
+		conns, total, err := service.ListConnectionsPaginated(ctx, 10, 100)
+		require.NoError(t, err)
+		assert.Empty(t, conns)
+		assert.Equal(t, 5, total)
+	})
+
+	t.Run("LargeLimit", func(t *testing.T) {
+		conns, total, err := service.ListConnectionsPaginated(ctx, 100, 0)
+		require.NoError(t, err)
+		assert.Len(t, conns, 5)
+		assert.Equal(t, 5, total)
+	})
+}
+
+// Tests for CountAssociatedTasks
+func TestConnectionService_CountAssociatedTasks(t *testing.T) {
+	client := setupTestDB(t)
+	defer client.Close()
+
+	encryptor := setupTestEncryptor(t)
+	connService := NewConnectionService(client, encryptor)
+	taskService := NewTaskService(client)
+
+	ctx := context.Background()
+
+	// Create a connection
+	config := map[string]string{"type": "local"}
+	conn, err := connService.CreateConnection(ctx, "count-tasks-conn", "local", config)
+	require.NoError(t, err)
+
+	t.Run("ZeroTasks", func(t *testing.T) {
+		count, err := connService.CountAssociatedTasks(ctx, conn.ID)
+		require.NoError(t, err)
+		assert.Equal(t, 0, count)
+	})
+
+	t.Run("OneTasks", func(t *testing.T) {
+		// Create one task
+		_, err := taskService.CreateTask(ctx, "task1", "/src", conn.ID, "/dst", string(model.SyncDirectionBidirectional), "", false, nil)
+		require.NoError(t, err)
+
+		count, err := connService.CountAssociatedTasks(ctx, conn.ID)
+		require.NoError(t, err)
+		assert.Equal(t, 1, count)
+	})
+
+	t.Run("MultipleTasks", func(t *testing.T) {
+		// Create more tasks
+		_, err := taskService.CreateTask(ctx, "task2", "/src2", conn.ID, "/dst2", string(model.SyncDirectionUpload), "", false, nil)
+		require.NoError(t, err)
+		_, err = taskService.CreateTask(ctx, "task3", "/src3", conn.ID, "/dst3", string(model.SyncDirectionDownload), "", false, nil)
+		require.NoError(t, err)
+
+		count, err := connService.CountAssociatedTasks(ctx, conn.ID)
+		require.NoError(t, err)
+		assert.Equal(t, 3, count)
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		_, err := connService.CountAssociatedTasks(ctx, uuid.New())
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "not found")
+	})
+}
+
+// Test CreateConnection with empty type
+func TestConnectionService_CreateConnection_EmptyType(t *testing.T) {
+	client := setupTestDB(t)
+	defer client.Close()
+
+	encryptor := setupTestEncryptor(t)
+	service := NewConnectionService(client, encryptor)
+
+	ctx := context.Background()
+
+	config := map[string]string{"key": "value"}
+	_, err := service.CreateConnection(ctx, "valid-name", "", config)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "type cannot be empty")
 }

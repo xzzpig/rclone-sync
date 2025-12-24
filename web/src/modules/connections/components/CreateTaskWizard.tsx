@@ -1,6 +1,6 @@
-import * as m from '@/paraglide/messages.js';
-import { getConnection } from '@/api/connections';
-import { listLocalFiles, listRemoteFiles } from '@/api/files';
+import { client } from '@/api/graphql/client';
+import { ConnectionGetBasicQuery } from '@/api/graphql/queries/connections';
+import { FilesLocalQuery, FilesRemoteQuery } from '@/api/graphql/queries/files';
 import { FileBrowser } from '@/components/common/FileBrowser';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,39 +12,64 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { showToast } from '@/components/ui/toast';
-import { Task } from '@/lib/types';
-import { useQuery } from '@tanstack/solid-query';
+import type { CreateTaskInput } from '@/lib/types';
+import * as m from '@/paraglide/messages.js';
+import { createQuery } from '@urql/solid';
 import { Component, createSignal, Show } from 'solid-js';
 import IconChevronLeft from '~icons/lucide/chevron-left';
 import IconChevronRight from '~icons/lucide/chevron-right';
 import IconHardDrive from '~icons/lucide/hard-drive';
 import { TaskSettingsForm, TaskSettingsFormData } from './TaskSettingsForm';
 
+// Re-export CreateTaskInput for backward compatibility
+export type { CreateTaskInput };
+
 export interface CreateTaskWizardProps {
   connectionId: string;
   open: boolean;
   onClose: () => void;
-  onSubmit: (task: Omit<Task, 'id' | 'edges'>) => void | Promise<void>;
+  onSubmit: (task: CreateTaskInput) => void | Promise<void>;
 }
 
 type WizardStep = 'paths' | 'settings';
 
 export const CreateTaskWizard: Component<CreateTaskWizardProps> = (props) => {
-  // Fetch connection info to get the name for display
-  const connectionQuery = useQuery(() => ({
-    queryKey: ['connection', props.connectionId],
-    queryFn: () => getConnection(props.connectionId),
-    enabled: !!props.connectionId && props.open,
-  }));
+  // Fetch connection info to get the name for display using GraphQL
+  const [connectionResult] = createQuery({
+    query: ConnectionGetBasicQuery,
+    variables: () => ({ id: props.connectionId }),
+    pause: () => !props.connectionId || !props.open,
+  });
 
-  const connectionName = () => connectionQuery.data?.name ?? props.connectionId;
+  const connectionName = () => connectionResult.data?.connection?.get?.name ?? props.connectionId;
+
+  // Helper functions to load directory contents via GraphQL
+  const loadLocalFiles = async (path: string, refresh?: boolean) => {
+    const result = await client.query(
+      FilesLocalQuery,
+      { path },
+      { requestPolicy: refresh ? 'network-only' : 'cache-first' }
+    );
+    if (result.error) throw new Error(result.error.message);
+    return result.data?.file?.local ?? [];
+  };
+
+  const loadRemoteFiles = async (path: string, refresh?: boolean) => {
+    const result = await client.query(
+      FilesRemoteQuery,
+      { connectionId: props.connectionId, path },
+      { requestPolicy: refresh ? 'network-only' : 'cache-first' }
+    );
+    if (result.error) throw new Error(result.error.message);
+    return result.data?.file?.remote ?? [];
+  };
 
   const [currentStep, setCurrentStep] = createSignal<WizardStep>('paths');
   const [sourcePath, setSourcePath] = createSignal('');
   const [remotePath, setRemotePath] = createSignal('');
   const [formData, setFormData] = createSignal<TaskSettingsFormData>({
     name: '',
-    direction: 'upload',
+    direction: 'UPLOAD',
     schedule: '',
     realtime: false,
     options: {},
@@ -57,7 +82,7 @@ export const CreateTaskWizard: Component<CreateTaskWizardProps> = (props) => {
     setRemotePath('');
     setFormData({
       name: '',
-      direction: 'upload',
+      direction: 'UPLOAD',
       schedule: '',
       realtime: false,
       options: {},
@@ -88,9 +113,9 @@ export const CreateTaskWizard: Component<CreateTaskWizardProps> = (props) => {
       const data = formData();
       await props.onSubmit({
         name: data.name ?? `task-${new Date().getTime()}`,
-        source_path: sourcePath(),
-        connection_id: props.connectionId,
-        remote_path: remotePath(),
+        sourcePath: sourcePath(),
+        connectionId: props.connectionId,
+        remotePath: remotePath(),
         direction: data.direction,
         schedule: data.schedule,
         realtime: data.realtime,
@@ -144,7 +169,7 @@ export const CreateTaskWizard: Component<CreateTaskWizardProps> = (props) => {
                     initialPath="/"
                     rootLabel={m.file_browser_root()}
                     icon={IconHardDrive}
-                    loadDirectory={(path) => listLocalFiles(path)}
+                    loadDirectory={loadLocalFiles}
                     onSelect={setSourcePath}
                     class="h-full"
                   />
@@ -163,7 +188,7 @@ export const CreateTaskWizard: Component<CreateTaskWizardProps> = (props) => {
                   <FileBrowser
                     initialPath="/"
                     rootLabel={`${connectionName()}:`}
-                    loadDirectory={(path) => listRemoteFiles(props.connectionId, path)}
+                    loadDirectory={loadRemoteFiles}
                     onSelect={setRemotePath}
                     class="h-full"
                   />
@@ -187,9 +212,9 @@ export const CreateTaskWizard: Component<CreateTaskWizardProps> = (props) => {
                     </div>
                     <div>
                       <span class="text-muted-foreground">{m.wizard_direction()}:</span>{' '}
-                      {formData().direction === 'upload'
+                      {formData().direction === 'UPLOAD'
                         ? m.form_directionUpload()
-                        : formData().direction === 'download'
+                        : formData().direction === 'DOWNLOAD'
                           ? m.form_directionDownload()
                           : m.form_directionBidirectional()}
                     </div>

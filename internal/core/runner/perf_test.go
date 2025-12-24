@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
-	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 	"github.com/xzzpig/rclone-sync/internal/core/runner"
 )
@@ -22,7 +22,7 @@ type MockSyncEngineForPerf struct {
 	mock.Mock
 }
 
-func (m *MockSyncEngineForPerf) RunTask(ctx context.Context, task *ent.Task, trigger job.Trigger) error {
+func (m *MockSyncEngineForPerf) RunTask(ctx context.Context, task *ent.Task, trigger model.JobTrigger) error {
 	args := m.Called(ctx, task, trigger)
 	return args.Error(0)
 }

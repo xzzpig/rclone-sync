@@ -1,16 +1,18 @@
+import { client } from '@/api/graphql/client';
+import { JobsListQuery, LogsListQuery } from '@/api/graphql/queries/jobs';
+import { JOB_PROGRESS_SUBSCRIPTION } from '@/api/graphql/queries/subscriptions';
+import type { JobListItem, JobLogListItem, JobProgressEvent, LogLevel } from '@/lib/types';
 import * as m from '@/paraglide/messages.js';
-import { createStore } from 'solid-js/store';
-import { createContext, useContext, ParentComponent } from 'solid-js';
-import { getJobs } from '@/api/history';
-import { getLogs } from '@/api/logs';
-import { Job, JobLog } from '@/lib/types';
+import { createSubscription } from '@urql/solid';
+import { createContext, createEffect, ParentComponent, useContext } from 'solid-js';
+import { createStore, produce } from 'solid-js/store';
 
 interface HistoryState {
-  jobs: Job[];
+  jobs: JobListItem[];
   jobsTotal: number;
   jobsPage: number;
   jobsPageSize: number;
-  logs: JobLog[];
+  logs: JobLogListItem[];
   logsTotal: number;
   logsPage: number;
   logsPageSize: number;
@@ -18,6 +20,9 @@ interface HistoryState {
   isLoadingLogs: boolean;
   errorJobs: unknown | null;
   errorLogs: unknown | null;
+  // Tracking current filter parameters for subscription
+  currentConnectionId: string | null;
+  currentTaskId: string | null;
 }
 
 const initialState: HistoryState = {
@@ -33,6 +38,8 @@ const initialState: HistoryState = {
   isLoadingLogs: false,
   errorJobs: null,
   errorLogs: null,
+  currentConnectionId: null,
+  currentTaskId: null,
 };
 
 interface HistoryActions {
@@ -41,7 +48,7 @@ interface HistoryActions {
     connection_id: string;
     task_id?: string;
     job_id?: string;
-    level?: string;
+    level?: LogLevel;
     page?: number;
   }) => Promise<void>;
   clearLogs: () => void;
@@ -52,19 +59,81 @@ const HistoryContext = createContext<[HistoryState, HistoryActions]>();
 export const HistoryProvider: ParentComponent = (props) => {
   const [state, setState] = createStore<HistoryState>(initialState);
 
+  // GraphQL subscription for job progress using @urql/solid
+  const [subscriptionResult] = createSubscription({
+    query: JOB_PROGRESS_SUBSCRIPTION,
+    variables: () => ({
+      connectionId: state.currentConnectionId ?? undefined,
+      taskId: state.currentTaskId ?? undefined,
+    }),
+    pause: () => !state.currentConnectionId,
+  });
+
+  // Handle subscription data updates
+  createEffect(() => {
+    const data = subscriptionResult.data?.jobProgress as JobProgressEvent | undefined;
+    if (!data) return;
+
+    // Check if the subscription data matches our current filter
+    if (state.currentConnectionId && data.connectionId !== state.currentConnectionId) {
+      return;
+    }
+    if (state.currentTaskId && data.taskId !== state.currentTaskId) {
+      return;
+    }
+
+    setState(
+      produce((s) => {
+        const jobIndex = s.jobs.findIndex((j) => j.id === data.jobId);
+        if (jobIndex !== -1) {
+          // Update existing job with subscription data
+          const job = s.jobs[jobIndex];
+          job.status = data.status;
+          job.filesTransferred = data.filesTransferred;
+          job.bytesTransferred = data.bytesTransferred;
+          if (data.endTime) {
+            job.endTime = data.endTime;
+          }
+          console.info('Updated job from GraphQL subscription:', data.jobId);
+        } else if (s.jobsPage === 1) {
+          // New job detected on first page - reload to get full job data with task info
+          // We use a timeout to debounce rapid updates
+          console.info('New job detected, will reload jobs list');
+          // Don't reload here directly to avoid infinite loops
+          // The UI should handle this via polling or user refresh
+        }
+      })
+    );
+  });
+
   const actions: HistoryActions = {
     loadJobs: async (params) => {
       setState('isLoadingJobs', true);
+      // Update current filter state for subscription
+      setState('currentConnectionId', params.connection_id);
+      setState('currentTaskId', params.task_id ?? null);
+
       try {
         const page = params.page ?? state.jobsPage;
         const offset = (page - 1) * state.jobsPageSize;
-        const response = await getJobs({
-          ...params,
-          limit: state.jobsPageSize,
-          offset,
-        });
-        setState('jobs', response.data);
-        setState('jobsTotal', response.total);
+
+        const result = await client.query(
+          JobsListQuery,
+          {
+            taskId: params.task_id,
+            connectionId: params.connection_id,
+            pagination: { limit: state.jobsPageSize, offset },
+          },
+          { requestPolicy: 'network-only' }
+        );
+
+        if (result.error) {
+          throw new Error(result.error.message);
+        }
+
+        const listData = result.data?.job?.list;
+        setState('jobs', listData?.items ?? []);
+        setState('jobsTotal', listData?.totalCount ?? 0);
         setState('jobsPage', page);
         setState('errorJobs', null);
       } catch (err) {
@@ -80,13 +149,26 @@ export const HistoryProvider: ParentComponent = (props) => {
       try {
         const page = params.page ?? state.logsPage;
         const offset = (page - 1) * state.logsPageSize;
-        const response = await getLogs({
-          ...params,
-          limit: state.logsPageSize,
-          offset,
-        });
-        setState('logs', response.data);
-        setState('logsTotal', response.total);
+
+        const result = await client.query(
+          LogsListQuery,
+          {
+            connectionId: params.connection_id,
+            taskId: params.task_id,
+            jobId: params.job_id,
+            level: params.level,
+            pagination: { limit: state.logsPageSize, offset },
+          },
+          { requestPolicy: 'network-only' }
+        );
+
+        if (result.error) {
+          throw new Error(result.error.message);
+        }
+
+        const listData = result.data?.log?.list;
+        setState('logs', listData?.items ?? []);
+        setState('logsTotal', listData?.totalCount ?? 0);
         setState('logsPage', page);
         setState('errorLogs', null);
       } catch (err) {

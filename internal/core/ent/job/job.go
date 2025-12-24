@@ -9,6 +9,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 )
 
 const (
@@ -16,6 +17,8 @@ const (
 	Label = "job"
 	// FieldID holds the string denoting the id field in the database.
 	FieldID = "id"
+	// FieldTaskID holds the string denoting the task_id field in the database.
+	FieldTaskID = "task_id"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// FieldTrigger holds the string denoting the trigger field in the database.
@@ -42,19 +45,20 @@ const (
 	// It exists in this package in order to avoid circular dependency with the "task" package.
 	TaskInverseTable = "tasks"
 	// TaskColumn is the table column denoting the task relation/edge.
-	TaskColumn = "task_jobs"
+	TaskColumn = "task_id"
 	// LogsTable is the table that holds the logs relation/edge.
 	LogsTable = "job_logs"
 	// LogsInverseTable is the table name for the JobLog entity.
 	// It exists in this package in order to avoid circular dependency with the "joblog" package.
 	LogsInverseTable = "job_logs"
 	// LogsColumn is the table column denoting the logs relation/edge.
-	LogsColumn = "job_logs"
+	LogsColumn = "job_id"
 )
 
 // Columns holds all SQL columns for job fields.
 var Columns = []string{
 	FieldID,
+	FieldTaskID,
 	FieldStatus,
 	FieldTrigger,
 	FieldStartTime,
@@ -64,21 +68,10 @@ var Columns = []string{
 	FieldErrors,
 }
 
-// ForeignKeys holds the SQL foreign-keys that are owned by the "jobs"
-// table and are not defined as standalone fields in the schema.
-var ForeignKeys = []string{
-	"task_jobs",
-}
-
 // ValidColumn reports if the column name is valid (part of the table columns).
 func ValidColumn(column string) bool {
 	for i := range Columns {
 		if column == Columns[i] {
-			return true
-		}
-	}
-	for i := range ForeignKeys {
-		if column == ForeignKeys[i] {
 			return true
 		}
 	}
@@ -96,53 +89,22 @@ var (
 	DefaultID func() uuid.UUID
 )
 
-// Status defines the type for the "status" enum field.
-type Status string
-
-// StatusPending is the default value of the Status enum.
-const DefaultStatus = StatusPending
-
-// Status values.
-const (
-	StatusPending   Status = "pending"
-	StatusRunning   Status = "running"
-	StatusSuccess   Status = "success"
-	StatusFailed    Status = "failed"
-	StatusCancelled Status = "cancelled"
-)
-
-func (s Status) String() string {
-	return string(s)
-}
+const DefaultStatus model.JobStatus = "PENDING"
 
 // StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
-func StatusValidator(s Status) error {
-	switch s {
-	case StatusPending, StatusRunning, StatusSuccess, StatusFailed, StatusCancelled:
+func StatusValidator(s model.JobStatus) error {
+	switch s.String() {
+	case "PENDING", "RUNNING", "SUCCESS", "FAILED", "CANCELLED":
 		return nil
 	default:
 		return fmt.Errorf("job: invalid enum value for status field: %q", s)
 	}
 }
 
-// Trigger defines the type for the "trigger" enum field.
-type Trigger string
-
-// Trigger values.
-const (
-	TriggerManual   Trigger = "manual"
-	TriggerSchedule Trigger = "schedule"
-	TriggerRealtime Trigger = "realtime"
-)
-
-func (t Trigger) String() string {
-	return string(t)
-}
-
 // TriggerValidator is a validator for the "trigger" field enum values. It is called by the builders before save.
-func TriggerValidator(t Trigger) error {
-	switch t {
-	case TriggerManual, TriggerSchedule, TriggerRealtime:
+func TriggerValidator(t model.JobTrigger) error {
+	switch t.String() {
+	case "MANUAL", "SCHEDULE", "REALTIME":
 		return nil
 	default:
 		return fmt.Errorf("job: invalid enum value for trigger field: %q", t)
@@ -155,6 +117,11 @@ type OrderOption func(*sql.Selector)
 // ByID orders the results by the id field.
 func ByID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldID, opts...).ToFunc()
+}
+
+// ByTaskID orders the results by the task_id field.
+func ByTaskID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTaskID, opts...).ToFunc()
 }
 
 // ByStatus orders the results by the status field.

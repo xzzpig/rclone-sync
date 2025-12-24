@@ -11,6 +11,7 @@ A "Synology Cloud Sync"-like application built on top of `rclone`. This applicat
 - **Bidirectional Sync**: Keep two locations in sync using `rclone bisync` logic.
 - **Monitoring**: Real-time progress updates and job history logs.
 - **Cross-Platform**: Run on Linux, Windows, macOS (Single binary).
+- **GraphQL API**: Modern GraphQL API with real-time subscriptions.
 
 ## Requirements
 
@@ -60,6 +61,106 @@ A "Synology Cloud Sync"-like application built on top of `rclone`. This applicat
    ./cloud-sync serve --config /path/to/rclone.conf
    ```
 
+## API
+
+### GraphQL Endpoint
+
+The application exposes a GraphQL API at `/api/graphql`.
+
+- **HTTP**: `POST /api/graphql` - Send GraphQL queries and mutations
+- **WebSocket**: `GET /api/graphql` - Connect for GraphQL subscriptions (real-time updates)
+- **Playground**: `GET /api/graphql/playground` - Interactive GraphQL IDE (development only)
+
+#### Example Queries
+
+**List all connections:**
+```graphql
+query {
+  connection {
+    list {
+      id
+      name
+      type
+      loadStatus
+    }
+  }
+}
+```
+
+**List all tasks:**
+```graphql
+query {
+  task {
+    list {
+      id
+      name
+      status
+      connection {
+        name
+      }
+    }
+  }
+}
+```
+
+**Create a new task:**
+```graphql
+mutation {
+  task {
+    create(input: {
+      connectionId: "conn-id"
+      name: "My Sync Task"
+      localPath: "/data/sync"
+      remotePath: "/"
+      direction: DOWNLOAD
+      mode: COPY
+    }) {
+      ... on Task {
+        id
+        name
+      }
+      ... on Error {
+        message
+        code
+      }
+    }
+  }
+}
+```
+
+**Subscribe to job progress:**
+```graphql
+subscription {
+  jobProgress {
+    jobId
+    taskId
+    status
+    progress
+    speed
+    eta
+    currentFile
+    transferredBytes
+    totalBytes
+    transferredFiles
+    totalFiles
+    error
+  }
+}
+```
+
+#### Schema Overview
+
+The GraphQL schema provides the following main types:
+
+- **Connection**: Represents a cloud storage connection (e.g., Google Drive, S3)
+- **Task**: A sync task definition with source, destination, and sync settings
+- **Job**: An execution instance of a task with progress and logs
+- **JobLog**: Log entries for a job execution
+- **Provider**: Available storage provider types and their configuration options
+- **FileEntry**: File and directory entries for browsing local/remote paths
+
+For the complete schema, visit the GraphQL Playground at `/api/graphql/playground` in development mode.
+
 ## Development
 
 ### Backend
@@ -77,6 +178,14 @@ Running the frontend dev server:
 ```bash
 cd web
 pnpm dev
+```
+
+### GraphQL Development
+
+Regenerate GraphQL code after schema changes:
+
+```bash
+go generate ./internal/api/graphql/...
 ```
 
 ## Configuration

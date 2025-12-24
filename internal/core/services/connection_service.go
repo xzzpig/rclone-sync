@@ -71,6 +71,11 @@ func (s *ConnectionService) CreateConnection(ctx context.Context, name, connType
 		return nil, fmt.Errorf("connection with name '%s' already exists", name) //nolint:err113
 	}
 
+	if config == nil {
+		config = make(map[string]string)
+	}
+	config["type"] = connType
+
 	// 加密配置
 	encryptedConfig, err := s.encryptor.EncryptConfig(config)
 	if err != nil {
@@ -130,6 +135,47 @@ func (s *ConnectionService) ListConnections(ctx context.Context) ([]*ent.Connect
 	return conns, nil
 }
 
+// ListConnectionsPaginated 分页列出连接
+func (s *ConnectionService) ListConnectionsPaginated(ctx context.Context, limit, offset int) ([]*ent.Connection, int, error) {
+	query := s.client.Connection.Query().
+		Order(ent.Desc(connection.FieldCreatedAt))
+
+	// Get total count
+	totalCount, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to count connections: %w", err)
+	}
+
+	// Apply pagination and fetch items
+	conns, err := query.
+		Limit(limit).
+		Offset(offset).
+		All(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list connections: %w", err)
+	}
+
+	return conns, totalCount, nil
+}
+
+// CountAssociatedTasks 返回连接关联的任务数量
+func (s *ConnectionService) CountAssociatedTasks(ctx context.Context, connectionID uuid.UUID) (int, error) {
+	conn, err := s.client.Connection.Get(ctx, connectionID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return 0, errConnectionNotFound
+		}
+		return 0, fmt.Errorf("failed to get connection: %w", err)
+	}
+
+	count, err := conn.QueryTasks().Count(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count tasks: %w", err)
+	}
+
+	return count, nil
+}
+
 // ListConnectionNames 仅返回连接名称列表（优化查询，不加载 encrypted_config）
 func (s *ConnectionService) ListConnectionNames(ctx context.Context) ([]string, error) {
 	conns, err := s.client.Connection.
@@ -159,6 +205,7 @@ func (s *ConnectionService) GetConnectionConfig(ctx context.Context, name string
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt config: %w", err)
 	}
+	config["type"] = conn.Type
 
 	return config, nil
 }
@@ -215,6 +262,11 @@ func (s *ConnectionService) UpdateConnection(ctx context.Context, id uuid.UUID, 
 	if connType != nil {
 		update = update.SetType(*connType)
 	}
+
+	if config == nil {
+		config = make(map[string]string)
+	}
+	config["type"] = conn.Type
 
 	// 加密并更新配置（config 是必需的）
 	encryptedConfig, err := s.encryptor.EncryptConfig(config)

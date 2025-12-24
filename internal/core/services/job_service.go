@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/joblog"
@@ -31,12 +32,12 @@ func NewJobService(client *ent.Client) *JobService {
 }
 
 // CreateJob creates a new job for a task.
-func (s *JobService) CreateJob(ctx context.Context, taskID uuid.UUID, trigger job.Trigger) (*ent.Job, error) {
+func (s *JobService) CreateJob(ctx context.Context, taskID uuid.UUID, trigger model.JobTrigger) (*ent.Job, error) {
 	s.logger.Info("Creating new job", zap.String("task_id", taskID.String()), zap.Stringer("trigger", trigger))
 	j, err := s.client.Job.Create().
 		SetTaskID(taskID).
-		SetTrigger(job.Trigger(trigger)).
-		SetStatus(job.StatusPending).
+		SetTrigger(trigger).
+		SetStatus(model.JobStatusPending).
 		SetStartTime(time.Now()).
 		Save(ctx)
 	if err != nil {
@@ -48,9 +49,9 @@ func (s *JobService) CreateJob(ctx context.Context, taskID uuid.UUID, trigger jo
 // UpdateJobStatus updates the status of a job.
 func (s *JobService) UpdateJobStatus(ctx context.Context, jobID uuid.UUID, status string, errStr string) (*ent.Job, error) {
 	update := s.client.Job.UpdateOneID(jobID).
-		SetStatus(job.Status(status))
+		SetStatus(model.JobStatus(status))
 
-	if status == string(job.StatusSuccess) || status == string(job.StatusFailed) || status == string(job.StatusCancelled) {
+	if status == string(model.JobStatusSuccess) || status == string(model.JobStatusFailed) || status == string(model.JobStatusCancelled) {
 		update.SetEndTime(time.Now())
 	}
 
@@ -87,8 +88,8 @@ func (s *JobService) UpdateJobStats(ctx context.Context, jobID uuid.UUID, files,
 func (s *JobService) AddJobLog(ctx context.Context, jobID uuid.UUID, level, what, path string, size int64) (*ent.JobLog, error) {
 	create := s.client.JobLog.Create().
 		SetJobID(jobID).
-		SetLevel(joblog.Level(level)).
-		SetWhat(joblog.What(what)).
+		SetLevel(model.LogLevel(level)).
+		SetWhat(model.LogAction(what)).
 		SetNillablePath(&path).
 		SetTime(time.Now())
 
@@ -130,24 +131,77 @@ func (s *JobService) AddJobLogsBatch(ctx context.Context, jobID uuid.UUID, logs 
 	return nil
 }
 
-// ResetStuckJobs marks all jobs that are still in 'running' state as 'failed'.
+// ResetStuckJobs marks all jobs that are still in 'running' state as 'cancelled'.
 // This is typically called on application startup to handle crash recovery.
+// It also calculates and updates the files_transferred and bytes_transferred
+// statistics from the job logs before marking the job as cancelled.
 func (s *JobService) ResetStuckJobs(ctx context.Context) error {
 	s.logger.Info("Checking for stuck running jobs...")
-	count, err := s.client.Job.Update().
-		Where(job.StatusEQ(job.StatusRunning)).
-		SetStatus(job.StatusCancelled).
-		SetErrors("System crash or unexpected shutdown").
-		SetEndTime(time.Now()).
-		Save(ctx)
+
+	// Find all jobs that are still in 'running' state
+	stuckJobs, err := s.client.Job.Query().
+		Where(job.StatusEQ(model.JobStatusRunning)).
+		All(ctx)
 
 	if err != nil {
 		return errors.Join(errs.ErrSystem, err)
 	}
 
-	if count > 0 {
-		s.logger.Info("Reset stuck jobs", zap.Int("count", count))
+	if len(stuckJobs) == 0 {
+		return nil
 	}
+
+	s.logger.Info("Found stuck jobs", zap.Int("count", len(stuckJobs)))
+
+	// Process each stuck job
+	for _, j := range stuckJobs {
+		// Calculate statistics from job logs
+		// Count files transferred (UPLOAD, DOWNLOAD, MOVE with INFO level)
+		logs, err := s.client.JobLog.Query().
+			Where(
+				joblog.JobIDEQ(j.ID),
+				joblog.LevelEQ(model.LogLevelInfo),
+				joblog.WhatIn(model.LogActionUpload, model.LogActionDownload, model.LogActionMove),
+			).
+			All(ctx)
+
+		if err != nil {
+			s.logger.Error("Failed to query job logs for stuck job",
+				zap.String("job_id", j.ID.String()),
+				zap.Error(err))
+			continue
+		}
+
+		// Calculate totals
+		filesTransferred := len(logs)
+		var bytesTransferred int64
+		for _, log := range logs {
+			bytesTransferred += log.Size
+		}
+
+		// Update the job with statistics and mark as cancelled
+		_, err = s.client.Job.UpdateOneID(j.ID).
+			SetFilesTransferred(filesTransferred).
+			SetBytesTransferred(bytesTransferred).
+			SetStatus(model.JobStatusCancelled).
+			SetErrors("System crash or unexpected shutdown").
+			SetEndTime(time.Now()).
+			Save(ctx)
+
+		if err != nil {
+			s.logger.Error("Failed to update stuck job",
+				zap.String("job_id", j.ID.String()),
+				zap.Error(err))
+			continue
+		}
+
+		s.logger.Info("Reset stuck job with statistics",
+			zap.String("job_id", j.ID.String()),
+			zap.Int("files_transferred", filesTransferred),
+			zap.Int64("bytes_transferred", bytesTransferred))
+	}
+
+	s.logger.Info("Reset stuck jobs completed", zap.Int("count", len(stuckJobs)))
 	return nil
 }
 
@@ -199,7 +253,6 @@ func (s *JobService) ListJobs(ctx context.Context, taskID *uuid.UUID, connection
 		Order(ent.Desc(job.FieldStartTime)).
 		Limit(limit).
 		Offset(offset).
-		WithTask().
 		All(ctx)
 
 	if err != nil {
@@ -256,7 +309,7 @@ func (s *JobService) buildJobLogQuery(connectionID *uuid.UUID, taskID *uuid.UUID
 
 	// Optional: filter by level
 	if level != "" {
-		query.Where(joblog.LevelEQ(joblog.Level(level)))
+		query.Where(joblog.LevelEQ(model.LogLevel(level)))
 	}
 
 	return query
@@ -285,6 +338,30 @@ func (s *JobService) CountJobLogs(ctx context.Context, connectionID *uuid.UUID, 
 		return 0, errors.Join(errs.ErrSystem, err)
 	}
 	return count, nil
+}
+
+// ListJobLogsByJobPaginated lists job logs for a specific job with pagination.
+func (s *JobService) ListJobLogsByJobPaginated(ctx context.Context, jobID uuid.UUID, limit, offset int) ([]*ent.JobLog, int, error) {
+	query := s.client.JobLog.Query().
+		Where(joblog.HasJobWith(job.ID(jobID))).
+		Order(ent.Asc(joblog.FieldTime))
+
+	// Get total count
+	totalCount, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, errors.Join(errs.ErrSystem, err)
+	}
+
+	// Apply pagination and fetch items
+	logs, err := query.
+		Limit(limit).
+		Offset(offset).
+		All(ctx)
+	if err != nil {
+		return nil, 0, errors.Join(errs.ErrSystem, err)
+	}
+
+	return logs, totalCount, nil
 }
 
 var _ ports.JobService = (*JobService)(nil)

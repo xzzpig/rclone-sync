@@ -1,7 +1,7 @@
 import StatusIcon from '@/components/common/StatusIcon';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRelativeTime } from '@/lib/date';
-import { type Job, type JobStatus } from '@/lib/types';
+import type { JobListItem, JobStatus } from '@/lib/types';
 import { formatBytes } from '@/lib/utils';
 import * as m from '@/paraglide/messages.js';
 import { useNavigate } from '@solidjs/router';
@@ -9,15 +9,15 @@ import { Component, For, Show } from 'solid-js';
 import IconClock from '~icons/lucide/clock';
 
 interface RecentActivityProps {
-  jobs: Job[];
+  jobs: JobListItem[];
 }
 
 const RecentActivity: Component<RecentActivityProps> = (props) => {
   const navigate = useNavigate();
 
-  const handleJobClick = (job: Job) => {
-    const taskId = job.edges?.task?.id;
-    const connectionId = job.edges?.task?.connection_id;
+  const handleJobClick = (job: JobListItem) => {
+    const taskId = job.task?.id;
+    const connectionId = job.task?.connection?.id;
     const jobId = job.id;
 
     if (connectionId && taskId && jobId) {
@@ -26,17 +26,17 @@ const RecentActivity: Component<RecentActivityProps> = (props) => {
     }
   };
 
-  const getStatusText = (status: JobStatus) => {
-    switch (status) {
-      case 'success':
+  const getStatusText = (status: string) => {
+    switch (status.toUpperCase()) {
+      case 'SUCCESS':
         return m.status_completed();
-      case 'failed':
+      case 'FAILED':
         return m.status_failed();
-      case 'running':
+      case 'RUNNING':
         return m.status_running();
-      case 'canceled':
+      case 'CANCELLED':
         return m.task_status_cancelled();
-      case 'pending':
+      case 'PENDING':
         return m.status_idle();
       default:
         return status;
@@ -66,32 +66,31 @@ const RecentActivity: Component<RecentActivityProps> = (props) => {
                   onClick={() => handleJobClick(job)}
                 >
                   <div class="mt-0.5">
-                    <StatusIcon status={job.status} class="size-5" />
-                    {/* {getStatusIcon(job.status)} */}
+                    <StatusIcon status={job.status as JobStatus} class="size-5" />
                   </div>
                   <div class="min-w-0 flex-1">
                     <div class="flex items-start justify-between gap-2">
                       <div class="flex-1">
                         <p class="truncate font-medium text-foreground">
-                          {job.edges?.task?.name ?? 'Unnamed Task'}
+                          {job.task?.name ?? 'Unnamed Task'}
                         </p>
                         <p class="text-sm text-muted-foreground">
-                          {job.edges?.task?.edges?.connection?.name ?? 'Unknown Connection'}
+                          {job.task?.connection?.name ?? 'Unknown Connection'}
                         </p>
                       </div>
                       <span class="whitespace-nowrap text-xs text-muted-foreground">
-                        {formatRelativeTime(job.start_time)}
+                        {formatRelativeTime(job.startTime)}
                       </span>
                     </div>
                     <div class="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
                       <span>{getStatusText(job.status)}</span>
-                      <Show when={job.files_transferred > 0}>
+                      <Show when={job.filesTransferred > 0}>
                         <span>•</span>
-                        <span>{job.files_transferred} files</span>
+                        <span>{job.filesTransferred} files</span>
                       </Show>
-                      <Show when={job.bytes_transferred > 0}>
+                      <Show when={job.bytesTransferred > 0}>
                         <span>•</span>
-                        <span>{formatBytes(job.bytes_transferred)}</span>
+                        <span>{formatBytes(job.bytesTransferred)}</span>
                       </Show>
                     </div>
                   </div>

@@ -1,10 +1,10 @@
 <!--
 SYNC IMPACT REPORT
-Version change: 1.2.0 -> 1.2.1
-Modified principles: None
-Added sections: None (Technical Constraints > Technology Stack updated with migration tools)
+Version change: 1.3.0 -> 1.4.0
+Modified principles: Added X. Schema-First API Contract
+Added sections: None
 Removed sections: None
-Templates requiring updates: ✅ None (no principle-specific references affected)
+Templates requiring updates: ✅ None
 Follow-up TODOs: None
 -->
 
@@ -20,9 +20,9 @@ All sync operations MUST be implemented through rclone as a library. Direct file
 
 All user interactions MUST be through the Web UI. CLI is for development and debugging only. The Web UI provides complete functionality for managing remotes, tasks, and monitoring sync operations.
 
-### III. Test-Driven Development (NON-NEGOTIABLE)
+### III. Test-Driven Development (Backend Mandatory)
 
-All features MUST be implemented with tests first. Unit tests for internal logic, integration tests for API endpoints, and end-to-end tests for user workflows. Red-Green-Refactor cycle is strictly enforced.
+Backend features MUST be implemented with tests first. Unit tests for internal logic and integration tests for API endpoints are NON-NEGOTIABLE. Frontend unit tests are currently NOT REQUIRED. End-to-end tests for critical user workflows are maintained. Red-Green-Refactor cycle is strictly enforced for backend.
 
 ### IV. Independent User Stories
 
@@ -48,17 +48,21 @@ The interface MUST implement Optimistic UI patterns for mutations to ensure perc
 
 All user-visible text MUST be externalized into translation resource files—hardcoded strings are prohibited. The system MUST support Chinese (zh-CN) and English (en) with an extensible architecture for future languages. Frontend MUST use Paraglide for compile-time type-safe translations; Backend MUST use go-i18n with embedded TOML locale files. Language detection MUST follow priority: user preference (localStorage) > Accept-Language header > English fallback. Translation keys MUST be organized hierarchically by feature/module namespace. Missing translations MUST fall back to English gracefully—never display raw keys to users. All API error messages MUST be translatable via I18nError pattern. Date, time, and number formatting MUST respect the user's locale settings.
 
+### X. Schema-First API Contract
+
+All API interactions MUST be defined via GraphQL Schema first. Code generation MUST be used to ensure type safety across Backend (Go) and Frontend (TypeScript). Ad-hoc API endpoints are prohibited. Resolvers MUST implement the generated interfaces strictly.
+
 ## Technical Constraints
 
 ### Technology Stack
 
-- Backend: Go (latest stable) with Gin web framework
-- Frontend: SolidJS with TypeScript
+- Backend: Go (latest stable) with Gin web framework and gqlgen
+- Frontend: SolidJS with TypeScript and urql
 - Styling: Tailwind CSS
 - Database: SQLite with Ent ORM
 - Database Migration: golang-migrate (runtime execution) + Atlas CLI (schema diff generation)
 - Sync Engine: rclone as Go library
-- Real-time Updates: Server-Sent Events (SSE)
+- Real-time Updates: GraphQL Subscriptions (WebSocket)
 - File Watching: fsnotify
 - Configuration: TOML files with Viper
 - Frontend i18n: Paraglide (inlang)
@@ -92,7 +96,7 @@ All user-visible text MUST be externalized into translation resource files—har
 
 ### Testing Strategy
 
-- Unit tests for all internal packages
+- Unit tests for all internal backend packages
 - Integration tests for all API endpoints
 - End-to-end tests for critical user workflows
 - Performance tests for sync operations
@@ -103,4 +107,4 @@ All user-visible text MUST be externalized into translation resource files—har
 
 This constitution supersedes all other development practices. Amendments REQUIRE documentation, team approval, and migration plan. Versioning follows Semantic Versioning (MAJOR.MINOR.PATCH). All code reviews MUST verify compliance with these principles. Complexity MUST be justified with clear business value.
 
-**Version**: 1.2.1 | **Ratified**: 2025-12-04 | **Last Amended**: 2025-12-19
+**Version**: 1.4.0 | **Ratified**: 2025-12-04 | **Last Amended**: 2025-12-24

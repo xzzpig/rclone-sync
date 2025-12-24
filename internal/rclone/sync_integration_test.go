@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
 	"github.com/xzzpig/rclone-sync/internal/core/services"
@@ -66,7 +67,7 @@ func TestSyncEngine_RunTask_Integration(t *testing.T) {
 		sourceDir,
 		testConn.ID,
 		destDir,
-		"bidirectional",
+		string(model.SyncDirectionBidirectional),
 		"",
 		false,
 		nil,
@@ -75,14 +76,14 @@ func TestSyncEngine_RunTask_Integration(t *testing.T) {
 
 	// 3. Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobService, dataDir)
+	syncEngine := rclone.NewSyncEngine(jobService, nil, dataDir)
 
 	// 4. Reload task with Connection edge before running
 	testTask, err = taskService.GetTaskWithConnection(ctx, testTask.ID)
 	require.NoError(t, err)
 
 	// 5. Run the task - this should use DBStorage to read the connection config
-	err = syncEngine.RunTask(ctx, testTask, "manual")
+	err = syncEngine.RunTask(ctx, testTask, model.JobTriggerManual)
 	require.NoError(t, err)
 
 	// 6. Verify results
@@ -97,7 +98,7 @@ func TestSyncEngine_RunTask_Integration(t *testing.T) {
 	assert.Len(t, jobs, 1, "Should be one job in the database")
 
 	job := jobs[0]
-	assert.Equal(t, "success", string(job.Status), "Job status should be success")
+	assert.Equal(t, string(model.JobStatusSuccess), string(job.Status), "Job status should be success")
 	assert.Equal(t, 1, job.FilesTransferred, "Should have transferred one file")
 	assert.Equal(t, int64(11), job.BytesTransferred, "Should have transferred 11 bytes")
 
@@ -132,7 +133,7 @@ func TestSyncEngine_RunTask_Failure(t *testing.T) {
 		sourceDir,
 		testConn.ID,
 		destDir,
-		"bidirectional",
+		string(model.SyncDirectionBidirectional),
 		"",
 		false,
 		nil,
@@ -141,14 +142,14 @@ func TestSyncEngine_RunTask_Failure(t *testing.T) {
 
 	// 3. Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobService, dataDir)
+	syncEngine := rclone.NewSyncEngine(jobService, nil, dataDir)
 
 	// 4. Reload task with Connection edge before running
 	testTask, err = taskService.GetTaskWithConnection(ctx, testTask.ID)
 	require.NoError(t, err)
 
 	// 5. Run the task and expect an error
-	err = syncEngine.RunTask(ctx, testTask, "manual")
+	err = syncEngine.RunTask(ctx, testTask, model.JobTriggerManual)
 	assert.Error(t, err, "RunTask should return an error for non-existent source")
 
 	// 6. Verify results
@@ -157,7 +158,7 @@ func TestSyncEngine_RunTask_Failure(t *testing.T) {
 	assert.Len(t, jobs, 1, "Should be one job in the database")
 
 	job := jobs[0]
-	assert.Equal(t, "failed", string(job.Status), "Job status should be failed")
+	assert.Equal(t, string(model.JobStatusFailed), string(job.Status), "Job status should be failed")
 	assert.NotEmpty(t, job.Errors, "Job should have an error message")
 }
 
@@ -183,7 +184,7 @@ func TestSyncEngine_RunTask_Cancel(t *testing.T) {
 		sourceDir,
 		testConn.ID,
 		destDir,
-		"bidirectional",
+		string(model.SyncDirectionBidirectional),
 		"",
 		false,
 		nil,
@@ -192,7 +193,7 @@ func TestSyncEngine_RunTask_Cancel(t *testing.T) {
 
 	// 3. Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobService, dataDir)
+	syncEngine := rclone.NewSyncEngine(jobService, nil, dataDir)
 
 	// 4. Reload task with Connection edge before running
 	testTask, err = taskService.GetTaskWithConnection(ctx, testTask.ID)
@@ -203,7 +204,7 @@ func TestSyncEngine_RunTask_Cancel(t *testing.T) {
 	cancel() // Cancel immediately
 
 	// 6. Run the task with the cancelled context
-	err = syncEngine.RunTask(cancelCtx, testTask, "manual")
+	err = syncEngine.RunTask(cancelCtx, testTask, model.JobTriggerManual)
 	assert.Error(t, err, "RunTask should return an error for a cancelled context")
 	assert.Contains(t, err.Error(), "context canceled", "Error should mention context cancellation")
 
@@ -248,7 +249,7 @@ func TestSyncEngine_RunTask_CancelDuringSync(t *testing.T) {
 		sourceDir,
 		slowConn.ID,
 		destDir,
-		"upload",
+		string(model.SyncDirectionUpload),
 		"",
 		false,
 		nil,
@@ -261,7 +262,7 @@ func TestSyncEngine_RunTask_CancelDuringSync(t *testing.T) {
 
 	// 6. Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobService, dataDir)
+	syncEngine := rclone.NewSyncEngine(jobService, nil, dataDir)
 
 	// 7. Create cancellable context
 	taskCtx, cancel := context.WithCancel(context.Background())
@@ -269,7 +270,7 @@ func TestSyncEngine_RunTask_CancelDuringSync(t *testing.T) {
 	// 8. Run task in background
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- syncEngine.RunTask(taskCtx, testTask, "manual")
+		errCh <- syncEngine.RunTask(taskCtx, testTask, model.JobTriggerManual)
 	}()
 
 	// 9. Wait for sync operation to actually start
@@ -289,7 +290,7 @@ func TestSyncEngine_RunTask_CancelDuringSync(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, jobs, 1, "Should have exactly one job")
 	jobID := jobs[0].ID
-	assert.Equal(t, "running", string(jobs[0].Status), "Job should be running before cancellation")
+	assert.Equal(t, string(model.JobStatusRunning), string(jobs[0].Status), "Job should be running before cancellation")
 	t.Logf("Job ID: %s, status: %s", jobID, jobs[0].Status)
 
 	// 12. Cancel the context while sync is in progress
@@ -316,7 +317,7 @@ func TestSyncEngine_RunTask_CancelDuringSync(t *testing.T) {
 
 	job := jobs[0]
 	assert.Equal(t, jobID, job.ID, "Should be the same job")
-	assert.Equal(t, "cancelled", string(job.Status), "Job status should be cancelled after context cancellation")
+	assert.Equal(t, string(model.JobStatusCancelled), string(job.Status), "Job status should be cancelled after context cancellation")
 	assert.Contains(t, job.Errors, "cancelled", "Job errors should mention cancellation")
 	t.Logf("Final job status: %s, errors: %s", job.Status, job.Errors)
 }

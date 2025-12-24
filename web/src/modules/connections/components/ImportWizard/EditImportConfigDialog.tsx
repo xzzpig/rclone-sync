@@ -1,4 +1,4 @@
-import { getProviderOptions } from '@/api/connections';
+import { ProviderGetQuery } from '@/api/graphql/queries/providers';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import type { ImportPreviewItem } from '@/lib/types';
 import * as m from '@/paraglide/messages';
-import { createQuery } from '@tanstack/solid-query';
+import { createQuery } from '@urql/solid';
 import { Component, Show } from 'solid-js';
 import { DynamicConfigForm } from '../DynamicConfigForm';
 
@@ -21,12 +21,16 @@ interface EditImportConfigDialogProps {
 }
 
 export const EditImportConfigDialog: Component<EditImportConfigDialogProps> = (props) => {
-  // Query provider options when dialog opens and item type is available
-  const providerOptionsQuery = createQuery(() => ({
-    queryKey: ['providers', props.item?.type],
-    queryFn: () => getProviderOptions(props.item!.type),
-    enabled: props.isOpen && !!props.item?.type,
-  }));
+  // Query provider options when dialog opens and item type is available using GraphQL
+  const [providerResult, reexecuteQuery] = createQuery({
+    query: ProviderGetQuery,
+    variables: () => ({ name: props.item?.type ?? '' }),
+    pause: () => !props.isOpen || !props.item?.type,
+  });
+
+  const providerOptions = () => providerResult.data?.provider?.get?.options ?? [];
+  const isLoading = () => providerResult.fetching;
+  const isError = () => !!providerResult.error;
 
   const handleSave = async (_name: string | undefined, config: Record<string, string>) => {
     props.onSave(config);
@@ -62,18 +66,21 @@ export const EditImportConfigDialog: Component<EditImportConfigDialogProps> = (p
         >
           {(item) => (
             <Show
-              when={!providerOptionsQuery.isLoading && !providerOptionsQuery.isError}
+              when={!isLoading() && !isError()}
               fallback={
                 <div class="space-y-4 p-4">
-                  <Show when={providerOptionsQuery.isLoading}>
+                  <Show when={isLoading()}>
                     <div class="text-center text-muted-foreground">{m.import_loadingOptions()}</div>
                   </Show>
-                  <Show when={providerOptionsQuery.isError}>
+                  <Show when={isError()}>
                     <div class="space-y-2 text-center">
                       <div class="text-error-foreground">
-                        {m.import_loadOptionsFailed({ error: String(providerOptionsQuery.error) })}:
+                        {m.import_loadOptionsFailed({ error: String(providerResult.error) })}:
                       </div>
-                      <Button variant="outline" onClick={() => providerOptionsQuery.refetch()}>
+                      <Button
+                        variant="outline"
+                        onClick={() => reexecuteQuery({ requestPolicy: 'network-only' })}
+                      >
                         {m.common_retry()}
                       </Button>
                     </div>
@@ -82,7 +89,7 @@ export const EditImportConfigDialog: Component<EditImportConfigDialogProps> = (p
               }
             >
               <DynamicConfigForm
-                options={providerOptionsQuery.data ?? []}
+                options={providerOptions()}
                 provider={item().type}
                 initialValues={item().editedConfig ?? item().config}
                 onBack={handleClose}
@@ -90,7 +97,7 @@ export const EditImportConfigDialog: Component<EditImportConfigDialogProps> = (p
                 hideName
                 saveButtonText={m.common_save()}
                 showBack
-                loading={providerOptionsQuery.isLoading}
+                loading={isLoading()}
               />
             </Show>
           )}

@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/joblog"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/task"
@@ -23,14 +24,20 @@ type JobCreate struct {
 	hooks    []Hook
 }
 
+// SetTaskID sets the "task_id" field.
+func (_c *JobCreate) SetTaskID(v uuid.UUID) *JobCreate {
+	_c.mutation.SetTaskID(v)
+	return _c
+}
+
 // SetStatus sets the "status" field.
-func (_c *JobCreate) SetStatus(v job.Status) *JobCreate {
+func (_c *JobCreate) SetStatus(v model.JobStatus) *JobCreate {
 	_c.mutation.SetStatus(v)
 	return _c
 }
 
 // SetNillableStatus sets the "status" field if the given value is not nil.
-func (_c *JobCreate) SetNillableStatus(v *job.Status) *JobCreate {
+func (_c *JobCreate) SetNillableStatus(v *model.JobStatus) *JobCreate {
 	if v != nil {
 		_c.SetStatus(*v)
 	}
@@ -38,7 +45,7 @@ func (_c *JobCreate) SetNillableStatus(v *job.Status) *JobCreate {
 }
 
 // SetTrigger sets the "trigger" field.
-func (_c *JobCreate) SetTrigger(v job.Trigger) *JobCreate {
+func (_c *JobCreate) SetTrigger(v model.JobTrigger) *JobCreate {
 	_c.mutation.SetTrigger(v)
 	return _c
 }
@@ -127,12 +134,6 @@ func (_c *JobCreate) SetNillableID(v *uuid.UUID) *JobCreate {
 	return _c
 }
 
-// SetTaskID sets the "task" edge to the Task entity by ID.
-func (_c *JobCreate) SetTaskID(id uuid.UUID) *JobCreate {
-	_c.mutation.SetTaskID(id)
-	return _c
-}
-
 // SetTask sets the "task" edge to the Task entity.
 func (_c *JobCreate) SetTask(v *Task) *JobCreate {
 	return _c.SetTaskID(v.ID)
@@ -212,6 +213,9 @@ func (_c *JobCreate) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (_c *JobCreate) check() error {
+	if _, ok := _c.mutation.TaskID(); !ok {
+		return &ValidationError{Name: "task_id", err: errors.New(`ent: missing required field "Job.task_id"`)}
+	}
 	if _, ok := _c.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "Job.status"`)}
 	}
@@ -317,7 +321,7 @@ func (_c *JobCreate) createSpec() (*Job, *sqlgraph.CreateSpec) {
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_node.task_jobs = &nodes[0]
+		_node.TaskID = nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.LogsIDs(); len(nodes) > 0 {

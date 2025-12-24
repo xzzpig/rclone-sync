@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
-	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 )
 
@@ -22,8 +22,8 @@ type MockRunner struct {
 
 func (m *MockRunner) Start() { m.Called() }
 func (m *MockRunner) Stop()  { m.Called() }
-func (m *MockRunner) StartTask(task *ent.Task, trigger job.Trigger) error {
-	args := m.Called(task, string(trigger))
+func (m *MockRunner) StartTask(task *ent.Task, trigger model.JobTrigger) error {
+	args := m.Called(task, trigger)
 	return args.Error(0)
 }
 func (m *MockRunner) StopTask(taskID uuid.UUID) error {
@@ -87,7 +87,7 @@ func TestWatcher_Debounce(t *testing.T) {
 	// Watcher will call GetTaskWithConnection when the debounce timer fires.
 	mockTaskSvc.On("GetTaskWithConnection", mock.Anything, task.ID).Return(task, nil)
 	// We expect StartTask to be called only once.
-	mockRunner.On("StartTask", task, "realtime").Return(nil).Once()
+	mockRunner.On("StartTask", task, model.JobTriggerRealtime).Return(nil).Once()
 
 	w, err := NewWatcher(mockTaskSvc, mockRunner)
 	assert.NoError(t, err)

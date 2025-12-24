@@ -457,7 +457,9 @@ func (_q *TaskQuery) loadJobs(ctx context.Context, query *JobQuery, nodes []*Tas
 			init(nodes[i])
 		}
 	}
-	query.withFKs = true
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(job.FieldTaskID)
+	}
 	query.Where(predicate.Job(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(task.JobsColumn), fks...))
 	}))
@@ -466,13 +468,10 @@ func (_q *TaskQuery) loadJobs(ctx context.Context, query *JobQuery, nodes []*Tas
 		return err
 	}
 	for _, n := range neighbors {
-		fk := n.task_jobs
-		if fk == nil {
-			return fmt.Errorf(`foreign-key "task_jobs" is nil for node %v`, n.ID)
-		}
-		node, ok := nodeids[*fk]
+		fk := n.TaskID
+		node, ok := nodeids[fk]
 		if !ok {
-			return fmt.Errorf(`unexpected referenced foreign-key "task_jobs" returned %v for node %v`, *fk, n.ID)
+			return fmt.Errorf(`unexpected referenced foreign-key "task_id" returned %v for node %v`, fk, n.ID)
 		}
 		assign(node, n)
 	}

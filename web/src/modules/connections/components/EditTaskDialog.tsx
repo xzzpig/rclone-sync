@@ -1,4 +1,3 @@
-import * as m from '@/paraglide/messages.js';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -8,7 +7,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { showToast } from '@/components/ui/toast';
-import { Task } from '@/lib/types';
+import { type SyncDirection, type Task, type UpdateTaskInput } from '@/lib/types';
+import * as m from '@/paraglide/messages.js';
 import { createEffect, createSignal } from 'solid-js';
 import { TaskSettingsForm, TaskSettingsFormData } from './TaskSettingsForm';
 
@@ -16,13 +16,13 @@ interface EditTaskDialogProps {
   task: Task | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (id: string, updates: Partial<Task>) => Promise<void>;
+  onSave: (id: string, updates: UpdateTaskInput) => Promise<void>;
 }
 
 export function EditTaskDialog(props: EditTaskDialogProps) {
   const [formData, setFormData] = createSignal<TaskSettingsFormData>({
     name: '',
-    direction: 'upload',
+    direction: 'UPLOAD',
     schedule: '',
     realtime: false,
     options: {},
@@ -34,11 +34,11 @@ export function EditTaskDialog(props: EditTaskDialogProps) {
     const task = props.task;
     if (task) {
       setFormData({
-        name: task.name || '',
-        direction: task.direction || 'upload',
+        name: task.name ?? '',
+        direction: task.direction as SyncDirection,
         schedule: task.schedule ?? '',
-        realtime: task.realtime || false,
-        options: task.options || {},
+        realtime: task.realtime ?? false,
+        options: {},
       });
     }
   });

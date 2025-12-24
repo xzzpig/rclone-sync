@@ -2,22 +2,19 @@ package api
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/xzzpig/rclone-sync/internal/core/config"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
-	"github.com/xzzpig/rclone-sync/internal/core/ports"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
-	"github.com/xzzpig/rclone-sync/internal/core/runner"
-	"github.com/xzzpig/rclone-sync/internal/rclone"
 	"github.com/xzzpig/rclone-sync/internal/ui"
 
 	"github.com/xzzpig/rclone-sync/internal/api/context"
-	"github.com/xzzpig/rclone-sync/internal/api/handlers"
 )
 
 // srvLog returns a named logger for the api.server package.
@@ -26,7 +23,7 @@ func srvLog() *zap.Logger {
 }
 
 // SetupRouter creates and configures the Gin router with all middleware and routes.
-func SetupRouter(deps RouterDeps, syncEngine *rclone.SyncEngine, taskRunner *runner.Runner, jobService ports.JobService, watcher ports.Watcher, scheduler ports.Scheduler) *gin.Engine {
+func SetupRouter(deps RouterDeps) *gin.Engine {
 	cfg := deps.Config
 	if cfg.App.Environment == "development" {
 		gin.SetMode(gin.DebugMode)
@@ -39,7 +36,7 @@ func SetupRouter(deps RouterDeps, syncEngine *rclone.SyncEngine, taskRunner *run
 	// Middleware
 	r.Use(ginLogger(logger.Named("api.http")))
 	r.Use(gin.Recovery())
-	r.Use(context.Middleware(syncEngine, taskRunner, jobService, watcher, scheduler))
+	r.Use(context.Middleware(deps.SyncEngine, deps.Runner, deps.JobService, deps.Watcher, deps.Scheduler))
 	r.Use(context.LocaleMiddleware())    // Parse Accept-Language header
 	r.Use(context.I18nErrorMiddleware()) // Handle I18nError responses
 	r.Use(cors.New(cors.Config{
@@ -109,7 +106,7 @@ func setupFrontendService(r *gin.Engine, cfg *config.Config) error {
 		f, err = fs.Open("index.html")
 		if err != nil {
 			srvLog().Error("Failed to serve index.html", zap.Error(err))
-			handlers.NotFoundHandler(c)
+			notFoundHandler(c)
 			return
 		}
 		_ = f.Close()
@@ -121,11 +118,22 @@ func setupFrontendService(r *gin.Engine, cfg *config.Config) error {
 	return nil
 }
 
+// notFoundHandler handles 404 responses.
+func notFoundHandler(c *gin.Context) {
+	c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+}
+
 func ginLogger(l *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		path := c.Request.URL.Path
 		query := c.Request.URL.RawQuery
+
+		// 排除 GraphQL 路由（由 GraphQL 中间件单独处理）
+		if strings.HasPrefix(path, "/api/graphql") {
+			c.Next()
+			return
+		}
 
 		c.Next()
 

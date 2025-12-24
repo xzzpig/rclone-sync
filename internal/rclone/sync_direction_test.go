@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/rclone"
 )
 
@@ -40,7 +41,7 @@ func TestSyncEngine_RunTask_Upload(t *testing.T) {
 		sourceDir,
 		testConn.ID,
 		destDir,
-		"upload",
+		string(model.SyncDirectionUpload),
 		"",
 		false,
 		nil,
@@ -49,14 +50,14 @@ func TestSyncEngine_RunTask_Upload(t *testing.T) {
 
 	// 3. Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobService, dataDir)
+	syncEngine := rclone.NewSyncEngine(jobService, nil, dataDir)
 
 	// 4. Reload task with Connection edge before running
 	testTask, err = taskService.GetTaskWithConnection(ctx, testTask.ID)
 	require.NoError(t, err)
 
 	// 5. Run the task - this should use DBStorage to read the connection config
-	err = syncEngine.RunTask(ctx, testTask, "manual")
+	err = syncEngine.RunTask(ctx, testTask, model.JobTriggerManual)
 	require.NoError(t, err)
 
 	// 6. Verify results
@@ -79,7 +80,7 @@ func TestSyncEngine_RunTask_Upload(t *testing.T) {
 	jobs, err := jobService.ListJobs(ctx, &testTask.ID, nil, 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs, 1)
-	assert.Equal(t, "success", string(jobs[0].Status))
+	assert.Equal(t, string(model.JobStatusSuccess), string(jobs[0].Status))
 }
 
 func TestSyncEngine_RunTask_Download(t *testing.T) {
@@ -109,7 +110,7 @@ func TestSyncEngine_RunTask_Download(t *testing.T) {
 		sourceDir,
 		testConn.ID,
 		destDir,
-		"download",
+		string(model.SyncDirectionDownload),
 		"",
 		false,
 		nil,
@@ -118,14 +119,14 @@ func TestSyncEngine_RunTask_Download(t *testing.T) {
 
 	// 3. Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobService, dataDir)
+	syncEngine := rclone.NewSyncEngine(jobService, nil, dataDir)
 
 	// 4. Reload task with Connection edge before running
 	testTask, err = taskService.GetTaskWithConnection(ctx, testTask.ID)
 	require.NoError(t, err)
 
 	// 5. Run the task - this should use DBStorage to read the connection config
-	err = syncEngine.RunTask(ctx, testTask, "manual")
+	err = syncEngine.RunTask(ctx, testTask, model.JobTriggerManual)
 	require.NoError(t, err)
 
 	// 6. Verify results
@@ -142,7 +143,7 @@ func TestSyncEngine_RunTask_Download(t *testing.T) {
 	jobs, err := jobService.ListJobs(ctx, &testTask.ID, nil, 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs, 1)
-	assert.Equal(t, "success", string(jobs[0].Status))
+	assert.Equal(t, string(model.JobStatusSuccess), string(jobs[0].Status))
 }
 
 func TestSyncEngine_RunTask_Bidirectional(t *testing.T) {
@@ -172,7 +173,7 @@ func TestSyncEngine_RunTask_Bidirectional(t *testing.T) {
 		sourceDir,
 		testConn.ID,
 		destDir,
-		"bidirectional",
+		string(model.SyncDirectionBidirectional),
 		"",
 		false,
 		nil,
@@ -181,14 +182,14 @@ func TestSyncEngine_RunTask_Bidirectional(t *testing.T) {
 
 	// 3. Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobService, dataDir)
+	syncEngine := rclone.NewSyncEngine(jobService, nil, dataDir)
 
 	// 4. Reload task with Connection edge before running
 	testTask, err = taskService.GetTaskWithConnection(ctx, testTask.ID)
 	require.NoError(t, err)
 
 	// 5. Run the task - this should use DBStorage to read the connection config
-	err = syncEngine.RunTask(ctx, testTask, "manual")
+	err = syncEngine.RunTask(ctx, testTask, model.JobTriggerManual)
 	require.NoError(t, err)
 
 	// 6. Verify results
@@ -206,5 +207,5 @@ func TestSyncEngine_RunTask_Bidirectional(t *testing.T) {
 	jobs, err := jobService.ListJobs(ctx, &testTask.ID, nil, 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs, 1)
-	assert.Equal(t, "success", string(jobs[0].Status))
+	assert.Equal(t, string(model.JobStatusSuccess), string(jobs[0].Status))
 }

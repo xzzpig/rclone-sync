@@ -7,22 +7,22 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
-	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 )
 
 // Runner manages the lifecycle of background tasks.
 type Runner interface {
 	Start()
 	Stop()
-	StartTask(task *ent.Task, trigger job.Trigger) error
+	StartTask(task *ent.Task, trigger model.JobTrigger) error
 	StopTask(taskID uuid.UUID) error
 	IsRunning(taskID uuid.UUID) bool
 }
 
 // SyncEngine executes the actual sync operation for a task.
 type SyncEngine interface {
-	RunTask(ctx context.Context, task *ent.Task, trigger job.Trigger) error
+	RunTask(ctx context.Context, task *ent.Task, trigger model.JobTrigger) error
 }
 
 // Watcher defines the interface for file watching operations.
@@ -51,7 +51,7 @@ type TaskService interface {
 
 // JobService defines the interface for job management operations.
 type JobService interface {
-	CreateJob(ctx context.Context, taskID uuid.UUID, trigger job.Trigger) (*ent.Job, error)
+	CreateJob(ctx context.Context, taskID uuid.UUID, trigger model.JobTrigger) (*ent.Job, error)
 	UpdateJobStatus(ctx context.Context, jobID uuid.UUID, status string, errStr string) (*ent.Job, error)
 	UpdateJobStats(ctx context.Context, jobID uuid.UUID, files, bytes int64) (*ent.Job, error)
 	AddJobLog(ctx context.Context, jobID uuid.UUID, level, what, path string, size int64) (*ent.JobLog, error)

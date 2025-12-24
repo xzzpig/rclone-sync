@@ -8,6 +8,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 )
 
 const (
@@ -15,6 +16,8 @@ const (
 	Label = "job_log"
 	// FieldID holds the string denoting the id field in the database.
 	FieldID = "id"
+	// FieldJobID holds the string denoting the job_id field in the database.
+	FieldJobID = "job_id"
 	// FieldLevel holds the string denoting the level field in the database.
 	FieldLevel = "level"
 	// FieldTime holds the string denoting the time field in the database.
@@ -35,12 +38,13 @@ const (
 	// It exists in this package in order to avoid circular dependency with the "job" package.
 	JobInverseTable = "jobs"
 	// JobColumn is the table column denoting the job relation/edge.
-	JobColumn = "job_logs"
+	JobColumn = "job_id"
 )
 
 // Columns holds all SQL columns for joblog fields.
 var Columns = []string{
 	FieldID,
+	FieldJobID,
 	FieldLevel,
 	FieldTime,
 	FieldPath,
@@ -48,21 +52,10 @@ var Columns = []string{
 	FieldSize,
 }
 
-// ForeignKeys holds the SQL foreign-keys that are owned by the "job_logs"
-// table and are not defined as standalone fields in the schema.
-var ForeignKeys = []string{
-	"job_logs",
-}
-
 // ValidColumn reports if the column name is valid (part of the table columns).
 func ValidColumn(column string) bool {
 	for i := range Columns {
 		if column == Columns[i] {
-			return true
-		}
-	}
-	for i := range ForeignKeys {
-		if column == ForeignKeys[i] {
 			return true
 		}
 	}
@@ -74,54 +67,22 @@ var (
 	DefaultTime func() time.Time
 )
 
-// Level defines the type for the "level" enum field.
-type Level string
-
-// Level values.
-const (
-	LevelInfo    Level = "info"
-	LevelWarning Level = "warning"
-	LevelError   Level = "error"
-)
-
-func (l Level) String() string {
-	return string(l)
-}
-
 // LevelValidator is a validator for the "level" field enum values. It is called by the builders before save.
-func LevelValidator(l Level) error {
-	switch l {
-	case LevelInfo, LevelWarning, LevelError:
+func LevelValidator(l model.LogLevel) error {
+	switch l.String() {
+	case "INFO", "WARNING", "ERROR":
 		return nil
 	default:
 		return fmt.Errorf("joblog: invalid enum value for level field: %q", l)
 	}
 }
 
-// What defines the type for the "what" enum field.
-type What string
-
-// WhatUnknown is the default value of the What enum.
-const DefaultWhat = WhatUnknown
-
-// What values.
-const (
-	WhatUpload   What = "upload"
-	WhatDownload What = "download"
-	WhatDelete   What = "delete"
-	WhatMove     What = "move"
-	WhatError    What = "error"
-	WhatUnknown  What = "unknown"
-)
-
-func (w What) String() string {
-	return string(w)
-}
+const DefaultWhat model.LogAction = "UNKNOWN"
 
 // WhatValidator is a validator for the "what" field enum values. It is called by the builders before save.
-func WhatValidator(w What) error {
-	switch w {
-	case WhatUpload, WhatDownload, WhatDelete, WhatMove, WhatError, WhatUnknown:
+func WhatValidator(w model.LogAction) error {
+	switch w.String() {
+	case "UPLOAD", "DOWNLOAD", "DELETE", "MOVE", "ERROR", "UNKNOWN":
 		return nil
 	default:
 		return fmt.Errorf("joblog: invalid enum value for what field: %q", w)
@@ -134,6 +95,11 @@ type OrderOption func(*sql.Selector)
 // ByID orders the results by the id field.
 func ByID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldID, opts...).ToFunc()
+}
+
+// ByJobID orders the results by the job_id field.
+func ByJobID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldJobID, opts...).ToFunc()
 }
 
 // ByLevel orders the results by the level field.

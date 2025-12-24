@@ -1,11 +1,10 @@
-import * as m from '@/paraglide/messages.js';
+import { client } from '@/api/graphql/client';
 import {
-  deleteConnection,
-  getConnection,
-  getConnectionConfig,
-  getProviderOptions,
-  updateConnection,
-} from '@/api/connections';
+  ConnectionDeleteMutation,
+  ConnectionGetConfigQuery,
+  ConnectionUpdateMutation,
+} from '@/api/graphql/queries/connections';
+import { ProviderGetQuery } from '@/api/graphql/queries/providers';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -18,40 +17,53 @@ import {
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { showToast } from '@/components/ui/toast';
+import * as m from '@/paraglide/messages.js';
 import { useNavigate, useParams } from '@solidjs/router';
-import { useQuery, useQueryClient } from '@tanstack/solid-query';
-import { Component, Show, createSignal } from 'solid-js';
+import { createMutation, createQuery } from '@urql/solid';
+import { Component, Show, createMemo, createSignal } from 'solid-js';
 import IconLoader2 from '~icons/lucide/loader-2';
 import { DynamicConfigForm } from '../components/DynamicConfigForm';
 
 const Settings: Component = () => {
   const params = useParams();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const connectionId = () => params.connectionId;
 
-  // Fetch connection info
-  const connectionQuery = useQuery(() => ({
-    queryKey: ['connection', connectionId()],
-    queryFn: () => getConnection(connectionId()!),
-    enabled: !!connectionId(),
-  }));
+  // Fetch connection info with config using GraphQL
+  const [connectionResult] = createQuery({
+    query: ConnectionGetConfigQuery,
+    variables: () => ({ id: connectionId()! }),
+    pause: () => !connectionId(),
+  });
 
-  // Fetch connection config
-  const configQuery = useQuery(() => ({
-    queryKey: ['connectionConfig', connectionId()],
-    queryFn: () => getConnectionConfig(connectionId()!),
-    enabled: !!connectionId(),
-  }));
+  // Extract connection data
+  const connection = () => connectionResult.data?.connection?.get;
+  const connectionName = () => connection()?.name ?? connectionId() ?? '';
+  const connectionType = () => connection()?.type;
+  const connectionConfig = () => connection()?.config;
 
-  // Fetch provider options when config is available
-  const optionsQuery = useQuery(() => ({
-    queryKey: ['providerOptions', configQuery.data?.type],
-    queryFn: () => getProviderOptions(configQuery.data!.type),
-    enabled: !!configQuery.data?.type,
-  }));
+  // Fetch provider options when connection type is available
+  const [providerResult] = createQuery({
+    query: ProviderGetQuery,
+    variables: () => ({ name: connectionType()! }),
+    pause: () => !connectionType(),
+  });
 
-  const connectionName = () => connectionQuery.data?.name ?? connectionId() ?? '';
+  // Extract provider options directly from GraphQL (lowercase property names)
+  const providerOptions = () => providerResult.data?.provider?.get?.options ?? [];
+
+  // Build initial values by spreading config into flat Record<string, string>
+  const initialValues = createMemo(() => {
+    const config = connectionConfig();
+    return {
+      name: connectionName(),
+      ...(config ?? {}),
+    };
+  });
+
+  // Mutations
+  const [, executeUpdateConnection] = createMutation(ConnectionUpdateMutation);
+  const [, executeDeleteConnection] = createMutation(ConnectionDeleteMutation);
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = createSignal(false);
   const [isDeleting, setIsDeleting] = createSignal(false);
@@ -61,9 +73,18 @@ const Settings: Component = () => {
     if (!id) {
       throw new Error('Connection ID is required');
     }
-    await updateConnection(id, { config });
-    await queryClient.invalidateQueries({ queryKey: ['connections'] });
-    await queryClient.invalidateQueries({ queryKey: ['connectionConfig', id] });
+
+    const result = await executeUpdateConnection({
+      id,
+      input: { config },
+    });
+
+    if (result.error) {
+      throw new Error(result.error.message);
+    }
+
+    // Invalidate connection queries
+    client.query(ConnectionGetConfigQuery, { id }, { requestPolicy: 'network-only' });
 
     // Show success toast
     showToast({
@@ -77,8 +98,10 @@ const Settings: Component = () => {
     try {
       const id = connectionId();
       if (id) {
-        await deleteConnection(id);
-        await queryClient.invalidateQueries({ queryKey: ['connections'] });
+        const result = await executeDeleteConnection({ id });
+        if (result.error) {
+          throw new Error(result.error.message);
+        }
         navigate('/');
       }
     } catch (error) {
@@ -94,20 +117,22 @@ const Settings: Component = () => {
     }
   };
 
+  const isLoading = () => connectionResult.fetching || providerResult.fetching;
+
   return (
     <div class="h-full space-y-6 overflow-auto [scrollbar-gutter:stable]">
       <Card>
         <CardHeader>
-          <Show when={!configQuery.isLoading} fallback={<Skeleton class="h-6 w-[180px]" />}>
+          <Show when={!isLoading()} fallback={<Skeleton class="h-6 w-[180px]" />}>
             <CardTitle>{m.common_settings()}</CardTitle>
           </Show>
         </CardHeader>
         <CardContent>
           <DynamicConfigForm
-            loading={configQuery.isLoading || optionsQuery.isLoading}
-            initialValues={{ ...configQuery.data, name: connectionName() ?? '' }}
-            options={optionsQuery.data ?? []}
-            provider={configQuery.data?.type ?? ''}
+            loading={isLoading()}
+            initialValues={initialValues()}
+            options={providerOptions()}
+            provider={connectionType() ?? ''}
             isEditing={true}
             showBack={false}
             onBack={() => navigate('..')}

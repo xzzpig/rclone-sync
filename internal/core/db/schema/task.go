@@ -3,6 +3,8 @@ package schema
 import (
 	"time"
 
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
+
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
@@ -29,8 +31,8 @@ func (Task) Fields() []ent.Field {
 		field.String("remote_path").
 			NotEmpty(),
 		field.Enum("direction").
-			Values("upload", "download", "bidirectional").
-			Default("bidirectional"),
+			GoType(model.SyncDirection("")).
+			Default(string(model.SyncDirectionBidirectional)),
 		field.String("schedule").
 			Optional(),
 		field.Bool("realtime").

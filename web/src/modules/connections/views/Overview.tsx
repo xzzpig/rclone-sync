@@ -1,4 +1,4 @@
-import { getConnectionQuota } from '@/api/connections';
+import { ConnectionGetQuotaQuery } from '@/api/graphql/queries/connections';
 import StatusIcon from '@/components/common/StatusIcon';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -7,7 +7,7 @@ import { formatBytes } from '@/lib/utils';
 import * as m from '@/paraglide/messages.js';
 import { useTasks } from '@/store/tasks';
 import { useParams } from '@solidjs/router';
-import { useQuery } from '@tanstack/solid-query';
+import { createQuery } from '@urql/solid';
 import { Component, createMemo, Show } from 'solid-js';
 
 const Overview: Component = () => {
@@ -15,27 +15,31 @@ const Overview: Component = () => {
   const [, actions] = useTasks();
 
   const connectionId = () => params.connectionId;
-  const quotaQuery = useQuery(() => ({
-    queryKey: ['connectionQuota', connectionId()],
-    queryFn: () => getConnectionQuota(connectionId()!),
-    enabled: !!connectionId(),
-    refetchInterval: 60000, // Refetch every 60 seconds
-  }));
+
+  // Use GraphQL query to fetch connection with quota
+  const [connectionResult] = createQuery({
+    query: ConnectionGetQuotaQuery,
+    variables: () => ({ id: connectionId()! }),
+    pause: () => !connectionId(),
+  });
+
+  // Extract quota from GraphQL response
+  const quota = () => connectionResult.data?.connection?.get?.quota;
 
   // Use createMemo to ensure proper reactive tracking when connection changes
   const status = createMemo(() => actions.getTaskStatus(connectionId()));
 
   const statusLabel = () => {
     const s = status();
-    if (s === 'running') return m.status_running();
-    if (s === 'success') return m.overview_healthy();
-    if (s === 'failed') return m.status_failed();
+    if (s === 'RUNNING') return m.status_running();
+    if (s === 'SUCCESS') return m.overview_healthy();
+    if (s === 'FAILED') return m.status_failed();
     return m.status_idle();
   };
 
   // Calculate usage percentage
   const usagePercent = () => {
-    const q = quotaQuery.data;
+    const q = quota();
     if (!q || !q.total || !q.used) return 0;
     return Math.min(100, (q.used / q.total) * 100);
   };
@@ -52,7 +56,7 @@ const Overview: Component = () => {
           <CardContent>
             <div class="text-2xl font-bold tracking-tight">{statusLabel()}</div>
             <p class="mt-1 text-xs text-muted-foreground">
-              {status() === 'running'
+              {status() === 'RUNNING'
                 ? m.overview_syncInProgress()
                 : m.overview_lastCheckCompleted()}
             </p>
@@ -67,7 +71,7 @@ const Overview: Component = () => {
           </CardHeader>
           <CardContent>
             <Show
-              when={!quotaQuery.isLoading}
+              when={!connectionResult.fetching}
               fallback={
                 <div class="space-y-4">
                   <Skeleton class="h-8 w-[180px]" />
@@ -79,23 +83,21 @@ const Overview: Component = () => {
               }
             >
               <div class="flex items-end gap-2">
-                <div class="text-2xl font-bold tracking-tight">
-                  {formatBytes(quotaQuery.data?.used)}
-                </div>
+                <div class="text-2xl font-bold tracking-tight">{formatBytes(quota()?.used)}</div>
                 <div class="mb-1 text-sm font-medium text-muted-foreground">
-                  {m.overview_of()} {formatBytes(quotaQuery.data?.total)} {m.overview_used()}
+                  {m.overview_of()} {formatBytes(quota()?.total)} {m.overview_used()}
                 </div>
               </div>
               <Progress
-                value={quotaQuery.data?.used ?? 0}
+                value={quota()?.used ?? 0}
                 minValue={0}
-                maxValue={quotaQuery.data?.total ?? 100}
+                maxValue={quota()?.total ?? 100}
                 class="mt-4"
               />
               <div class="mt-2 flex justify-between text-xs text-muted-foreground">
                 <span>{usagePercent().toFixed(1)}%</span>
                 <span>
-                  {formatBytes(quotaQuery.data?.total)} {m.overview_total()}
+                  {formatBytes(quota()?.total)} {m.overview_total()}
                 </span>
               </div>
             </Show>

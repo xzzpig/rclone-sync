@@ -11,6 +11,7 @@ import (
 	"github.com/rclone/rclone/fs/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
 	"github.com/xzzpig/rclone-sync/internal/core/services"
@@ -30,9 +31,7 @@ func TestDBStorage_Integration_FsNewFs(t *testing.T) {
 
 	// Create a local connection in the database
 	tempDir := t.TempDir()
-	_, err := connSvc.CreateConnection(ctx, "test-local", "local", map[string]string{
-		"type": "local",
-	})
+	_, err := connSvc.CreateConnection(ctx, "test-local", "local", map[string]string{})
 	require.NoError(t, err)
 
 	// Create a test file in tempDir
@@ -62,11 +61,11 @@ func TestDBStorage_Integration_ConfigGetRemoteNames(t *testing.T) {
 	assert.Empty(t, names, "Should have no remotes initially")
 
 	// Create some connections
-	_, err := connSvc.CreateConnection(ctx, "remote-a", "local", map[string]string{"type": "local"})
+	_, err := connSvc.CreateConnection(ctx, "remote-a", "local", map[string]string{})
 	require.NoError(t, err)
-	_, err = connSvc.CreateConnection(ctx, "remote-b", "local", map[string]string{"type": "local"})
+	_, err = connSvc.CreateConnection(ctx, "remote-b", "local", map[string]string{})
 	require.NoError(t, err)
-	_, err = connSvc.CreateConnection(ctx, "remote-c", "local", map[string]string{"type": "local"})
+	_, err = connSvc.CreateConnection(ctx, "remote-c", "local", map[string]string{})
 	require.NoError(t, err)
 
 	// Verify config.GetRemoteNames returns all connections
@@ -84,7 +83,6 @@ func TestDBStorage_Integration_ConfigFileGet(t *testing.T) {
 
 	// Create a connection with specific config
 	_, err := connSvc.CreateConnection(ctx, "config-test", "onedrive", map[string]string{
-		"type":     "onedrive",
 		"token":    `{"access_token":"test-token"}`,
 		"drive_id": "abc123",
 	})
@@ -115,7 +113,6 @@ func TestDBStorage_Integration_ConfigFileSet(t *testing.T) {
 
 	// Create a connection
 	_, err := connSvc.CreateConnection(ctx, "set-test", "s3", map[string]string{
-		"type":  "s3",
 		"token": "old-token",
 	})
 	require.NoError(t, err)
@@ -142,7 +139,6 @@ func TestDBStorage_Integration_TokenRefresh_Persistence(t *testing.T) {
 	// Create an OAuth connection with initial token
 	initialToken := `{"access_token":"old_access","refresh_token":"xxx","expiry":"2024-01-01T00:00:00Z"}`
 	_, err := connSvc.CreateConnection(ctx, "oauth-remote", "onedrive", map[string]string{
-		"type":  "onedrive",
 		"token": initialToken,
 	})
 	require.NoError(t, err)
@@ -169,7 +165,6 @@ func TestDBStorage_ConcurrentAccess(t *testing.T) {
 
 	// Create a connection for testing
 	_, err := connSvc.CreateConnection(ctx, "concurrent-test", "local", map[string]string{
-		"type":    "local",
 		"counter": "0",
 	})
 	require.NoError(t, err)
@@ -239,7 +234,7 @@ func TestSyncEngine_WithDBStorage_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create local connection via ConnectionService (this goes to database)
-	testConn, err := connSvc.CreateConnection(ctx, "db-local", "local", map[string]string{"type": "local"})
+	testConn, err := connSvc.CreateConnection(ctx, "db-local", "local", map[string]string{})
 	require.NoError(t, err)
 
 	// Create task
@@ -248,7 +243,7 @@ func TestSyncEngine_WithDBStorage_Integration(t *testing.T) {
 		sourceDir,
 		testConn.ID,
 		destDir,
-		"bidirectional",
+		string(model.SyncDirectionBidirectional),
 		"",
 		false,
 		nil,
@@ -261,10 +256,10 @@ func TestSyncEngine_WithDBStorage_Integration(t *testing.T) {
 
 	// Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobSvc, dataDir)
+	syncEngine := rclone.NewSyncEngine(jobSvc, nil, dataDir)
 
 	// Run the task - this should use DBStorage to read the connection config
-	err = syncEngine.RunTask(ctx, testTask, "manual")
+	err = syncEngine.RunTask(ctx, testTask, model.JobTriggerManual)
 	require.NoError(t, err)
 
 	// Verify results
@@ -277,7 +272,7 @@ func TestSyncEngine_WithDBStorage_Integration(t *testing.T) {
 	jobs, err := jobSvc.ListJobs(ctx, &testTask.ID, nil, 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs, 1)
-	assert.Equal(t, "success", string(jobs[0].Status))
+	assert.Equal(t, string(model.JobStatusSuccess), string(jobs[0].Status))
 }
 
 // TestDBStorage_Integration_DeleteConnection tests that deleting a connection clears rclone cache
@@ -286,7 +281,7 @@ func TestDBStorage_Integration_DeleteConnection(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a connection
-	_, err := connSvc.CreateConnection(ctx, "delete-test", "local", map[string]string{"type": "local"})
+	_, err := connSvc.CreateConnection(ctx, "delete-test", "local", map[string]string{})
 	require.NoError(t, err)
 
 	// Verify it exists
@@ -337,14 +332,11 @@ func TestDBStorage_Integration_AliasRemote(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(subDir, "file2.txt"), []byte("content2"), 0644))
 
 	// Create base local connection
-	_, err := connSvc.CreateConnection(ctx, "base-local", "local", map[string]string{
-		"type": "local",
-	})
+	_, err := connSvc.CreateConnection(ctx, "base-local", "local", map[string]string{})
 	require.NoError(t, err)
 
 	// Create alias connection pointing to base-local:subdir
 	_, err = connSvc.CreateConnection(ctx, "my-alias", "alias", map[string]string{
-		"type":   "alias",
 		"remote": "base-local:" + subDir,
 	})
 	require.NoError(t, err)
@@ -380,19 +372,14 @@ func TestDBStorage_Integration_UnionRemote(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir2, "from-dir2.txt"), []byte("dir2"), 0644))
 
 	// Create two local connections
-	_, err := connSvc.CreateConnection(ctx, "local-1", "local", map[string]string{
-		"type": "local",
-	})
+	_, err := connSvc.CreateConnection(ctx, "local-1", "local", map[string]string{})
 	require.NoError(t, err)
 
-	_, err = connSvc.CreateConnection(ctx, "local-2", "local", map[string]string{
-		"type": "local",
-	})
+	_, err = connSvc.CreateConnection(ctx, "local-2", "local", map[string]string{})
 	require.NoError(t, err)
 
 	// Create union connection that merges both locals
 	_, err = connSvc.CreateConnection(ctx, "my-union", "union", map[string]string{
-		"type":      "union",
 		"upstreams": "local-1:" + dir1 + " local-2:" + dir2,
 	})
 	require.NoError(t, err)
@@ -428,19 +415,14 @@ func TestDBStorage_Integration_CombineRemote(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dirB, "fileB.txt"), []byte("B"), 0644))
 
 	// Create two local connections
-	_, err := connSvc.CreateConnection(ctx, "local-a", "local", map[string]string{
-		"type": "local",
-	})
+	_, err := connSvc.CreateConnection(ctx, "local-a", "local", map[string]string{})
 	require.NoError(t, err)
 
-	_, err = connSvc.CreateConnection(ctx, "local-b", "local", map[string]string{
-		"type": "local",
-	})
+	_, err = connSvc.CreateConnection(ctx, "local-b", "local", map[string]string{})
 	require.NoError(t, err)
 
 	// Create combine connection that maps locals to subdirectories
 	_, err = connSvc.CreateConnection(ctx, "my-combine", "combine", map[string]string{
-		"type":      "combine",
 		"upstreams": "folder-a=local-a:" + dirA + " folder-b=local-b:" + dirB,
 	})
 	require.NoError(t, err)
@@ -490,21 +472,17 @@ func TestDBStorage_Integration_NestedWrappers(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(baseDir, "nested-file.txt"), []byte("nested"), 0644))
 
 	// Create base local connection
-	_, err := connSvc.CreateConnection(ctx, "nested-local", "local", map[string]string{
-		"type": "local",
-	})
+	_, err := connSvc.CreateConnection(ctx, "nested-local", "local", map[string]string{})
 	require.NoError(t, err)
 
 	// Create first alias pointing to local
 	_, err = connSvc.CreateConnection(ctx, "alias-level1", "alias", map[string]string{
-		"type":   "alias",
 		"remote": "nested-local:" + baseDir,
 	})
 	require.NoError(t, err)
 
 	// Create second alias pointing to first alias (nested)
 	_, err = connSvc.CreateConnection(ctx, "alias-level2", "alias", map[string]string{
-		"type":   "alias",
 		"remote": "alias-level1:",
 	})
 	require.NoError(t, err)

@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/connection"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/predicate"
@@ -94,13 +95,13 @@ func (_u *TaskUpdate) SetNillableRemotePath(v *string) *TaskUpdate {
 }
 
 // SetDirection sets the "direction" field.
-func (_u *TaskUpdate) SetDirection(v task.Direction) *TaskUpdate {
+func (_u *TaskUpdate) SetDirection(v model.SyncDirection) *TaskUpdate {
 	_u.mutation.SetDirection(v)
 	return _u
 }
 
 // SetNillableDirection sets the "direction" field if the given value is not nil.
-func (_u *TaskUpdate) SetNillableDirection(v *task.Direction) *TaskUpdate {
+func (_u *TaskUpdate) SetNillableDirection(v *model.SyncDirection) *TaskUpdate {
 	if v != nil {
 		_u.SetDirection(*v)
 	}
@@ -488,13 +489,13 @@ func (_u *TaskUpdateOne) SetNillableRemotePath(v *string) *TaskUpdateOne {
 }
 
 // SetDirection sets the "direction" field.
-func (_u *TaskUpdateOne) SetDirection(v task.Direction) *TaskUpdateOne {
+func (_u *TaskUpdateOne) SetDirection(v model.SyncDirection) *TaskUpdateOne {
 	_u.mutation.SetDirection(v)
 	return _u
 }
 
 // SetNillableDirection sets the "direction" field if the given value is not nil.
-func (_u *TaskUpdateOne) SetNillableDirection(v *task.Direction) *TaskUpdateOne {
+func (_u *TaskUpdateOne) SetNillableDirection(v *model.SyncDirection) *TaskUpdateOne {
 	if v != nil {
 		_u.SetDirection(*v)
 	}

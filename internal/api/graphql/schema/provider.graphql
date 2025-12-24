@@ -1,0 +1,116 @@
+# GraphQL Schema: Provider 相关类型定义
+
+# =============================================================================
+# TYPES
+# =============================================================================
+
+"""
+存储提供者
+"""
+type Provider {
+	"""
+	提供者名称（如 onedrive, s3）
+	"""
+	name: String!
+	"""
+	描述
+	"""
+	description: String!
+	"""
+	前缀标识
+	"""
+	prefix: String!
+	"""
+	配置选项列表
+	"""
+	options: [ProviderOption!]!
+}
+
+"""
+提供者配置选项
+"""
+type ProviderOption {
+	"""
+	选项名称
+	"""
+	name: String!
+	"""
+	帮助文本
+	"""
+	help: String!
+	"""
+	是否必填
+	"""
+	required: Boolean!
+	"""
+	是否密码字段
+	"""
+	isPassword: Boolean!
+	"""
+	默认值
+	"""
+	default: String
+	"""
+	示例值列表
+	"""
+	examples: [OptionExample!]
+	"""
+	是否高级选项
+	"""
+	advanced: Boolean!
+	"""
+	选项分组
+	"""
+	groups: String
+	"""
+	是否独占选择（使用下拉框而非输入框）
+	"""
+	exclusive: Boolean!
+	"""
+	选项数据类型
+	"""
+	type: String!
+}
+
+"""
+选项示例
+"""
+type OptionExample {
+	"""
+	示例值
+	"""
+	value: String!
+	"""
+	帮助说明
+	"""
+	help: String
+}
+
+# =============================================================================
+# NAMESPACED TYPES
+# =============================================================================
+
+"""
+提供者查询命名空间
+"""
+type ProviderQuery {
+	"""
+	获取所有存储提供者
+	"""
+	list: [Provider!]! @goField(forceResolver: true)
+	"""
+	获取单个提供者的配置选项
+	"""
+	get(name: String!): Provider @goField(forceResolver: true)
+}
+
+# =============================================================================
+# EXTEND ROOT TYPES
+# =============================================================================
+
+extend type Query {
+	"""
+	提供者相关查询（命名空间）
+	"""
+	provider: ProviderQuery! @goField(forceResolver: true)
+}

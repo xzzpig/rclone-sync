@@ -1,0 +1,137 @@
+# GraphQL Schema: Import 相关类型定义
+
+# =============================================================================
+# INPUT TYPES
+# =============================================================================
+
+"""
+导入解析输入
+"""
+input ImportParseInput {
+	"""
+	rclone 配置文件内容
+	"""
+	content: String!
+}
+
+"""
+导入执行输入
+"""
+input ImportExecuteInput {
+	"""
+	要导入的连接列表
+	"""
+	connections: [ImportConnectionInput!]!
+}
+
+"""
+导入连接输入
+"""
+input ImportConnectionInput {
+	"""
+	连接名称
+	"""
+	name: String!
+	"""
+	提供者类型
+	"""
+	type: String!
+	"""
+	配置参数
+	"""
+	config: StringMap!
+}
+
+# =============================================================================
+# RESULT TYPES
+# =============================================================================
+
+"""
+解析出的连接
+"""
+type ParsedConnection {
+	"""
+	连接名称
+	"""
+	name: String!
+	"""
+	提供者类型
+	"""
+	type: String!
+	"""
+	配置参数
+	"""
+	config: StringMap!
+}
+
+"""
+导入解析成功
+"""
+type ImportParseSuccess {
+	"""
+	解析出的连接列表
+	"""
+	connections: [ParsedConnection!]!
+}
+
+"""
+导入解析错误
+"""
+type ImportParseError {
+	"""
+	错误消息（已本地化）
+	"""
+	error: String!
+	"""
+	错误行号
+	"""
+	line: Int
+}
+
+"""
+导入解析结果
+"""
+union ImportParseResult = ImportParseSuccess | ImportParseError
+
+"""
+导入执行结果
+"""
+type ImportExecuteResult {
+	"""
+	成功导入的连接列表
+	"""
+	connections: [Connection!]!
+	"""
+	跳过的连接数（名称冲突）
+	"""
+	skippedCount: Int!
+}
+
+# =============================================================================
+# NAMESPACED TYPES
+# =============================================================================
+
+"""
+导入变更命名空间
+"""
+type ImportMutation {
+	"""
+	解析 rclone 配置文件（解析失败是预期业务结果，用 union 表示）
+	"""
+	parse(input: ImportParseInput!): ImportParseResult! @goField(forceResolver: true)
+	"""
+	执行导入（失败抛出 GraphQL error）
+	"""
+	execute(input: ImportExecuteInput!): ImportExecuteResult! @goField(forceResolver: true)
+}
+
+# =============================================================================
+# EXTEND ROOT TYPES
+# =============================================================================
+
+extend type Mutation {
+	"""
+	导入相关变更（命名空间）
+	"""
+	import: ImportMutation! @goField(forceResolver: true)
+}

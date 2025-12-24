@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/robfig/cron/v3"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 	"github.com/xzzpig/rclone-sync/internal/core/ports"
@@ -122,7 +123,7 @@ func (s *Scheduler) addJob(task *ent.Task) error {
 			return
 		}
 
-		_ = s.runner.StartTask(currentTask, "schedule")
+		_ = s.runner.StartTask(currentTask, model.JobTriggerSchedule)
 	})
 
 	if err != nil {

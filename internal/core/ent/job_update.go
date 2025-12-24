@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/joblog"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/predicate"
@@ -31,14 +32,28 @@ func (_u *JobUpdate) Where(ps ...predicate.Job) *JobUpdate {
 	return _u
 }
 
+// SetTaskID sets the "task_id" field.
+func (_u *JobUpdate) SetTaskID(v uuid.UUID) *JobUpdate {
+	_u.mutation.SetTaskID(v)
+	return _u
+}
+
+// SetNillableTaskID sets the "task_id" field if the given value is not nil.
+func (_u *JobUpdate) SetNillableTaskID(v *uuid.UUID) *JobUpdate {
+	if v != nil {
+		_u.SetTaskID(*v)
+	}
+	return _u
+}
+
 // SetStatus sets the "status" field.
-func (_u *JobUpdate) SetStatus(v job.Status) *JobUpdate {
+func (_u *JobUpdate) SetStatus(v model.JobStatus) *JobUpdate {
 	_u.mutation.SetStatus(v)
 	return _u
 }
 
 // SetNillableStatus sets the "status" field if the given value is not nil.
-func (_u *JobUpdate) SetNillableStatus(v *job.Status) *JobUpdate {
+func (_u *JobUpdate) SetNillableStatus(v *model.JobStatus) *JobUpdate {
 	if v != nil {
 		_u.SetStatus(*v)
 	}
@@ -46,13 +61,13 @@ func (_u *JobUpdate) SetNillableStatus(v *job.Status) *JobUpdate {
 }
 
 // SetTrigger sets the "trigger" field.
-func (_u *JobUpdate) SetTrigger(v job.Trigger) *JobUpdate {
+func (_u *JobUpdate) SetTrigger(v model.JobTrigger) *JobUpdate {
 	_u.mutation.SetTrigger(v)
 	return _u
 }
 
 // SetNillableTrigger sets the "trigger" field if the given value is not nil.
-func (_u *JobUpdate) SetNillableTrigger(v *job.Trigger) *JobUpdate {
+func (_u *JobUpdate) SetNillableTrigger(v *model.JobTrigger) *JobUpdate {
 	if v != nil {
 		_u.SetTrigger(*v)
 	}
@@ -152,12 +167,6 @@ func (_u *JobUpdate) SetNillableErrors(v *string) *JobUpdate {
 // ClearErrors clears the value of the "errors" field.
 func (_u *JobUpdate) ClearErrors() *JobUpdate {
 	_u.mutation.ClearErrors()
-	return _u
-}
-
-// SetTaskID sets the "task" edge to the Task entity by ID.
-func (_u *JobUpdate) SetTaskID(id uuid.UUID) *JobUpdate {
-	_u.mutation.SetTaskID(id)
 	return _u
 }
 
@@ -397,14 +406,28 @@ type JobUpdateOne struct {
 	mutation *JobMutation
 }
 
+// SetTaskID sets the "task_id" field.
+func (_u *JobUpdateOne) SetTaskID(v uuid.UUID) *JobUpdateOne {
+	_u.mutation.SetTaskID(v)
+	return _u
+}
+
+// SetNillableTaskID sets the "task_id" field if the given value is not nil.
+func (_u *JobUpdateOne) SetNillableTaskID(v *uuid.UUID) *JobUpdateOne {
+	if v != nil {
+		_u.SetTaskID(*v)
+	}
+	return _u
+}
+
 // SetStatus sets the "status" field.
-func (_u *JobUpdateOne) SetStatus(v job.Status) *JobUpdateOne {
+func (_u *JobUpdateOne) SetStatus(v model.JobStatus) *JobUpdateOne {
 	_u.mutation.SetStatus(v)
 	return _u
 }
 
 // SetNillableStatus sets the "status" field if the given value is not nil.
-func (_u *JobUpdateOne) SetNillableStatus(v *job.Status) *JobUpdateOne {
+func (_u *JobUpdateOne) SetNillableStatus(v *model.JobStatus) *JobUpdateOne {
 	if v != nil {
 		_u.SetStatus(*v)
 	}
@@ -412,13 +435,13 @@ func (_u *JobUpdateOne) SetNillableStatus(v *job.Status) *JobUpdateOne {
 }
 
 // SetTrigger sets the "trigger" field.
-func (_u *JobUpdateOne) SetTrigger(v job.Trigger) *JobUpdateOne {
+func (_u *JobUpdateOne) SetTrigger(v model.JobTrigger) *JobUpdateOne {
 	_u.mutation.SetTrigger(v)
 	return _u
 }
 
 // SetNillableTrigger sets the "trigger" field if the given value is not nil.
-func (_u *JobUpdateOne) SetNillableTrigger(v *job.Trigger) *JobUpdateOne {
+func (_u *JobUpdateOne) SetNillableTrigger(v *model.JobTrigger) *JobUpdateOne {
 	if v != nil {
 		_u.SetTrigger(*v)
 	}
@@ -518,12 +541,6 @@ func (_u *JobUpdateOne) SetNillableErrors(v *string) *JobUpdateOne {
 // ClearErrors clears the value of the "errors" field.
 func (_u *JobUpdateOne) ClearErrors() *JobUpdateOne {
 	_u.mutation.ClearErrors()
-	return _u
-}
-
-// SetTaskID sets the "task" edge to the Task entity by ID.
-func (_u *JobUpdateOne) SetTaskID(id uuid.UUID) *JobUpdateOne {
-	_u.mutation.SetTaskID(id)
 	return _u
 }
 

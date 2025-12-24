@@ -20,19 +20,19 @@ export const ConnectionStatusBadge = (props: ConnectionStatusBadgeProps) => {
 
   const badge = () => (
     <Switch>
-      <Match when={props.status === 'loaded'}>
+      <Match when={props.status === 'LOADED'}>
         <Badge variant="success" class={cn('gap-1', textClass())}>
           <IconCheckCircle class={iconClass()} />
           <span>{m.connection_statusLoaded()}</span>
         </Badge>
       </Match>
-      <Match when={props.status === 'loading'}>
+      <Match when={props.status === 'LOADING'}>
         <Badge variant="secondary" class={cn('gap-1', textClass())}>
           <IconLoader class={cn(iconClass(), 'animate-spin')} />
           <span>{m.connection_statusLoading()}</span>
         </Badge>
       </Match>
-      <Match when={props.status === 'error'}>
+      <Match when={props.status === 'ERROR'}>
         <Badge variant="error" class={cn('gap-1', textClass())}>
           <IconAlertCircle class={iconClass()} />
           <span>{m.connection_statusError()}</span>
@@ -42,7 +42,7 @@ export const ConnectionStatusBadge = (props: ConnectionStatusBadgeProps) => {
   );
 
   return (
-    <Show when={props.status === 'error' && props.error} fallback={badge()}>
+    <Show when={props.status === 'ERROR' && props.error} fallback={badge()}>
       <Tooltip>
         <TooltipTrigger>{badge()}</TooltipTrigger>
         <TooltipContent>

@@ -1,0 +1,283 @@
+# GraphQL Schema: Task 相关类型定义
+
+# =============================================================================
+# ENUMS
+# =============================================================================
+
+"""
+同步方向
+"""
+enum SyncDirection {
+	"""
+	本地上传到远程
+	"""
+	UPLOAD
+	"""
+	远程下载到本地
+	"""
+	DOWNLOAD
+	"""
+	双向同步
+	"""
+	BIDIRECTIONAL
+}
+
+"""
+冲突解决策略（仅用于双向同步）
+"""
+enum ConflictResolution {
+	"""
+	保留较新文件，重命名较旧文件
+	"""
+	NEWER
+	"""
+	保留本地文件，删除远程
+	"""
+	LOCAL
+	"""
+	保留远程文件，删除本地
+	"""
+	REMOTE
+	"""
+	保留两者，添加冲突后缀
+	"""
+	BOTH
+}
+
+# =============================================================================
+# TYPES
+# =============================================================================
+
+"""
+任务同步选项
+"""
+type TaskSyncOptions {
+	"""
+	冲突解决策略（默认 NEWER，仅用于双向同步）
+	"""
+	conflictResolution: ConflictResolution
+}
+
+"""
+同步任务
+"""
+type Task @goExtraField(name: "ConnectionID", type: "github.com/google/uuid.UUID") {
+	"""
+	UUID 主键
+	"""
+	id: ID!
+	"""
+	任务名称
+	"""
+	name: String!
+	"""
+	本地源路径
+	"""
+	sourcePath: String!
+	"""
+	远程目标路径
+	"""
+	remotePath: String!
+	"""
+	同步方向
+	"""
+	direction: SyncDirection!
+	"""
+	Cron 调度表达式
+	"""
+	schedule: String
+	"""
+	是否启用实时同步
+	"""
+	realtime: Boolean!
+	"""
+	同步选项（JSON → 类型转换）
+	"""
+	options: TaskSyncOptions @goField(forceResolver: true)
+	"""
+	创建时间
+	"""
+	createdAt: DateTime!
+	"""
+	更新时间
+	"""
+	updatedAt: DateTime!
+	"""
+	关联的远程连接（ent edge）
+	"""
+	connection: Connection! @goField(forceResolver: true)
+	"""
+	作业历史（分页查询）
+	"""
+	jobs(pagination: PaginationInput): JobConnection! @goField(forceResolver: true)
+	"""
+	最近一次作业（计算字段）
+	"""
+	latestJob: Job @goField(forceResolver: true)
+}
+
+"""
+任务分页连接
+"""
+type TaskConnection {
+	"""
+	任务列表
+	"""
+	items: [Task!]!
+	"""
+	总数
+	"""
+	totalCount: Int!
+	"""
+	分页信息
+	"""
+	pageInfo: OffsetPageInfo!
+}
+
+# =============================================================================
+# INPUT TYPES
+# =============================================================================
+
+"""
+任务同步选项输入
+"""
+input TaskSyncOptionsInput {
+	"""
+	冲突解决策略（默认 NEWER，仅用于双向同步）
+	"""
+	conflictResolution: ConflictResolution
+}
+
+"""
+创建任务输入
+"""
+input CreateTaskInput {
+	"""
+	任务名称
+	"""
+	name: String!
+	"""
+	本地源路径
+	"""
+	sourcePath: String!
+	"""
+	关联连接 ID
+	"""
+	connectionId: ID!
+	"""
+	远程目标路径
+	"""
+	remotePath: String!
+	"""
+	同步方向
+	"""
+	direction: SyncDirection!
+	"""
+	Cron 调度表达式
+	"""
+	schedule: String
+	"""
+	是否启用实时同步
+	"""
+	realtime: Boolean = false
+	"""
+	同步选项
+	"""
+	options: TaskSyncOptionsInput
+}
+
+"""
+更新任务输入
+"""
+input UpdateTaskInput {
+	"""
+	任务名称
+	"""
+	name: String
+	"""
+	本地源路径
+	"""
+	sourcePath: String
+	"""
+	关联连接 ID
+	"""
+	connectionId: ID
+	"""
+	远程目标路径
+	"""
+	remotePath: String
+	"""
+	同步方向
+	"""
+	direction: SyncDirection
+	"""
+	Cron 调度表达式
+	"""
+	schedule: String
+	"""
+	是否启用实时同步
+	"""
+	realtime: Boolean
+	"""
+	同步选项
+	"""
+	options: TaskSyncOptionsInput
+}
+
+# =============================================================================
+# NAMESPACED TYPES
+# =============================================================================
+
+"""
+任务查询命名空间
+"""
+type TaskQuery {
+	"""
+	获取任务列表
+	"""
+	list(pagination: PaginationInput): TaskConnection! @goField(forceResolver: true)
+	"""
+	获取单个任务
+	"""
+	get(id: ID!): Task @goField(forceResolver: true)
+}
+
+"""
+任务变更命名空间
+"""
+type TaskMutation {
+	"""
+	创建任务（失败抛出 GraphQL error）
+	"""
+	create(input: CreateTaskInput!): Task! @goField(forceResolver: true)
+	"""
+	更新任务（失败抛出 GraphQL error）
+	"""
+	update(id: ID!, input: UpdateTaskInput!): Task! @goField(forceResolver: true)
+	"""
+	删除任务（失败抛出 GraphQL error）
+	"""
+	delete(id: ID!): Task! @goField(forceResolver: true)
+	"""
+	运行任务（创建并启动作业，失败抛出 GraphQL error）
+	"""
+	run(taskId: ID!): Job! @goField(forceResolver: true)
+}
+
+# =============================================================================
+# EXTEND ROOT TYPES
+# =============================================================================
+
+extend type Query {
+	"""
+	任务相关查询（命名空间）
+	"""
+	task: TaskQuery! @goField(forceResolver: true)
+}
+
+extend type Mutation {
+	"""
+	任务相关变更（命名空间）
+	"""
+	task: TaskMutation! @goField(forceResolver: true)
+}

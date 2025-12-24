@@ -1,5 +1,5 @@
-import * as m from '@/paraglide/messages.js';
-import { testUnsavedConnection } from '@/api/connections';
+import { client } from '@/api/graphql/client';
+import { ConnectionTestUnsavedMutation } from '@/api/graphql/queries/connections';
 import { HelpTooltip } from '@/components/common/HelpTooltip';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -19,31 +19,31 @@ import {
   TextFieldInput,
   TextFieldLabel,
 } from '@/components/ui/text-field';
-import { extractErrorDetails, extractErrorMessage } from '@/lib/api';
-import type { RcloneOption } from '@/lib/types';
+import type { ProviderOption } from '@/lib/types';
+import * as m from '@/paraglide/messages.js';
 import { createEffect, createMemo, createSignal, For, Show } from 'solid-js';
 import { createStore, unwrap } from 'solid-js/store';
 import IconAlertCircle from '~icons/lucide/alert-circle';
 import IconChevronDown from '~icons/lucide/chevron-down';
 
-const groupOptions = (options: RcloneOption[]) => {
-  const grouped: Record<string, RcloneOption[]> = {};
-  const advanced: RcloneOption[] = [];
+const groupOptions = (options: ProviderOption[]) => {
+  const grouped: Record<string, ProviderOption[]> = {};
+  const advanced: ProviderOption[] = [];
 
   if (!Array.isArray(options)) {
     return { grouped, advanced };
   }
 
   options.forEach((opt) => {
-    if (opt.Advanced) {
+    // Use advanced field to separate advanced options
+    if (opt.advanced) {
       advanced.push(opt);
-      return;
+    } else {
+      // Use groups field for grouping, default to 'General'
+      const groupName = opt.groups ?? 'General';
+      grouped[groupName] ??= [];
+      grouped[groupName].push(opt);
     }
-    const groupName = opt.Groups ?? 'General';
-    if (!grouped[groupName]) {
-      grouped[groupName] = [];
-    }
-    grouped[groupName].push(opt);
   });
 
   return { grouped, advanced };
@@ -89,7 +89,7 @@ const DynamicConfigFormSkeleton = (props: { showBack?: boolean }) => (
 );
 
 export const DynamicConfigForm = (props: {
-  options: RcloneOption[];
+  options: ProviderOption[];
   provider: string;
   onBack: () => void;
   /** Save handler - receives name and config */
@@ -129,12 +129,31 @@ export const DynamicConfigForm = (props: {
       // Build config without name field - use unwrap to get current snapshot
       const currentFormState = unwrap(formState);
       const { name: _, ...config } = currentFormState;
-      await testUnsavedConnection(props.provider, config as Record<string, string>);
-      setErrors('testResult', { message: m.connection_testSuccess(), type: 'success' });
+
+      const result = await client.mutation(ConnectionTestUnsavedMutation, {
+        input: {
+          type: props.provider,
+          config: config as Record<string, string>,
+        },
+      });
+
+      if (result.error) {
+        throw new Error(result.error.message);
+      }
+
+      const testResult = result.data?.connection?.testUnsaved;
+      if (testResult?.__typename === 'ConnectionTestSuccess') {
+        setErrors('testResult', { message: m.connection_testSuccess(), type: 'success' });
+      } else if (testResult?.__typename === 'ConnectionTestFailure') {
+        setErrors('testResult', {
+          message: testResult.error ?? m.error_connectionFailed(),
+          type: 'error',
+        });
+      }
     } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : m.error_connectionFailed();
       setErrors('testResult', {
-        message: extractErrorMessage(err) ?? m.error_connectionFailed(),
-        details: extractErrorDetails(err),
+        message,
         type: 'error',
       });
     } finally {
@@ -160,9 +179,9 @@ export const DynamicConfigForm = (props: {
     try {
       await props.onSave(nameValue, config as Record<string, string>);
     } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : m.connection_saveError();
       setErrors('saveResult', {
-        message: extractErrorMessage(err) ?? m.connection_saveError(),
-        details: extractErrorDetails(err),
+        message,
         type: 'error',
       });
     } finally {
@@ -203,7 +222,7 @@ export const DynamicConfigForm = (props: {
                 {(opt) => (
                   <FormField
                     option={opt}
-                    value={formState[opt.Name]}
+                    value={formState[opt.name]}
                     onChange={handleInputChange}
                   />
                 )}
@@ -228,7 +247,7 @@ export const DynamicConfigForm = (props: {
                 {(opt) => (
                   <FormField
                     option={opt}
-                    value={formState[opt.Name]}
+                    value={formState[opt.name]}
                     onChange={handleInputChange}
                   />
                 )}
@@ -304,37 +323,37 @@ export const DynamicConfigForm = (props: {
   );
 };
 
-const OptionLabel = (props: { option: RcloneOption }) => {
+const OptionLabel = (props: { option: ProviderOption }) => {
   return (
     <span class="flex items-center gap-1">
-      {props.option.Name}
-      <Show when={props.option.Required}>
+      {props.option.name}
+      <Show when={props.option.required}>
         <span class="text-red-500">*</span>
       </Show>
-      <HelpTooltip content={props.option.Help} />
+      <HelpTooltip content={props.option.help} />
     </span>
   );
 };
 
 const FormField = (props: {
-  option: RcloneOption;
+  option: ProviderOption;
   value?: string;
   onChange: (name: string, value?: string) => void;
 }) => {
-  const val = () => props.value ?? props.option.DefaultStr;
-  const fieldId = () => `field-${props.option.Name}`;
-  const isRequired = () => props.option.Required;
+  const val = () => props.value ?? props.option.default ?? '';
+  const fieldId = () => `field-${props.option.name}`;
+  const isRequired = () => props.option.required;
   const changeValue = (v?: string | null) => {
     if (v === '') {
-      return props.onChange(props.option.Name, undefined);
+      return props.onChange(props.option.name, undefined);
     }
     if (v === null) {
-      return props.onChange(props.option.Name, undefined);
+      return props.onChange(props.option.name, undefined);
     }
-    if (v === props.option.DefaultStr) {
-      return props.onChange(props.option.Name, '');
+    if (v === props.option.default) {
+      return props.onChange(props.option.name, '');
     }
-    return props.onChange(props.option.Name, v);
+    return props.onChange(props.option.name, v);
   };
 
   const label = (
@@ -343,13 +362,18 @@ const FormField = (props: {
     </label>
   );
 
+  // Check if this is a select field (exclusive option with examples)
+  const hasExamples = () => props.option.examples && props.option.examples.length > 0;
+  const isExclusive = () => props.option.exclusive && hasExamples();
+  const isBool = () => props.option.type === 'bool';
+
   return (
     <div class="mb-2">
       <Show
-        when={props.option.Examples?.length > 0 && props.option.Exclusive}
+        when={isExclusive()}
         fallback={
           <Show
-            when={props.option.Type === 'bool'}
+            when={isBool()}
             fallback={
               <TextField
                 class="w-full"
@@ -359,12 +383,12 @@ const FormField = (props: {
               >
                 {label}
                 <TextFieldInput
-                  type={props.option.IsPassword ? 'password' : 'text'}
+                  type={props.option.isPassword ? 'password' : 'text'}
                   id={fieldId()}
                   class="mt-1"
-                  placeholder={props.option.DefaultStr}
+                  placeholder={props.option.default ?? ''}
                   aria-required={isRequired() ? 'true' : undefined}
-                  aria-describedby={props.option.Help ? `${fieldId()}-help` : undefined}
+                  aria-describedby={props.option.help ? `${fieldId()}-help` : undefined}
                 />
               </TextField>
             }
@@ -375,7 +399,7 @@ const FormField = (props: {
                 checked={val() === 'true'}
                 onChange={(c) => changeValue(String(c))}
                 class="relative flex w-full items-center justify-between"
-                aria-describedby={props.option.Help ? `${fieldId()}-help` : undefined}
+                aria-describedby={props.option.help ? `${fieldId()}-help` : undefined}
               >
                 <SwitchLabel
                   class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
@@ -395,7 +419,7 @@ const FormField = (props: {
         <Select
           value={val()}
           onChange={(v) => changeValue(v)}
-          options={props.option.Examples.map((ex: { Value: string; Help: string }) => ex.Value)}
+          options={props.option.examples?.map((ex) => ex.value) ?? []}
           placeholder="Select an option..."
           itemComponent={(p) => <SelectItem item={p.item}>{p.item.rawValue}</SelectItem>}
           required={isRequired()}
@@ -404,7 +428,7 @@ const FormField = (props: {
             id={fieldId()}
             class="mt-1 w-full"
             aria-required={isRequired() ? 'true' : undefined}
-            aria-describedby={props.option.Help ? `${fieldId()}-help` : undefined}
+            aria-describedby={props.option.help ? `${fieldId()}-help` : undefined}
           >
             <SelectValue<string>>{(state) => state.selectedOption()}</SelectValue>
           </SelectTrigger>

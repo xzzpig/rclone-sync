@@ -6,8 +6,8 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
-	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 	"github.com/xzzpig/rclone-sync/internal/core/ports"
 	"go.uber.org/zap"
@@ -57,7 +57,7 @@ func (r *Runner) Stop() {
 
 // StartTask starts a task execution asynchronously.
 // It cancels any existing execution of the same task before starting a new one.
-func (r *Runner) StartTask(task *ent.Task, trigger job.Trigger) error {
+func (r *Runner) StartTask(task *ent.Task, trigger model.JobTrigger) error {
 	taskID := task.ID
 	runID := uuid.New()
 

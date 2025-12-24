@@ -1,5 +1,7 @@
-import * as m from '@/paraglide/messages.js';
-import { createConnection, getProviderOptions, getProviders } from '@/api/connections';
+import { client } from '@/api/graphql/client';
+import { ConnectionCreateMutation, ConnectionsListQuery } from '@/api/graphql/queries/connections';
+import { ProviderGetQuery, ProvidersListQuery } from '@/api/graphql/queries/providers';
+import { RichText } from '@/components/common/RichText';
 import {
   Dialog,
   DialogContent,
@@ -7,31 +9,42 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import type { RcloneProvider } from '@/lib/types';
-import { useQuery, useQueryClient } from '@tanstack/solid-query';
-import { createSignal, Show } from 'solid-js';
+import type { ProviderListItem } from '@/lib/types';
+import * as m from '@/paraglide/messages.js';
+import { createQuery } from '@urql/solid';
+import { createEffect, createSignal, Show } from 'solid-js';
 import { DynamicConfigForm } from './DynamicConfigForm';
 import { ProviderSelection } from './ProviderSelection';
-import { RichText } from '@/components/common/RichText';
 
 export const AddConnectionDialog = (props: { isOpen: boolean; onClose: () => void }) => {
   const [step, setStep] = createSignal(1);
-  const [selectedProvider, setSelectedProvider] = createSignal<RcloneProvider | null>(null);
-  const queryClient = useQueryClient();
+  const [selectedProvider, setSelectedProvider] = createSignal<ProviderListItem | null>(null);
 
-  const providersQuery = useQuery(() => ({
-    queryKey: ['providers'],
-    queryFn: getProviders,
-    enabled: props.isOpen,
-  }));
+  // Use GraphQL query for providers
+  const [providersResult, reexecuteProviders] = createQuery({
+    query: ProvidersListQuery,
+    pause: () => !props.isOpen,
+  });
 
-  const optionsQuery = useQuery(() => ({
-    queryKey: ['providerOptions', selectedProvider()?.name],
-    queryFn: () => getProviderOptions(selectedProvider()!.name),
-    enabled: !!selectedProvider(),
-  }));
+  // Refetch when dialog opens
+  createEffect(() => {
+    if (props.isOpen) {
+      reexecuteProviders({ requestPolicy: 'cache-first' });
+    }
+  });
 
-  const handleSelectProvider = (provider: RcloneProvider) => {
+  const providers = () => providersResult.data?.provider?.list ?? [];
+
+  // Use GraphQL query for provider options
+  const [optionsResult] = createQuery({
+    query: ProviderGetQuery,
+    variables: () => ({ name: selectedProvider()?.name ?? '' }),
+    pause: () => !selectedProvider(),
+  });
+
+  const options = () => optionsResult.data?.provider?.get?.options ?? [];
+
+  const handleSelectProvider = (provider: ProviderListItem) => {
     setSelectedProvider(provider);
     setStep(2);
   };
@@ -45,8 +58,25 @@ export const AddConnectionDialog = (props: { isOpen: boolean; onClose: () => voi
     if (!name) {
       throw new Error('Connection name is required');
     }
-    await createConnection(name, selectedProvider()!.name, config);
-    await queryClient.invalidateQueries({ queryKey: ['connections'] });
+
+    const result = await client.mutation(ConnectionCreateMutation, {
+      input: {
+        name,
+        type: selectedProvider()!.name,
+        config,
+      },
+    });
+
+    if (result.error) {
+      throw new Error(result.error.message);
+    }
+
+    // Invalidate connections cache by reexecuting query
+    await client.query(
+      ConnectionsListQuery,
+      { pagination: { limit: 100, offset: 0 } },
+      { requestPolicy: 'network-only' }
+    );
   };
 
   const handleClose = () => {
@@ -69,17 +99,14 @@ export const AddConnectionDialog = (props: { isOpen: boolean; onClose: () => voi
         </DialogHeader>
 
         <Show when={step() === 1}>
-          <ProviderSelection
-            providers={providersQuery.data ?? []}
-            onSelect={handleSelectProvider}
-          />
+          <ProviderSelection providers={providers()} onSelect={handleSelectProvider} />
         </Show>
 
         <Show when={step() === 2}>
           <div class="min-h-0 flex-1 p-4">
             <DynamicConfigForm
-              loading={optionsQuery.isLoading}
-              options={optionsQuery.data ?? []}
+              loading={optionsResult.fetching}
+              options={options()}
               provider={selectedProvider()!.name}
               onBack={handleBack}
               onSave={handleSave}

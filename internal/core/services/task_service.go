@@ -5,13 +5,13 @@ import (
 	"errors"
 
 	"entgo.io/ent/dialect/sql"
+	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/task"
 	"github.com/xzzpig/rclone-sync/internal/core/errs"
 	"github.com/xzzpig/rclone-sync/internal/core/ports"
-
-	"github.com/google/uuid"
 )
 
 // TaskService provides operations for managing sync tasks.
@@ -31,7 +31,7 @@ func withLatestJobPredicate(q *ent.JobQuery) {
 		// 创建子查询,获取每个 task 的最新 job ID
 		// 子查询: SELECT id FROM jobs j2 WHERE j2.task_jobs = jobs.task_jobs ORDER BY start_time DESC LIMIT 1
 		subquery := sql.Select("id").
-			From(sql.Table("jobs").As("j2")).
+			From(sql.Table(job.Table).As("j2")).
 			Where(sql.ColumnsEQ(
 				sql.Table("j2").C(job.TaskColumn),
 				s.C(job.TaskColumn),
@@ -51,7 +51,7 @@ func (s *TaskService) CreateTask(ctx context.Context, name, sourcePath string, c
 		SetSourcePath(sourcePath).
 		SetConnectionID(connectionID).
 		SetRemotePath(remotePath).
-		SetDirection(task.Direction(direction)).
+		SetDirection(model.SyncDirection(direction)).
 		SetSchedule(schedule).
 		SetRealtime(realtime).
 		SetOptions(options).
@@ -142,7 +142,7 @@ func (s *TaskService) UpdateTask(ctx context.Context, id uuid.UUID, name, source
 		SetSourcePath(sourcePath).
 		SetConnectionID(connectionID).
 		SetRemotePath(remotePath).
-		SetDirection(task.Direction(direction)).
+		SetDirection(model.SyncDirection(direction)).
 		SetSchedule(schedule).
 		SetRealtime(realtime).
 		SetOptions(options).
@@ -169,6 +169,77 @@ func (s *TaskService) DeleteTask(ctx context.Context, id uuid.UUID) error {
 		return errors.Join(errs.ErrSystem, err)
 	}
 	return nil
+}
+
+// ListTasksPaginated lists tasks with pagination.
+func (s *TaskService) ListTasksPaginated(ctx context.Context, limit, offset int) ([]*ent.Task, int, error) {
+	query := s.client.Task.Query().
+		Order(ent.Desc(task.FieldCreatedAt))
+
+	// Get total count
+	totalCount, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, errors.Join(errs.ErrSystem, err)
+	}
+
+	// Apply pagination and fetch items
+	tasks, err := query.
+		Limit(limit).
+		Offset(offset).
+		All(ctx)
+	if err != nil {
+		return nil, 0, errors.Join(errs.ErrSystem, err)
+	}
+
+	return tasks, totalCount, nil
+}
+
+// ListTasksByConnectionPaginated lists tasks by connection ID with pagination.
+func (s *TaskService) ListTasksByConnectionPaginated(ctx context.Context, connectionID uuid.UUID, limit, offset int) ([]*ent.Task, int, error) {
+	query := s.client.Task.Query().
+		Where(task.ConnectionID(connectionID)).
+		Order(ent.Desc(task.FieldCreatedAt))
+
+	// Get total count
+	totalCount, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, errors.Join(errs.ErrSystem, err)
+	}
+
+	// Apply pagination and fetch items
+	tasks, err := query.
+		Limit(limit).
+		Offset(offset).
+		All(ctx)
+	if err != nil {
+		return nil, 0, errors.Join(errs.ErrSystem, err)
+	}
+
+	return tasks, totalCount, nil
+}
+
+// ListJobsByTaskPaginated lists jobs for a task with pagination.
+func (s *TaskService) ListJobsByTaskPaginated(ctx context.Context, taskID uuid.UUID, limit, offset int) ([]*ent.Job, int, error) {
+	query := s.client.Job.Query().
+		Where(job.HasTaskWith(task.ID(taskID))).
+		Order(ent.Desc(job.FieldStartTime))
+
+	// Get total count
+	totalCount, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, errors.Join(errs.ErrSystem, err)
+	}
+
+	// Apply pagination and fetch items
+	jobs, err := query.
+		Limit(limit).
+		Offset(offset).
+		All(ctx)
+	if err != nil {
+		return nil, 0, errors.Join(errs.ErrSystem, err)
+	}
+
+	return jobs, totalCount, nil
 }
 
 var _ ports.TaskService = (*TaskService)(nil)

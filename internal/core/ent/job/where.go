@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/predicate"
 )
 
@@ -56,6 +57,11 @@ func IDLTE(id uuid.UUID) predicate.Job {
 	return predicate.Job(sql.FieldLTE(FieldID, id))
 }
 
+// TaskID applies equality check predicate on the "task_id" field. It's identical to TaskIDEQ.
+func TaskID(v uuid.UUID) predicate.Job {
+	return predicate.Job(sql.FieldEQ(FieldTaskID, v))
+}
+
 // StartTime applies equality check predicate on the "start_time" field. It's identical to StartTimeEQ.
 func StartTime(v time.Time) predicate.Job {
 	return predicate.Job(sql.FieldEQ(FieldStartTime, v))
@@ -81,44 +87,84 @@ func Errors(v string) predicate.Job {
 	return predicate.Job(sql.FieldEQ(FieldErrors, v))
 }
 
+// TaskIDEQ applies the EQ predicate on the "task_id" field.
+func TaskIDEQ(v uuid.UUID) predicate.Job {
+	return predicate.Job(sql.FieldEQ(FieldTaskID, v))
+}
+
+// TaskIDNEQ applies the NEQ predicate on the "task_id" field.
+func TaskIDNEQ(v uuid.UUID) predicate.Job {
+	return predicate.Job(sql.FieldNEQ(FieldTaskID, v))
+}
+
+// TaskIDIn applies the In predicate on the "task_id" field.
+func TaskIDIn(vs ...uuid.UUID) predicate.Job {
+	return predicate.Job(sql.FieldIn(FieldTaskID, vs...))
+}
+
+// TaskIDNotIn applies the NotIn predicate on the "task_id" field.
+func TaskIDNotIn(vs ...uuid.UUID) predicate.Job {
+	return predicate.Job(sql.FieldNotIn(FieldTaskID, vs...))
+}
+
 // StatusEQ applies the EQ predicate on the "status" field.
-func StatusEQ(v Status) predicate.Job {
-	return predicate.Job(sql.FieldEQ(FieldStatus, v))
+func StatusEQ(v model.JobStatus) predicate.Job {
+	vc := v
+	return predicate.Job(sql.FieldEQ(FieldStatus, vc))
 }
 
 // StatusNEQ applies the NEQ predicate on the "status" field.
-func StatusNEQ(v Status) predicate.Job {
-	return predicate.Job(sql.FieldNEQ(FieldStatus, v))
+func StatusNEQ(v model.JobStatus) predicate.Job {
+	vc := v
+	return predicate.Job(sql.FieldNEQ(FieldStatus, vc))
 }
 
 // StatusIn applies the In predicate on the "status" field.
-func StatusIn(vs ...Status) predicate.Job {
-	return predicate.Job(sql.FieldIn(FieldStatus, vs...))
+func StatusIn(vs ...model.JobStatus) predicate.Job {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.Job(sql.FieldIn(FieldStatus, v...))
 }
 
 // StatusNotIn applies the NotIn predicate on the "status" field.
-func StatusNotIn(vs ...Status) predicate.Job {
-	return predicate.Job(sql.FieldNotIn(FieldStatus, vs...))
+func StatusNotIn(vs ...model.JobStatus) predicate.Job {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.Job(sql.FieldNotIn(FieldStatus, v...))
 }
 
 // TriggerEQ applies the EQ predicate on the "trigger" field.
-func TriggerEQ(v Trigger) predicate.Job {
-	return predicate.Job(sql.FieldEQ(FieldTrigger, v))
+func TriggerEQ(v model.JobTrigger) predicate.Job {
+	vc := v
+	return predicate.Job(sql.FieldEQ(FieldTrigger, vc))
 }
 
 // TriggerNEQ applies the NEQ predicate on the "trigger" field.
-func TriggerNEQ(v Trigger) predicate.Job {
-	return predicate.Job(sql.FieldNEQ(FieldTrigger, v))
+func TriggerNEQ(v model.JobTrigger) predicate.Job {
+	vc := v
+	return predicate.Job(sql.FieldNEQ(FieldTrigger, vc))
 }
 
 // TriggerIn applies the In predicate on the "trigger" field.
-func TriggerIn(vs ...Trigger) predicate.Job {
-	return predicate.Job(sql.FieldIn(FieldTrigger, vs...))
+func TriggerIn(vs ...model.JobTrigger) predicate.Job {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.Job(sql.FieldIn(FieldTrigger, v...))
 }
 
 // TriggerNotIn applies the NotIn predicate on the "trigger" field.
-func TriggerNotIn(vs ...Trigger) predicate.Job {
-	return predicate.Job(sql.FieldNotIn(FieldTrigger, vs...))
+func TriggerNotIn(vs ...model.JobTrigger) predicate.Job {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.Job(sql.FieldNotIn(FieldTrigger, v...))
 }
 
 // StartTimeEQ applies the EQ predicate on the "start_time" field.

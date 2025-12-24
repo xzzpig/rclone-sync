@@ -18,29 +18,32 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { showToast } from '@/components/ui/toast';
+import type { CreateTaskInput, StatusType, UpdateTaskInput } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { Task } from '@/lib/types';
 import * as m from '@/paraglide/messages.js';
 import { useTasks } from '@/store/tasks';
-import IconPlay from '~icons/lucide/play';
-import IconHistory from '~icons/lucide/history';
-import IconEdit from '~icons/lucide/edit';
-import IconTrash2 from '~icons/lucide/trash-2';
-import IconCalendarPlus from '~icons/lucide/calendar-plus';
 import { useNavigate, useParams } from '@solidjs/router';
 import { createSignal, For, Show } from 'solid-js';
+import IconCalendarPlus from '~icons/lucide/calendar-plus';
+import IconEdit from '~icons/lucide/edit';
+import IconHistory from '~icons/lucide/history';
+import IconPlay from '~icons/lucide/play';
+import IconTrash2 from '~icons/lucide/trash-2';
 import { CreateTaskWizard } from '../components/CreateTaskWizard';
 import { EditTaskDialog } from '../components/EditTaskDialog';
 import ConnectionViewLayout from '../layouts/ConnectionViewLayout';
 
+// Direction display helper - handles both GraphQL enum and legacy formats
 const DirectionArrow = (props: { direction: string; class?: string }) => {
   const getArrow = () => {
-    switch (props.direction) {
-      case 'upload':
+    const dir = props.direction.toUpperCase();
+    switch (dir) {
+      case 'UPLOAD':
         return '→';
-      case 'download':
+      case 'DOWNLOAD':
         return '←';
-      case 'bidirectional':
+      case 'BIDIRECT':
+      case 'BIDIRECTIONAL':
         return '↔';
       default:
         return '?';
@@ -77,11 +80,11 @@ function Tasks() {
   const navigate = useNavigate();
 
   // Filter tasks for the current connection
-  // Global SSE subscription in AppShell handles real-time updates
+  // GraphQL subscription handles real-time updates
   const filteredTasks = () => {
     const id = params.connectionId;
     if (!id) return state.tasks;
-    return state.tasks.filter((task) => task.connection_id === id);
+    return state.tasks.filter((task) => task.connection?.id === id);
   };
 
   const selectedTask = () => {
@@ -147,12 +150,12 @@ function Tasks() {
     }
   };
 
-  const handleSaveTask = async (id: string, updates: Partial<Task>) => {
+  const handleSaveTask = async (id: string, updates: UpdateTaskInput) => {
     await actions.updateTask(id, updates);
   };
 
-  const handleCreateTask = async (task: Omit<Task, 'id' | 'edges'>) => {
-    await actions.createTask(task);
+  const handleCreateTask = async (input: CreateTaskInput) => {
+    await actions.createTask(input);
   };
 
   return (
@@ -249,11 +252,13 @@ function Tasks() {
                 >
                   <For each={filteredTasks()}>
                     {(task) => {
-                      const latestJob = () => task.edges?.jobs?.[0];
-                      const status = () => latestJob()?.status ?? 'idle';
+                      // Use latestJob from GraphQL/subscription
+                      const latestJob = () => task.latestJob;
+                      // Use GraphQL uppercase status directly, default to IDLE
+                      const status = (): StatusType => latestJob()?.status ?? 'IDLE';
                       const lastRun = () => {
                         const job = latestJob();
-                        return job?.end_time ?? job?.start_time;
+                        return job?.endTime ?? job?.startTime;
                       };
 
                       return (
@@ -275,13 +280,13 @@ function Tasks() {
                           </TableCell>
                           <TableCell class="py-2">
                             <div class="flex w-full min-w-0 flex-col items-center gap-1 md:flex-row md:gap-2">
-                              <PathDisplay path={task.source_path} type="local" class="flex-1" />
+                              <PathDisplay path={task.sourcePath} type="local" class="flex-1" />
                               <DirectionArrow
                                 direction={task.direction}
                                 class="rotate-90 md:rotate-0"
                               />
                               <PathDisplay
-                                path={`${task.edges?.connection?.name ?? '?'}:${task.remote_path}`}
+                                path={`${task.connection?.name ?? '?'}:${task.remotePath}`}
                                 type="remote"
                                 class="flex-1"
                               />

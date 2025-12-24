@@ -9,6 +9,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 	"github.com/xzzpig/rclone-sync/internal/core/ports"
@@ -234,7 +235,7 @@ func (w *Watcher) triggerSync(taskID string) {
 			return
 		}
 
-		_ = w.runner.StartTask(task, "realtime")
+		_ = w.runner.StartTask(task, model.JobTriggerRealtime)
 	})
 }
 

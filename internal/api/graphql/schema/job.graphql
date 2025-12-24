@@ -1,0 +1,351 @@
+# GraphQL Schema: Job 相关类型定义（包含 Log 和 Subscription 事件）
+
+# =============================================================================
+# ENUMS
+# =============================================================================
+
+"""
+作业执行状态
+"""
+enum JobStatus {
+	"""
+	等待执行
+	"""
+	PENDING
+	"""
+	执行中
+	"""
+	RUNNING
+	"""
+	成功完成
+	"""
+	SUCCESS
+	"""
+	执行失败
+	"""
+	FAILED
+	"""
+	已取消
+	"""
+	CANCELLED
+}
+
+"""
+作业触发方式
+"""
+enum JobTrigger {
+	"""
+	手动触发
+	"""
+	MANUAL
+	"""
+	定时触发
+	"""
+	SCHEDULE
+	"""
+	实时触发（文件变更）
+	"""
+	REALTIME
+}
+
+"""
+日志级别
+"""
+enum LogLevel {
+	INFO
+	WARNING
+	ERROR
+}
+
+"""
+日志操作类型
+"""
+enum LogAction {
+	"""
+	上传文件
+	"""
+	UPLOAD
+	"""
+	下载文件
+	"""
+	DOWNLOAD
+	"""
+	删除文件
+	"""
+	DELETE
+	"""
+	移动文件
+	"""
+	MOVE
+	"""
+	错误
+	"""
+	ERROR
+	"""
+	未知操作
+	"""
+	UNKNOWN
+}
+
+# =============================================================================
+# TYPES
+# =============================================================================
+
+"""
+作业执行记录
+"""
+type Job @goExtraField(name: "TaskID", type: "github.com/google/uuid.UUID") {
+	"""
+	UUID 主键
+	"""
+	id: ID!
+	"""
+	执行状态
+	"""
+	status: JobStatus!
+	"""
+	触发方式
+	"""
+	trigger: JobTrigger!
+	"""
+	开始时间
+	"""
+	startTime: DateTime!
+	"""
+	结束时间
+	"""
+	endTime: DateTime
+	"""
+	已传输文件数
+	"""
+	filesTransferred: Int!
+	"""
+	已传输字节数
+	"""
+	bytesTransferred: BigInt!
+	"""
+	错误信息
+	"""
+	errors: String
+	"""
+	关联的任务（ent edge）
+	"""
+	task: Task! @goField(forceResolver: true)
+	"""
+	执行日志（分页查询）
+	"""
+	logs(pagination: PaginationInput): JobLogConnection! @goField(forceResolver: true)
+}
+
+"""
+作业日志条目
+"""
+type JobLog @goExtraField(name: "JobID", type: "github.com/google/uuid.UUID") {
+	"""
+	自增主键
+	"""
+	id: Int!
+	"""
+	日志级别
+	"""
+	level: LogLevel!
+	"""
+	日志时间
+	"""
+	time: DateTime!
+	"""
+	文件路径
+	"""
+	path: String!
+	"""
+	操作类型
+	"""
+	what: LogAction!
+	"""
+	文件大小（字节）
+	"""
+	size: BigInt!
+	"""
+	关联的作业（ent edge）
+	"""
+	job: Job! @goField(forceResolver: true)
+}
+
+"""
+作业分页连接
+"""
+type JobConnection {
+	"""
+	作业列表
+	"""
+	items: [Job!]!
+	"""
+	总数
+	"""
+	totalCount: Int!
+	"""
+	分页信息
+	"""
+	pageInfo: OffsetPageInfo!
+}
+
+"""
+日志分页连接
+"""
+type JobLogConnection {
+	"""
+	日志列表
+	"""
+	items: [JobLog!]!
+	"""
+	总数
+	"""
+	totalCount: Int!
+	"""
+	分页信息
+	"""
+	pageInfo: OffsetPageInfo!
+}
+
+# =============================================================================
+# SUBSCRIPTION EVENT TYPES
+# =============================================================================
+
+"""
+作业进度事件
+"""
+type JobProgressEvent {
+	"""
+	作业 ID
+	"""
+	jobId: ID!
+	"""
+	关联的任务 ID
+	"""
+	taskId: ID!
+	"""
+	关联的连接 ID
+	"""
+	connectionId: ID!
+	"""
+	当前状态
+	"""
+	status: JobStatus!
+	"""
+	已传输文件数
+	"""
+	filesTransferred: Int!
+	"""
+	已传输字节数
+	"""
+	bytesTransferred: BigInt!
+	"""
+	开始时间
+	"""
+	startTime: DateTime!
+	"""
+	结束时间
+	"""
+	endTime: DateTime
+}
+
+# =============================================================================
+# NAMESPACED TYPES
+# =============================================================================
+
+"""
+作业查询命名空间
+"""
+type JobQuery {
+	"""
+	获取作业列表
+	"""
+	list(
+		"""
+		按任务 ID 过滤
+		"""
+		taskId: ID
+		"""
+		按连接 ID 过滤
+		"""
+		connectionId: ID
+		"""
+		分页参数
+		"""
+		pagination: PaginationInput
+	): JobConnection! @goField(forceResolver: true)
+	"""
+	获取单个作业
+	"""
+	get(id: ID!): Job
+	"""
+	获取作业进度
+	"""
+	progress(id: ID!): JobProgressEvent @goField(forceResolver: true)
+}
+
+"""
+日志查询命名空间
+"""
+type LogQuery {
+	"""
+	获取日志列表
+	"""
+	list(
+		"""
+		按连接 ID 过滤（必填）
+		"""
+		connectionId: ID!
+		"""
+		按任务 ID 过滤
+		"""
+		taskId: ID
+		"""
+		按作业 ID 过滤
+		"""
+		jobId: ID
+		"""
+		按日志级别过滤
+		"""
+		level: LogLevel
+		"""
+		分页参数
+		"""
+		pagination: PaginationInput
+	): JobLogConnection! @goField(forceResolver: true)
+}
+
+# =============================================================================
+# EXTEND ROOT TYPES
+# =============================================================================
+
+extend type Query {
+	"""
+	作业相关查询（命名空间）
+	"""
+	job: JobQuery! @goField(forceResolver: true)
+	"""
+	日志相关查询（命名空间）
+	"""
+	log: LogQuery! @goField(forceResolver: true)
+}
+
+extend type Subscription {
+	"""
+	订阅作业进度事件
+
+	- 无参数：订阅所有作业进度（全局订阅）
+	- taskId：仅订阅指定任务的作业
+	- connectionId：仅订阅指定连接相关的作业
+	"""
+	jobProgress(
+		"""
+		按任务 ID 过滤
+		"""
+		taskId: ID
+		"""
+		按连接 ID 过滤
+		"""
+		connectionId: ID
+	): JobProgressEvent!
+}

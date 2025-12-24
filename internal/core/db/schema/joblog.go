@@ -3,9 +3,12 @@ package schema
 import (
 	"time"
 
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
+
 	"entgo.io/ent"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
+	"github.com/google/uuid"
 )
 
 // JobLog holds the schema definition for the JobLog entity.
@@ -16,15 +19,16 @@ type JobLog struct {
 // Fields of the JobLog.
 func (JobLog) Fields() []ent.Field {
 	return []ent.Field{
+		field.UUID("job_id", uuid.UUID{}),
 		field.Enum("level").
-			Values("info", "warning", "error"),
+			GoType(model.LogLevel("")),
 		field.Time("time").
 			Default(time.Now),
 		field.String("path").
 			Optional(),
 		field.Enum("what").
-			Values("upload", "download", "delete", "move", "error", "unknown").
-			Default("unknown"),
+			GoType(model.LogAction("")).
+			Default(string(model.LogActionUnknown)),
 		field.Int64("size").
 			Optional(),
 	}
@@ -36,6 +40,7 @@ func (JobLog) Edges() []ent.Edge {
 		edge.From("job", Job.Type).
 			Ref("logs").
 			Unique().
-			Required(),
+			Required().
+			Field("job_id"),
 	}
 }

@@ -9,17 +9,20 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { TextField, TextFieldInput, TextFieldLabel } from '@/components/ui/text-field';
-import { SyncDirection, Task } from '@/lib/types';
 import { Component, JSXElement, Show } from 'solid-js';
 import { RichText } from '@/components/common/RichText';
+import type { ConflictResolution, SyncDirection } from '@/lib/types';
 
-export type ConflictResolution = 'newer' | 'local' | 'remote' | 'both';
-
-// Form data type - subset of Task type
-export type TaskSettingsFormData = Pick<
-  Task,
-  'name' | 'direction' | 'schedule' | 'realtime' | 'options'
->;
+// Form data type for task settings
+export interface TaskSettingsFormData {
+  name: string;
+  direction: SyncDirection;
+  schedule: string;
+  realtime: boolean;
+  options?: {
+    conflictResolution?: ConflictResolution;
+  };
+}
 
 export interface TaskSettingsFormProps {
   value: TaskSettingsFormData;
@@ -28,8 +31,7 @@ export interface TaskSettingsFormProps {
 }
 
 export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
-  const conflictResolution = () =>
-    (props.value.options?.conflict_resolution as ConflictResolution) ?? 'newer';
+  const conflictResolution = () => props.value.options?.conflictResolution ?? 'NEWER';
 
   const updateField = <K extends keyof TaskSettingsFormData>(
     field: K,
@@ -37,8 +39,8 @@ export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
   ) => {
     const updates: Partial<TaskSettingsFormData> = { [field]: value };
 
-    // When direction switches to 'download', automatically disable realtime
-    if (field === 'direction' && value === 'download') {
+    // When direction switches to 'DOWNLOAD', automatically disable realtime
+    if (field === 'direction' && value === 'DOWNLOAD') {
       updates.realtime = false;
     }
 
@@ -53,7 +55,7 @@ export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
       ...props.value,
       options: {
         ...props.value.options,
-        conflict_resolution: value,
+        conflictResolution: value,
       },
     });
   };
@@ -79,13 +81,13 @@ export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
         <Select
           value={props.value.direction}
           onChange={(value) => updateField('direction', value as SyncDirection)}
-          options={['upload', 'download', 'bidirectional'] as const}
+          options={['UPLOAD', 'DOWNLOAD', 'BIDIRECTIONAL'] as const}
           placeholder={m.form_selectDirection()}
           itemComponent={(itemProps) => (
             <SelectItem item={itemProps.item}>
-              {itemProps.item.rawValue === 'upload'
+              {itemProps.item.rawValue === 'UPLOAD'
                 ? m.form_directionUpload()
-                : itemProps.item.rawValue === 'download'
+                : itemProps.item.rawValue === 'DOWNLOAD'
                   ? m.form_directionDownload()
                   : m.form_directionBidirectional()}
             </SelectItem>
@@ -95,11 +97,11 @@ export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
             <SelectValue>
               {(state) => {
                 const val = state.selectedOption();
-                return val === 'upload'
+                return val === 'UPLOAD'
                   ? m.form_directionUpload()
-                  : val === 'download'
+                  : val === 'DOWNLOAD'
                     ? m.form_directionDownload()
-                    : val === 'bidirectional'
+                    : val === 'BIDIRECTIONAL'
                       ? m.form_directionBidirectional()
                       : m.form_selectDirection();
               }}
@@ -126,7 +128,7 @@ export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
       </TextField>
 
       {/* Realtime Sync Toggle */}
-      <Show when={props.value.direction !== 'download'}>
+      <Show when={props.value.direction !== 'DOWNLOAD'}>
         <div class="flex items-center space-x-2">
           <Checkbox
             id="realtime"
@@ -140,21 +142,21 @@ export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
       </Show>
 
       {/* Conflict Resolution (only for bidirectional sync) */}
-      <Show when={props.value.direction === 'bidirectional'}>
+      <Show when={props.value.direction === 'BIDIRECTIONAL'}>
         <TextField>
           <TextFieldLabel for="conflictResolution">{m.form_conflictResolution()}</TextFieldLabel>
           <Select
             value={conflictResolution()}
             onChange={(value) => updateConflictResolution(value as ConflictResolution)}
-            options={['newer', 'local', 'remote', 'both'] as const}
+            options={['NEWER', 'LOCAL', 'REMOTE', 'BOTH'] as const}
             placeholder={m.form_selectConflictResolution()}
             itemComponent={(itemProps) => (
               <SelectItem item={itemProps.item}>
-                {itemProps.item.rawValue === 'newer'
+                {itemProps.item.rawValue === 'NEWER'
                   ? m.form_keepNewer()
-                  : itemProps.item.rawValue === 'local'
+                  : itemProps.item.rawValue === 'LOCAL'
                     ? m.form_keepLocal()
-                    : itemProps.item.rawValue === 'remote'
+                    : itemProps.item.rawValue === 'REMOTE'
                       ? m.form_keepRemote()
                       : m.form_keepBoth()}
               </SelectItem>
@@ -164,13 +166,13 @@ export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
               <SelectValue>
                 {(state) => {
                   const val = state.selectedOption();
-                  return val === 'newer'
+                  return val === 'NEWER'
                     ? m.form_keepNewer()
-                    : val === 'local'
+                    : val === 'LOCAL'
                       ? m.form_keepLocal()
-                      : val === 'remote'
+                      : val === 'REMOTE'
                         ? m.form_keepRemote()
-                        : val === 'both'
+                        : val === 'BOTH'
                           ? m.form_keepBoth()
                           : m.form_selectConflictResolution();
                 }}

@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/predicate"
 )
 
@@ -322,23 +323,33 @@ func RemotePathContainsFold(v string) predicate.Task {
 }
 
 // DirectionEQ applies the EQ predicate on the "direction" field.
-func DirectionEQ(v Direction) predicate.Task {
-	return predicate.Task(sql.FieldEQ(FieldDirection, v))
+func DirectionEQ(v model.SyncDirection) predicate.Task {
+	vc := v
+	return predicate.Task(sql.FieldEQ(FieldDirection, vc))
 }
 
 // DirectionNEQ applies the NEQ predicate on the "direction" field.
-func DirectionNEQ(v Direction) predicate.Task {
-	return predicate.Task(sql.FieldNEQ(FieldDirection, v))
+func DirectionNEQ(v model.SyncDirection) predicate.Task {
+	vc := v
+	return predicate.Task(sql.FieldNEQ(FieldDirection, vc))
 }
 
 // DirectionIn applies the In predicate on the "direction" field.
-func DirectionIn(vs ...Direction) predicate.Task {
-	return predicate.Task(sql.FieldIn(FieldDirection, vs...))
+func DirectionIn(vs ...model.SyncDirection) predicate.Task {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.Task(sql.FieldIn(FieldDirection, v...))
 }
 
 // DirectionNotIn applies the NotIn predicate on the "direction" field.
-func DirectionNotIn(vs ...Direction) predicate.Task {
-	return predicate.Task(sql.FieldNotIn(FieldDirection, vs...))
+func DirectionNotIn(vs ...model.SyncDirection) predicate.Task {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.Task(sql.FieldNotIn(FieldDirection, v...))
 }
 
 // ScheduleEQ applies the EQ predicate on the "schedule" field.

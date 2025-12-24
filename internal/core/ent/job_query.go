@@ -28,7 +28,6 @@ type JobQuery struct {
 	predicates []predicate.Job
 	withTask   *TaskQuery
 	withLogs   *JobLogQuery
-	withFKs    bool
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -337,12 +336,12 @@ func (_q *JobQuery) WithLogs(opts ...func(*JobLogQuery)) *JobQuery {
 // Example:
 //
 //	var v []struct {
-//		Status job.Status `json:"status,omitempty"`
+//		TaskID uuid.UUID `json:"task_id,omitempty"`
 //		Count int `json:"count,omitempty"`
 //	}
 //
 //	client.Job.Query().
-//		GroupBy(job.FieldStatus).
+//		GroupBy(job.FieldTaskID).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
 func (_q *JobQuery) GroupBy(field string, fields ...string) *JobGroupBy {
@@ -360,11 +359,11 @@ func (_q *JobQuery) GroupBy(field string, fields ...string) *JobGroupBy {
 // Example:
 //
 //	var v []struct {
-//		Status job.Status `json:"status,omitempty"`
+//		TaskID uuid.UUID `json:"task_id,omitempty"`
 //	}
 //
 //	client.Job.Query().
-//		Select(job.FieldStatus).
+//		Select(job.FieldTaskID).
 //		Scan(ctx, &v)
 func (_q *JobQuery) Select(fields ...string) *JobSelect {
 	_q.ctx.Fields = append(_q.ctx.Fields, fields...)
@@ -408,19 +407,12 @@ func (_q *JobQuery) prepareQuery(ctx context.Context) error {
 func (_q *JobQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Job, error) {
 	var (
 		nodes       = []*Job{}
-		withFKs     = _q.withFKs
 		_spec       = _q.querySpec()
 		loadedTypes = [2]bool{
 			_q.withTask != nil,
 			_q.withLogs != nil,
 		}
 	)
-	if _q.withTask != nil {
-		withFKs = true
-	}
-	if withFKs {
-		_spec.Node.Columns = append(_spec.Node.Columns, job.ForeignKeys...)
-	}
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*Job).scanValues(nil, columns)
 	}
@@ -459,10 +451,7 @@ func (_q *JobQuery) loadTask(ctx context.Context, query *TaskQuery, nodes []*Job
 	ids := make([]uuid.UUID, 0, len(nodes))
 	nodeids := make(map[uuid.UUID][]*Job)
 	for i := range nodes {
-		if nodes[i].task_jobs == nil {
-			continue
-		}
-		fk := *nodes[i].task_jobs
+		fk := nodes[i].TaskID
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}
@@ -479,7 +468,7 @@ func (_q *JobQuery) loadTask(ctx context.Context, query *TaskQuery, nodes []*Job
 	for _, n := range neighbors {
 		nodes, ok := nodeids[n.ID]
 		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "task_jobs" returned %v`, n.ID)
+			return fmt.Errorf(`unexpected foreign-key "task_id" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
@@ -497,7 +486,9 @@ func (_q *JobQuery) loadLogs(ctx context.Context, query *JobLogQuery, nodes []*J
 			init(nodes[i])
 		}
 	}
-	query.withFKs = true
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(joblog.FieldJobID)
+	}
 	query.Where(predicate.JobLog(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(job.LogsColumn), fks...))
 	}))
@@ -506,13 +497,10 @@ func (_q *JobQuery) loadLogs(ctx context.Context, query *JobLogQuery, nodes []*J
 		return err
 	}
 	for _, n := range neighbors {
-		fk := n.job_logs
-		if fk == nil {
-			return fmt.Errorf(`foreign-key "job_logs" is nil for node %v`, n.ID)
-		}
-		node, ok := nodeids[*fk]
+		fk := n.JobID
+		node, ok := nodeids[fk]
 		if !ok {
-			return fmt.Errorf(`unexpected referenced foreign-key "job_logs" returned %v for node %v`, *fk, n.ID)
+			return fmt.Errorf(`unexpected referenced foreign-key "job_id" returned %v for node %v`, fk, n.ID)
 		}
 		assign(node, n)
 	}
@@ -543,6 +531,9 @@ func (_q *JobQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != job.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
+		}
+		if _q.withTask != nil {
+			_spec.Node.AddColumnOnce(job.FieldTaskID)
 		}
 	}
 	if ps := _q.predicates; len(ps) > 0 {

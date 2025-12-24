@@ -4,12 +4,17 @@ package api
 import (
 	"fmt"
 
-	"github.com/xzzpig/rclone-sync/internal/api/handlers"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/dataloader"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/resolver"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/subscription"
 	"github.com/xzzpig/rclone-sync/internal/core/config"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
+	"github.com/xzzpig/rclone-sync/internal/core/ports"
 	"github.com/xzzpig/rclone-sync/internal/core/services"
+	"github.com/xzzpig/rclone-sync/internal/rclone"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -17,8 +22,14 @@ import (
 
 // RouterDeps contains all dependencies required for setting up API routes.
 type RouterDeps struct {
-	Client *ent.Client
-	Config *config.Config
+	Client         *ent.Client
+	Config         *config.Config
+	SyncEngine     *rclone.SyncEngine
+	Runner         ports.Runner
+	JobService     *services.JobService
+	Watcher        ports.Watcher
+	Scheduler      ports.Scheduler
+	JobProgressBus *subscription.JobProgressBus
 }
 
 // routesLog returns a named logger for the api.routes package.
@@ -39,73 +50,30 @@ func RegisterAPIRoutes(router *gin.RouterGroup, deps RouterDeps) error {
 	taskService := services.NewTaskService(deps.Client)
 	connService := services.NewConnectionService(deps.Client, encryptor)
 
-	// Initialize handlers
-	taskHandler := handlers.NewTaskHandler(taskService)
-	connHandler := handlers.NewConnectionHandler(connService)
-	importHandler := handlers.NewImportHandler(connService)
-	filesHandler := handlers.NewFilesHandler(connService)
-
-	// Global SSE events endpoint
-	router.GET("/events", handlers.GetGlobalEvents)
-
-	// Job management
-	jobs := router.Group("/jobs")
-	{
-		jobs.GET("", handlers.ListJobs)
-		jobs.GET("/:id", handlers.GetJob)
-		jobs.GET("/:id/progress", handlers.GetJobProgress)
+	// GraphQL endpoint
+	gqlDeps := &resolver.Dependencies{
+		SyncEngine:        deps.SyncEngine,
+		Runner:            deps.Runner,
+		JobService:        deps.JobService,
+		Watcher:           deps.Watcher,
+		Scheduler:         deps.Scheduler,
+		TaskService:       taskService,
+		ConnectionService: connService,
+		Encryptor:         encryptor,
+		JobProgressBus:    deps.JobProgressBus,
 	}
+	gqlHandler := graphql.NewHandler(gqlDeps)
 
-	// Log management
-	logs := router.Group("/logs")
+	gqlGroup := router.Group("/graphql")
+	gqlGroup.Use(dataloader.Middleware(deps.Client))
 	{
-		logs.GET("", handlers.ListLogs)
-	}
+		gqlGroup.POST("", graphql.GinHandler(gqlHandler))
+		gqlGroup.GET("", graphql.GinHandler(gqlHandler)) // For WebSocket upgrade
 
-	// Provider management
-	providers := router.Group("/providers")
-	{
-		providers.GET("", handlers.ListProviders)
-		providers.GET("/:name", handlers.GetProviderOptions)
-	}
-
-	// Connection management
-	connections := router.Group("/connections")
-	{
-		connections.POST("", connHandler.Create)
-		connections.GET("", connHandler.List)
-		connections.POST("/test", connHandler.TestUnsavedConfig)
-		connections.GET("/:id", connHandler.Get)
-		connections.GET("/:id/config", connHandler.GetConfig)
-		connections.POST("/:id/test", connHandler.Test)
-		connections.GET("/:id/quota", connHandler.GetQuota)
-		connections.PUT("/:id", connHandler.Update)
-		connections.DELETE("/:id", connHandler.Delete)
-	}
-
-	// Task management
-	tasks := router.Group("/tasks")
-	{
-		tasks.POST("", taskHandler.Create)
-		tasks.GET("", taskHandler.List)
-		tasks.POST("/:id/run", taskHandler.Run)
-		tasks.GET("/:id", taskHandler.Get)
-		tasks.PUT("/:id", taskHandler.Update)
-		tasks.DELETE("/:id", taskHandler.Delete)
-	}
-
-	// File browsing
-	files := router.Group("/files")
-	{
-		files.GET("/local", handlers.ListLocalFiles)
-		files.GET("/remote/:id", filesHandler.ListRemoteFiles)
-	}
-
-	// Import management
-	imports := router.Group("/import")
-	{
-		imports.POST("/parse", importHandler.Parse)
-		imports.POST("/execute", importHandler.Execute)
+		// GraphiQL Playground (development only)
+		if deps.Config.App.Environment == "development" {
+			gqlGroup.GET("/playground", graphql.PlaygroundHandler("/api/graphql"))
+		}
 	}
 
 	return nil

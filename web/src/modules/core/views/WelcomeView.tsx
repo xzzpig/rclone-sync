@@ -1,8 +1,8 @@
 import { Component, Show, createMemo } from 'solid-js';
-import { useQuery } from '@tanstack/solid-query';
-import { getConnections } from '@/api/connections';
-import { getTasks } from '@/api/tasks';
-import { getJobs } from '@/api/history';
+import { createQuery } from '@urql/solid';
+import { ConnectionsListQuery } from '@/api/graphql/queries/connections';
+import { TasksListQuery } from '@/api/graphql/queries/tasks';
+import { JobsListQuery } from '@/api/graphql/queries/jobs';
 import * as m from '@/paraglide/messages.js';
 import IconLink2 from '~icons/lucide/link-2';
 import IconListTodo from '~icons/lucide/list-todo';
@@ -13,58 +13,58 @@ import RecentActivity from '../components/RecentActivity';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const WelcomeView: Component = () => {
-  // Fetch all connections
-  const connectionsQuery = useQuery(() => ({
-    queryKey: ['connections'],
-    queryFn: getConnections,
-  }));
+  // Fetch all connections using GraphQL
+  const [connectionsResult] = createQuery({
+    query: ConnectionsListQuery,
+  });
 
-  // Fetch all tasks
-  const tasksQuery = useQuery(() => ({
-    queryKey: ['tasks'],
-    queryFn: () => getTasks(),
-  }));
+  // Fetch all tasks using GraphQL
+  const [tasksResult] = createQuery({
+    query: TasksListQuery,
+  });
 
-  // Fetch recent job records
-  const jobsQuery = useQuery(() => ({
-    queryKey: ['jobs', 'recent'],
-    queryFn: () => getJobs({ limit: 10 }),
-  }));
+  // Fetch recent job records using GraphQL (limit 10)
+  const [jobsResult] = createQuery({
+    query: JobsListQuery,
+    variables: { pagination: { limit: 10 }, withConnection: true },
+  });
+
+  // Extract data from GraphQL results
+  const connections = () => connectionsResult.data?.connection?.list?.items ?? [];
+  const tasks = () => tasksResult.data?.task?.list?.items ?? [];
+  const jobs = () => jobsResult.data?.job?.list?.items ?? [];
 
   // Calculate today's sync count
   const todaySyncCount = createMemo(() => {
-    const jobs = jobsQuery.data?.data ?? [];
+    const jobList = jobs();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    return jobs.filter((job) => {
-      const jobDate = new Date(job.start_time);
+    return jobList.filter((job) => {
+      const jobDate = new Date(job.startTime);
       jobDate.setHours(0, 0, 0, 0);
       return (
         jobDate.getTime() === today.getTime() &&
-        ['success', 'finished', 'done'].includes(job.status.toLowerCase())
+        ['SUCCESS', 'FINISHED', 'DONE'].includes(job.status)
       );
     }).length;
   });
 
   // Calculate running and failed job counts
   const runningCount = createMemo(() => {
-    const jobs = jobsQuery.data?.data ?? [];
-    return jobs.filter((job) =>
-      ['running', 'processing', 'queued'].includes(job.status.toLowerCase())
-    ).length;
+    const jobList = jobs();
+    return jobList.filter((job) => ['RUNNING', 'PROCESSING', 'QUEUED'].includes(job.status)).length;
   });
 
   const failedCount = createMemo(() => {
-    const jobs = jobsQuery.data?.data ?? [];
-    return jobs.filter((job) => ['failed', 'error'].includes(job.status.toLowerCase())).length;
+    const jobList = jobs();
+    return jobList.filter((job) => ['FAILED', 'ERROR'].includes(job.status)).length;
   });
 
-  const isLoading = () => connectionsQuery.isLoading || tasksQuery.isLoading || jobsQuery.isLoading;
+  const isLoading = () => connectionsResult.fetching ?? tasksResult.fetching ?? jobsResult.fetching;
 
   return (
     <div class="h-full space-y-6 overflow-auto">
-      {/* <div class="max-w-7xl mx-auto space-y-6"> */}
       {/* Welcome Header */}
       <div class="rounded-lg bg-card p-6 shadow-sm">
         <h1 class="text-3xl font-bold text-foreground">{m.welcome_title()}</h1>
@@ -87,13 +87,13 @@ const WelcomeView: Component = () => {
           <StatCard
             icon={<IconLink2 class="size-6" />}
             title={m.common_connections()}
-            value={connectionsQuery.data?.length ?? 0}
+            value={connections().length}
             color="blue"
           />
           <StatCard
             icon={<IconListTodo class="size-6" />}
             title={m.common_tasks()}
-            value={tasksQuery.data?.length ?? 0}
+            value={tasks().length}
             color="green"
           />
           <StatCard
@@ -117,10 +117,9 @@ const WelcomeView: Component = () => {
       </Show>
 
       {/* Recent Activity */}
-      <Show when={!jobsQuery.isLoading} fallback={<Skeleton height={400} />}>
-        <RecentActivity jobs={jobsQuery.data?.data ?? []} />
+      <Show when={!jobsResult.fetching} fallback={<Skeleton height={400} />}>
+        <RecentActivity jobs={jobs()} />
       </Show>
-      {/* </div> */}
     </div>
   );
 };

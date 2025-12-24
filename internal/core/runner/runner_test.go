@@ -8,8 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
-	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 	"github.com/xzzpig/rclone-sync/internal/core/runner"
 )
@@ -20,7 +20,7 @@ type MockSyncEngine struct {
 }
 
 // RunTask mocks the RunTask method.
-func (m *MockSyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger job.Trigger) error {
+func (m *MockSyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger model.JobTrigger) error {
 	args := m.Called(ctx, task, trigger)
 	// Simulate work or a blocking call that respects context cancellation.
 	select {
@@ -41,7 +41,7 @@ func TestRunner_StartAndStopTask(t *testing.T) {
 	r := runner.NewRunner(mockEngine)
 
 	task := &ent.Task{ID: uuid.New()}
-	trigger := job.TriggerManual
+	trigger := model.JobTriggerManual
 
 	// We use .On() to set an expectation that RunTask will be called.
 	// We use .Run() to capture the context passed to the mock, so we can check if it gets canceled.
@@ -93,8 +93,8 @@ func TestRunner_Concurrency_StartTaskTwiceCancelsFirst(t *testing.T) {
 	r := runner.NewRunner(mockEngine)
 
 	task := &ent.Task{ID: uuid.New()}
-	trigger1 := job.TriggerManual
-	trigger2 := job.TriggerRealtime
+	trigger1 := model.JobTriggerManual
+	trigger2 := model.JobTriggerRealtime
 
 	var firstTaskCtx, secondTaskCtx context.Context
 	firstStarted := make(chan struct{})
@@ -176,7 +176,7 @@ func TestRunner_Stop_CancelsAllTasks(t *testing.T) {
 	// Create multiple tasks
 	task1 := &ent.Task{ID: uuid.New()}
 	task2 := &ent.Task{ID: uuid.New()}
-	trigger := job.TriggerManual
+	trigger := model.JobTriggerManual
 
 	var ctx1, ctx2 context.Context
 	task1Started := make(chan struct{})

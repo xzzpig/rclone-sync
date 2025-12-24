@@ -44,15 +44,15 @@ func init() {
 	jobFields := schema.Job{}.Fields()
 	_ = jobFields
 	// jobDescStartTime is the schema descriptor for start_time field.
-	jobDescStartTime := jobFields[3].Descriptor()
+	jobDescStartTime := jobFields[4].Descriptor()
 	// job.DefaultStartTime holds the default value on creation for the start_time field.
 	job.DefaultStartTime = jobDescStartTime.Default.(func() time.Time)
 	// jobDescFilesTransferred is the schema descriptor for files_transferred field.
-	jobDescFilesTransferred := jobFields[5].Descriptor()
+	jobDescFilesTransferred := jobFields[6].Descriptor()
 	// job.DefaultFilesTransferred holds the default value on creation for the files_transferred field.
 	job.DefaultFilesTransferred = jobDescFilesTransferred.Default.(int)
 	// jobDescBytesTransferred is the schema descriptor for bytes_transferred field.
-	jobDescBytesTransferred := jobFields[6].Descriptor()
+	jobDescBytesTransferred := jobFields[7].Descriptor()
 	// job.DefaultBytesTransferred holds the default value on creation for the bytes_transferred field.
 	job.DefaultBytesTransferred = jobDescBytesTransferred.Default.(int64)
 	// jobDescID is the schema descriptor for id field.
@@ -62,7 +62,7 @@ func init() {
 	joblogFields := schema.JobLog{}.Fields()
 	_ = joblogFields
 	// joblogDescTime is the schema descriptor for time field.
-	joblogDescTime := joblogFields[1].Descriptor()
+	joblogDescTime := joblogFields[2].Descriptor()
 	// joblog.DefaultTime holds the default value on creation for the time field.
 	joblog.DefaultTime = joblogDescTime.Default.(func() time.Time)
 	taskFields := schema.Task{}.Fields()

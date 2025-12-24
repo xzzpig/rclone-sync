@@ -9,8 +9,8 @@ import (
 	"github.com/robfig/cron/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
-	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 	"github.com/xzzpig/rclone-sync/internal/core/scheduler"
 )
@@ -22,7 +22,7 @@ type MockRunner struct {
 
 func (m *MockRunner) Start() { m.Called() }
 func (m *MockRunner) Stop()  { m.Called() }
-func (m *MockRunner) StartTask(task *ent.Task, trigger job.Trigger) error {
+func (m *MockRunner) StartTask(task *ent.Task, trigger model.JobTrigger) error {
 	args := m.Called(task, string(trigger))
 	return args.Error(0)
 }
@@ -75,7 +75,7 @@ func TestScheduler_Start_LoadsScheduledTasks(t *testing.T) {
 	// We expect StartTask to be called for the scheduled task.
 	// We use a WaitGroup or channel to handle the async nature of cron.
 	startedChan := make(chan bool, 1)
-	mockRunner.On("StartTask", task1, "schedule").Return(nil).Run(func(args mock.Arguments) {
+	mockRunner.On("StartTask", task1, string(model.JobTriggerSchedule)).Return(nil).Run(func(args mock.Arguments) {
 		startedChan <- true
 	})
 
@@ -117,7 +117,7 @@ func TestScheduler_AddTask_And_RemoveTask(t *testing.T) {
 	mockTaskSvc.On("GetTaskWithConnection", mock.Anything, task.ID).Return(task, nil)
 	// Expect it to run
 	startedChan := make(chan bool, 1)
-	mockRunner.On("StartTask", task, "schedule").Return(nil).Run(func(args mock.Arguments) {
+	mockRunner.On("StartTask", task, string(model.JobTriggerSchedule)).Return(nil).Run(func(args mock.Arguments) {
 		startedChan <- true
 	})
 

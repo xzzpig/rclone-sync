@@ -1,4 +1,3 @@
-import * as m from '@/paraglide/messages.js';
 import TableSkeleton from '@/components/common/TableSkeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,8 +24,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatBytes } from '@/lib/utils';
 import { formatRelativeTime } from '@/lib/date';
+import type { LogLevel, LogLevelFilter } from '@/lib/types';
+import { LOG_LEVEL_FILTERS } from '@/lib/types';
+import { formatBytes } from '@/lib/utils';
+import * as m from '@/paraglide/messages.js';
 import { useHistory } from '@/store/history';
 import { useTasks } from '@/store/tasks';
 import { useParams, useSearchParams } from '@solidjs/router';
@@ -50,10 +52,30 @@ const Log: Component = () => {
   const [taskState, taskActions] = useTasks();
 
   // Derived values from URL params
-  const selectedTaskId = () => searchParams.task_id ?? '';
+  const selectedTaskId = () => searchParams.task_id;
   const selectedJobId = () => searchParams.job_id ?? undefined;
   const levelFilter = () => searchParams.level ?? 'all';
   const currentPage = () => parseInt(searchParams.page ?? '1', 10);
+
+  const loadLogs = () => {
+    historyActions.loadLogs({
+      connection_id: params.connectionId,
+      task_id: selectedTaskId(),
+      job_id: selectedJobId(),
+      level: levelFilter() === 'all' ? undefined : toLogLevel(levelFilter()),
+      page: currentPage(),
+    });
+  };
+
+  // Convert UI level filter to GraphQL LogLevel enum
+  const toLogLevel = (level: string): LogLevel | undefined => {
+    const levelMap: Record<string, LogLevel> = {
+      info: 'INFO',
+      warning: 'WARNING',
+      error: 'ERROR',
+    };
+    return levelMap[level.toLowerCase()];
+  };
 
   // Load tasks on mount
   onMount(() => {
@@ -72,28 +94,14 @@ const Log: Component = () => {
   });
 
   // Reload logs when filters or page changes
-  createEffect(() => {
-    const taskId = selectedTaskId();
-    const jobId = selectedJobId();
-    const level = levelFilter();
-    const page = currentPage();
+  createEffect(loadLogs);
 
-    historyActions.loadLogs({
-      connection_id: params.connectionId,
-      task_id: taskId,
-      job_id: jobId,
-      level: level === 'all' ? undefined : level,
-      page,
-    });
-  });
-
-  const setSelectedTaskId = (taskId: string) => {
+  const setSelectedTaskId = (taskId: string | undefined) => {
     const currentTaskId = selectedTaskId();
     // Only clear job_id if task actually changed
-    if (taskId === currentTaskId) return;
+    if ((taskId ?? '') === (currentTaskId ?? '')) return;
 
-    setSearchParams({ task_id: taskId ?? undefined, job_id: undefined, page: '1' });
-    historyActions.clearLogs();
+    setSearchParams({ task_id: taskId, job_id: undefined, page: '1' });
   };
 
   const setSelectedJobId = (jobId: string | undefined) => {
@@ -101,8 +109,7 @@ const Log: Component = () => {
     // Only update if job actually changed
     if (jobId === currentJobId) return;
 
-    setSearchParams({ job_id: jobId ?? undefined, page: '1' });
-    historyActions.clearLogs();
+    setSearchParams({ job_id: jobId, page: '1' });
   };
 
   const setLevelFilter = (level: string) => {
@@ -110,14 +117,7 @@ const Log: Component = () => {
   };
 
   const handleRefresh = () => {
-    setSearchParams({ page: '1' });
-    historyActions.loadLogs({
-      connection_id: params.connectionId,
-      task_id: selectedTaskId(),
-      job_id: selectedJobId(),
-      level: levelFilter() === 'all' ? undefined : levelFilter(),
-      page: 1,
-    });
+    loadLogs();
   };
 
   const handlePageChange = (page: number) => {
@@ -130,32 +130,40 @@ const Log: Component = () => {
 
   // Filter tasks by current connection
   const filteredTasks = createMemo(() => {
-    return taskState.tasks.filter((t) => t.connection_id === params.connectionId);
+    return taskState.tasks.filter((t) => t.connection?.id === params.connectionId);
   });
 
-  const getLevelIcon = (level: string) => {
+  const getLevelIcon = (level: LogLevel) => {
     switch (level) {
-      case 'error':
+      case 'ERROR':
         return <IconAlertCircle class="size-4 text-red-500" />;
-      case 'warning':
+      case 'WARNING':
         return <IconAlertTriangle class="size-4 text-yellow-500" />;
-      case 'info':
+      case 'INFO':
         return <IconInfo class="size-4 text-blue-500" />;
       default:
+        console.warn(`Unexpected log level: ${level}`);
         return <IconCheckCircle class="size-4 text-green-500" />;
     }
   };
 
-  const getLevelBadge = (level: string) => {
+  const getLevelBadge = (level: LogLevel) => {
     const variants: Record<
-      string,
+      LogLevel,
       'default' | 'secondary' | 'success' | 'warning' | 'error' | 'outline'
     > = {
-      error: 'error',
-      warning: 'warning',
-      info: 'secondary',
+      ERROR: 'error',
+      WARNING: 'warning',
+      INFO: 'secondary',
     };
-    return <Badge variant={variants[level] ?? 'outline'}>{level}</Badge>;
+
+    const labels: Record<LogLevel, string> = {
+      ERROR: m.common_error(),
+      WARNING: m.common_warning(),
+      INFO: m.common_info(),
+    };
+
+    return <Badge variant={variants[level] ?? 'outline'}>{labels[level] ?? level}</Badge>;
   };
 
   return (
@@ -172,8 +180,8 @@ const Log: Component = () => {
             <IconRefreshCw class="size-4" />
           </Button>
           <Select
-            value={selectedTaskId()}
-            onChange={(value) => setSelectedTaskId(value ?? '')}
+            value={selectedTaskId() ?? ''}
+            onChange={(value) => setSelectedTaskId(value ?? undefined)}
             options={['', ...(filteredTasks().map((t) => t.id) ?? [])]}
             placeholder={m.log_selectTask()}
             itemComponent={(props) => (
@@ -209,7 +217,7 @@ const Log: Component = () => {
                     ? m.log_selectExecution()
                     : m.log_ranAgo({
                         time: formatRelativeTime(
-                          historyState.jobs.find((j) => j.id === props.item.rawValue)?.start_time ??
+                          historyState.jobs.find((j) => j.id === props.item.rawValue)?.startTime ??
                             ''
                         ),
                       })}
@@ -224,7 +232,7 @@ const Log: Component = () => {
                     const job = historyState.jobs.find((j) => j.id === jobId);
                     if (!job) return m.log_selectExecution();
                     return m.log_ranAgo({
-                      time: formatRelativeTime(job.start_time),
+                      time: formatRelativeTime(job.startTime),
                     });
                   }}
                 </SelectValue>
@@ -236,21 +244,45 @@ const Log: Component = () => {
           <Select
             value={levelFilter() ?? 'all'}
             onChange={(value) => setLevelFilter(value ?? 'all')}
-            options={['all', 'info', 'warning', 'error']}
+            options={[...LOG_LEVEL_FILTERS]}
             placeholder={m.log_logLevel()}
             itemComponent={(props) => (
               <SelectItem item={props.item}>
-                {props.item.rawValue === 'all' ? m.log_allLevels() : props.item.rawValue}
+                {(() => {
+                  const value = props.item.rawValue as LogLevelFilter;
+                  switch (value) {
+                    case 'all':
+                      return m.log_allLevels();
+                    case 'info':
+                      return m.common_info();
+                    case 'warning':
+                      return m.common_warning();
+                    case 'error':
+                      return m.common_error();
+                    default:
+                      return value;
+                  }
+                })()}
               </SelectItem>
             )}
           >
             <SelectTrigger class="w-[150px]">
               <SelectValue<string>>
-                {(state) =>
-                  (state.selectedOption() === 'all'
-                    ? m.log_allLevels()
-                    : state.selectedOption()) as string
-                }
+                {(state) => {
+                  const value = state.selectedOption() as LogLevelFilter;
+                  switch (value) {
+                    case 'all':
+                      return m.log_allLevels();
+                    case 'info':
+                      return m.common_info();
+                    case 'warning':
+                      return m.common_warning();
+                    case 'error':
+                      return m.common_error();
+                    default:
+                      return value as string;
+                  }
+                }}
               </SelectValue>
             </SelectTrigger>
             <SelectContent />

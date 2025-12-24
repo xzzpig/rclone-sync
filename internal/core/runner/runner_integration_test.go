@@ -13,10 +13,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/db"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
-	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 	"github.com/xzzpig/rclone-sync/internal/core/runner"
 	"github.com/xzzpig/rclone-sync/internal/core/services"
@@ -67,7 +67,7 @@ func setupIntegrationTest(t *testing.T) *testContext {
 	storage.Install()
 
 	// Create SyncEngine and Runner
-	syncEngine := rclone.NewSyncEngine(jobService, dataDir)
+	syncEngine := rclone.NewSyncEngine(jobService, nil, dataDir)
 	r := runner.NewRunner(syncEngine)
 
 	cleanup := func() {
@@ -105,7 +105,7 @@ func createTestTask(t *testing.T, tc *testContext, name, sourceDir, destDir stri
 		sourceDir,
 		conn.ID,
 		destDir,
-		"bidirectional",
+		string(model.SyncDirectionBidirectional),
 		"",
 		false,
 		nil,
@@ -165,7 +165,7 @@ func setupCancelTest(t *testing.T) *cancelTestContext {
 	_ = storage // DBStorage is installed, slowfs backend will be created via ConnectionService
 
 	// Create SyncEngine and Runner
-	syncEngine := rclone.NewSyncEngine(jobService, dataDir)
+	syncEngine := rclone.NewSyncEngine(jobService, nil, dataDir)
 	r := runner.NewRunner(syncEngine)
 
 	cleanup := func() {
@@ -207,7 +207,7 @@ func createSlowTask(t *testing.T, tc *cancelTestContext, name, sourceDir, destDi
 		sourceDir,
 		conn.ID,
 		destDir,
-		"upload", // Use upload direction to trigger Put on destination
+		string(model.SyncDirectionUpload), // Use upload direction to trigger Put on destination
 		"",
 		false,
 		nil,
@@ -253,7 +253,7 @@ func TestRunner_Integration_BasicSyncFlow(t *testing.T) {
 	task := createTestTask(t, tc, "BasicSyncTest", sourceDir, destDir)
 
 	// Start task via Runner
-	err = tc.runner.StartTask(task, job.TriggerManual)
+	err = tc.runner.StartTask(task, model.JobTriggerManual)
 	require.NoError(t, err)
 	assert.True(t, tc.runner.IsRunning(task.ID), "Task should be running after StartTask")
 
@@ -272,7 +272,7 @@ func TestRunner_Integration_BasicSyncFlow(t *testing.T) {
 	jobs, err := tc.jobService.ListJobs(context.Background(), &task.ID, nil, 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs, 1, "Should have one job")
-	assert.Equal(t, string(job.StatusSuccess), string(jobs[0].Status), "Job should be successful")
+	assert.Equal(t, string(model.JobStatusSuccess), string(jobs[0].Status), "Job should be successful")
 }
 
 // TestRunner_Integration_StopRunningTask tests stopping a task while it's running.
@@ -299,7 +299,7 @@ func TestRunner_Integration_StopRunningTask(t *testing.T) {
 	task := createSlowTask(t, tc, "StopTaskTest", sourceDir, destDir)
 
 	// Start task via Runner
-	err = tc.runner.StartTask(task, job.TriggerManual)
+	err = tc.runner.StartTask(task, model.JobTriggerManual)
 	require.NoError(t, err)
 
 	// Wait for the task to actually start and reach the blocking point
@@ -328,7 +328,7 @@ func TestRunner_Integration_StopRunningTask(t *testing.T) {
 	jobs, err := tc.jobService.ListJobs(context.Background(), &task.ID, nil, 10, 0)
 	require.NoError(t, err)
 	require.Len(t, jobs, 1, "Should have exactly one job")
-	assert.Equal(t, string(job.StatusCancelled), string(jobs[0].Status), "Job should be cancelled after StopTask")
+	assert.Equal(t, string(model.JobStatusCancelled), string(jobs[0].Status), "Job should be cancelled after StopTask")
 }
 
 // TestRunner_Integration_MultipleTasks tests running multiple independent tasks sequentially.
@@ -352,13 +352,13 @@ func TestRunner_Integration_MultipleTasks(t *testing.T) {
 	task2 := createTestTask(t, tc, "MultiTask2", sourceDir2, destDir2)
 
 	// Start first task and wait for completion
-	err = tc.runner.StartTask(task1, job.TriggerManual)
+	err = tc.runner.StartTask(task1, model.JobTriggerManual)
 	require.NoError(t, err)
 	completed1 := waitForTaskCompletion(t, tc.runner, task1, 10*time.Second)
 	assert.True(t, completed1, "Task1 should complete")
 
 	// Start second task and wait for completion
-	err = tc.runner.StartTask(task2, job.TriggerSchedule)
+	err = tc.runner.StartTask(task2, model.JobTriggerSchedule)
 	require.NoError(t, err)
 	completed2 := waitForTaskCompletion(t, tc.runner, task2, 10*time.Second)
 	assert.True(t, completed2, "Task2 should complete")
@@ -376,12 +376,12 @@ func TestRunner_Integration_MultipleTasks(t *testing.T) {
 	jobs1, err := tc.jobService.ListJobs(context.Background(), &task1.ID, nil, 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs1, 1)
-	assert.Equal(t, string(job.StatusSuccess), string(jobs1[0].Status))
+	assert.Equal(t, string(model.JobStatusSuccess), string(jobs1[0].Status))
 
 	jobs2, err := tc.jobService.ListJobs(context.Background(), &task2.ID, nil, 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs2, 1)
-	assert.Equal(t, string(job.StatusSuccess), string(jobs2[0].Status))
+	assert.Equal(t, string(model.JobStatusSuccess), string(jobs2[0].Status))
 }
 
 // TestRunner_Cancel_RestartSameTaskCancelsFirst tests that restarting the same task
@@ -416,7 +416,7 @@ func TestRunner_Cancel_RestartSameTaskCancelsFirst(t *testing.T) {
 
 	// Start first task
 	t.Log("Starting first task...")
-	err = tc.runner.StartTask(task, job.TriggerManual)
+	err = tc.runner.StartTask(task, model.JobTriggerManual)
 	require.NoError(t, err)
 
 	// Wait for the first task to actually start and reach the blocking point
@@ -436,12 +436,12 @@ func TestRunner_Cancel_RestartSameTaskCancelsFirst(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, jobs, 1, "Should have exactly one job")
 	firstJobID := jobs[0].ID
-	assert.Equal(t, string(job.StatusRunning), string(jobs[0].Status), "First job should be running")
+	assert.Equal(t, string(model.JobStatusRunning), string(jobs[0].Status), "First job should be running")
 	t.Logf("First job ID: %s, status: %s", firstJobID, jobs[0].Status)
 
 	// Now start the second task (same task) - this should cancel the first one
 	t.Log("Starting second task (should cancel first)...")
-	err = tc.runner.StartTask(task, job.TriggerManual)
+	err = tc.runner.StartTask(task, model.JobTriggerManual)
 	require.NoError(t, err)
 
 	// Give it time to process the cancellation
@@ -464,7 +464,7 @@ func TestRunner_Cancel_RestartSameTaskCancelsFirst(t *testing.T) {
 	t.Logf("First job status after cancellation: %s", firstJob.Status)
 
 	// THIS IS THE KEY ASSERTION - the first job should be cancelled, not stuck at running
-	assert.Equal(t, string(job.StatusCancelled), string(firstJob.Status),
+	assert.Equal(t, string(model.JobStatusCancelled), string(firstJob.Status),
 		"First job should be cancelled when second task starts. If this fails, the bug exists!")
 
 	// Unblock the second task so it can complete
@@ -484,7 +484,7 @@ func TestRunner_Cancel_RestartSameTaskCancelsFirst(t *testing.T) {
 	// Should have at least one successful job (the second one)
 	hasSuccess := false
 	for _, j := range jobs {
-		if j.Status == job.StatusSuccess {
+		if j.Status == model.JobStatusSuccess {
 			hasSuccess = true
 			break
 		}
@@ -517,7 +517,7 @@ func TestRunner_Cancel_StopRunningTaskMarksCancelled(t *testing.T) {
 
 	// Start task
 	t.Log("Starting task...")
-	err = tc.runner.StartTask(task, job.TriggerManual)
+	err = tc.runner.StartTask(task, model.JobTriggerManual)
 	require.NoError(t, err)
 
 	// Wait for the task to start
@@ -537,7 +537,7 @@ func TestRunner_Cancel_StopRunningTaskMarksCancelled(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, jobs, 1)
 	jobID := jobs[0].ID
-	assert.Equal(t, string(job.StatusRunning), string(jobs[0].Status))
+	assert.Equal(t, string(model.JobStatusRunning), string(jobs[0].Status))
 
 	// Stop the task
 	t.Log("Stopping task...")
@@ -555,7 +555,7 @@ func TestRunner_Cancel_StopRunningTaskMarksCancelled(t *testing.T) {
 	t.Logf("Job status after stop: %s", jobs[0].Status)
 
 	// The job should be cancelled
-	assert.Equal(t, string(job.StatusCancelled), string(jobs[0].Status),
+	assert.Equal(t, string(model.JobStatusCancelled), string(jobs[0].Status),
 		"Job should be cancelled after StopTask. If this fails, the bug exists!")
 }
 
@@ -578,9 +578,9 @@ func TestRunner_Integration_StopCancelsAllTasks(t *testing.T) {
 	task2 := createTestTask(t, tc, "StopAllTask2", sourceDir2, destDir2)
 
 	// Start both tasks
-	err = tc.runner.StartTask(task1, job.TriggerManual)
+	err = tc.runner.StartTask(task1, model.JobTriggerManual)
 	require.NoError(t, err)
-	err = tc.runner.StartTask(task2, job.TriggerManual)
+	err = tc.runner.StartTask(task2, model.JobTriggerManual)
 	require.NoError(t, err)
 
 	// Give them a moment to start
@@ -621,7 +621,7 @@ func TestRunner_Integration_TaskExecutionError(t *testing.T) {
 	task := createTestTask(t, tc, "ErrorTest", sourceDir, destDir)
 
 	// Start task
-	err := tc.runner.StartTask(task, job.TriggerManual)
+	err := tc.runner.StartTask(task, model.JobTriggerManual)
 	require.NoError(t, err)
 
 	// Wait for completion (should fail quickly)
@@ -636,7 +636,7 @@ func TestRunner_Integration_TaskExecutionError(t *testing.T) {
 	jobs, err := tc.jobService.ListJobs(context.Background(), &task.ID, nil, 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs, 1, "Should have one job")
-	assert.Equal(t, string(job.StatusFailed), string(jobs[0].Status), "Job should have failed status")
+	assert.Equal(t, string(model.JobStatusFailed), string(jobs[0].Status), "Job should have failed status")
 	assert.NotEmpty(t, jobs[0].Errors, "Job should have error message")
 }
 
@@ -662,7 +662,7 @@ func TestRunner_Integration_ConcurrentStartStop(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_ = tc.runner.StartTask(task, job.TriggerManual)
+			_ = tc.runner.StartTask(task, model.JobTriggerManual)
 		}()
 	}
 
@@ -697,10 +697,10 @@ func TestRunner_Integration_DifferentTriggerTypes(t *testing.T) {
 	tc := setupIntegrationTest(t)
 	defer tc.cleanup()
 
-	triggers := []job.Trigger{
-		job.TriggerManual,
-		job.TriggerSchedule,
-		job.TriggerRealtime,
+	triggers := []model.JobTrigger{
+		model.JobTriggerManual,
+		model.JobTriggerSchedule,
+		model.JobTriggerRealtime,
 	}
 
 	for _, trigger := range triggers {
@@ -745,7 +745,7 @@ func TestRunner_Integration_StopNonExistentTask(t *testing.T) {
 	task := createTestTask(t, tc, "NonExistentStopTest", sourceDir, destDir)
 
 	// Start and wait for completion
-	err = tc.runner.StartTask(task, job.TriggerManual)
+	err = tc.runner.StartTask(task, model.JobTriggerManual)
 	require.NoError(t, err)
 
 	completed := waitForTaskCompletion(t, tc.runner, task, 10*time.Second)
@@ -777,14 +777,14 @@ func TestRunner_Integration_RapidStartStop(t *testing.T) {
 
 	// Rapidly start and stop the task multiple times
 	for i := 0; i < 5; i++ {
-		err = tc.runner.StartTask(task, job.TriggerManual)
+		err = tc.runner.StartTask(task, model.JobTriggerManual)
 		assert.NoError(t, err)
 		err = tc.runner.StopTask(task.ID)
 		assert.NoError(t, err)
 	}
 
 	// Final start and let it complete
-	err = tc.runner.StartTask(task, job.TriggerManual)
+	err = tc.runner.StartTask(task, model.JobTriggerManual)
 	require.NoError(t, err)
 
 	completed := waitForTaskCompletion(t, tc.runner, task, 10*time.Second)
@@ -799,7 +799,7 @@ func TestRunner_Integration_RapidStartStop(t *testing.T) {
 	// At least the last one should be successful
 	hasSuccess := false
 	for _, j := range jobs {
-		if j.Status == job.StatusSuccess {
+		if j.Status == model.JobStatusSuccess {
 			hasSuccess = true
 			break
 		}

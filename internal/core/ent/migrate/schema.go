@@ -38,14 +38,14 @@ var (
 	// JobsColumns holds the columns for the "jobs" table.
 	JobsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"pending", "running", "success", "failed", "cancelled"}, Default: "pending"},
-		{Name: "trigger", Type: field.TypeEnum, Enums: []string{"manual", "schedule", "realtime"}},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"PENDING", "RUNNING", "SUCCESS", "FAILED", "CANCELLED"}, Default: "PENDING"},
+		{Name: "trigger", Type: field.TypeEnum, Enums: []string{"MANUAL", "SCHEDULE", "REALTIME"}},
 		{Name: "start_time", Type: field.TypeTime},
 		{Name: "end_time", Type: field.TypeTime, Nullable: true},
 		{Name: "files_transferred", Type: field.TypeInt, Default: 0},
 		{Name: "bytes_transferred", Type: field.TypeInt64, Default: 0},
 		{Name: "errors", Type: field.TypeString, Nullable: true, Size: 2147483647},
-		{Name: "task_jobs", Type: field.TypeUUID},
+		{Name: "task_id", Type: field.TypeUUID},
 	}
 	// JobsTable holds the schema information for the "jobs" table.
 	JobsTable = &schema.Table{
@@ -64,12 +64,12 @@ var (
 	// JobLogsColumns holds the columns for the "job_logs" table.
 	JobLogsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
-		{Name: "level", Type: field.TypeEnum, Enums: []string{"info", "warning", "error"}},
+		{Name: "level", Type: field.TypeEnum, Enums: []string{"INFO", "WARNING", "ERROR"}},
 		{Name: "time", Type: field.TypeTime},
 		{Name: "path", Type: field.TypeString, Nullable: true},
-		{Name: "what", Type: field.TypeEnum, Enums: []string{"upload", "download", "delete", "move", "error", "unknown"}, Default: "unknown"},
+		{Name: "what", Type: field.TypeEnum, Enums: []string{"UPLOAD", "DOWNLOAD", "DELETE", "MOVE", "ERROR", "UNKNOWN"}, Default: "UNKNOWN"},
 		{Name: "size", Type: field.TypeInt64, Nullable: true},
-		{Name: "job_logs", Type: field.TypeUUID},
+		{Name: "job_id", Type: field.TypeUUID},
 	}
 	// JobLogsTable holds the schema information for the "job_logs" table.
 	JobLogsTable = &schema.Table{
@@ -91,7 +91,7 @@ var (
 		{Name: "name", Type: field.TypeString},
 		{Name: "source_path", Type: field.TypeString},
 		{Name: "remote_path", Type: field.TypeString},
-		{Name: "direction", Type: field.TypeEnum, Enums: []string{"upload", "download", "bidirectional"}, Default: "bidirectional"},
+		{Name: "direction", Type: field.TypeEnum, Enums: []string{"UPLOAD", "DOWNLOAD", "BIDIRECTIONAL"}, Default: "BIDIRECTIONAL"},
 		{Name: "schedule", Type: field.TypeString, Nullable: true},
 		{Name: "realtime", Type: field.TypeBool, Default: false},
 		{Name: "options", Type: field.TypeJSON, Nullable: true},

@@ -1,4 +1,3 @@
-import * as m from '@/paraglide/messages.js';
 import IntervalUpdated from '@/components/common/IntervalUpdated';
 import StatusIcon from '@/components/common/StatusIcon';
 import TableSkeleton from '@/components/common/TableSkeleton';
@@ -27,8 +26,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatBytes } from '@/lib/utils';
 import { formatDuration, formatRelativeTime } from '@/lib/date';
+import { formatBytes } from '@/lib/utils';
+import * as m from '@/paraglide/messages.js';
 import { useHistory } from '@/store/history';
 import { useTasks } from '@/store/tasks';
 import { useNavigate, useParams, useSearchParams } from '@solidjs/router';
@@ -72,7 +72,7 @@ const History: Component = () => {
 
   // Filter tasks by current connection
   const filteredTasks = createMemo(() => {
-    return taskState.tasks.filter((t) => t.connection_id === params.connectionId);
+    return taskState.tasks.filter((t) => t.connection?.id === params.connectionId);
   });
 
   const taskNameMap = createMemo(() => {
@@ -181,7 +181,7 @@ const History: Component = () => {
               >
                 <For each={historyState.jobs}>
                   {(job) => {
-                    const task = job.edges?.task;
+                    const task = job.task;
                     return (
                       <TableRow>
                         <TableCell class="flex items-center gap-2 py-2 align-top font-medium">
@@ -198,27 +198,23 @@ const History: Component = () => {
                         </TableCell>
                         <TableCell class="whitespace-nowrap py-2 align-top">
                           <IntervalUpdated when={true} interval={60 * 1000}>
-                            {() => formatRelativeTime(job.start_time)}
+                            {() => formatRelativeTime(job.startTime)}
                           </IntervalUpdated>
                         </TableCell>
                         <TableCell class="whitespace-nowrap py-2 align-top">
-                          <IntervalUpdated when={job.status === 'running'}>
+                          <IntervalUpdated when={job.status === 'RUNNING'}>
                             {(now) =>
                               calculateDuration(
-                                job.start_time,
-                                job.status === 'running' ? undefined : job.end_time,
+                                job.startTime,
+                                job.status === 'RUNNING' ? undefined : (job.endTime ?? undefined),
                                 now
                               )
                             }
                           </IntervalUpdated>
                         </TableCell>
-                        <TableCell class="py-2 align-top">
-                          {job.status === 'running'
-                            ? m.history_notApplicable()
-                            : (job.files_transferred ?? 0)}
-                        </TableCell>
+                        <TableCell class="py-2 align-top">{job.filesTransferred ?? 0}</TableCell>
                         <TableCell class="whitespace-nowrap py-2 align-top">
-                          {formatBytes(job.bytes_transferred)}
+                          {formatBytes(job.bytesTransferred)}
                         </TableCell>
                         <TableCell class="py-2 text-right align-top">
                           <Button

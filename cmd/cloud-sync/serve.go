@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/xzzpig/rclone-sync/internal/api"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/subscription"
 
 	"github.com/xzzpig/rclone-sync/internal/core/config"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
@@ -82,7 +83,8 @@ var serveCmd = &cobra.Command{
 		// 7. Initialize services
 		taskSvc := services.NewTaskService(dbClient)
 		jobSvc := services.NewJobService(dbClient)
-		syncEngine := rclone.NewSyncEngine(jobSvc, cfg.App.DataDir)
+		jobProgressBus := subscription.NewJobProgressBus()
+		syncEngine := rclone.NewSyncEngine(jobSvc, jobProgressBus, cfg.App.DataDir)
 		taskRunner := runner.NewRunner(syncEngine)
 
 		// Reset any stuck jobs from previous crash/shutdown
@@ -105,10 +107,16 @@ var serveCmd = &cobra.Command{
 
 		// 10. Setup router with dependencies
 		routerDeps := api.RouterDeps{
-			Client: dbClient,
-			Config: cfg,
+			Client:         dbClient,
+			Config:         cfg,
+			SyncEngine:     syncEngine,
+			Runner:         taskRunner,
+			JobService:     jobSvc,
+			Watcher:        watch,
+			Scheduler:      sched,
+			JobProgressBus: jobProgressBus,
 		}
-		r := api.SetupRouter(routerDeps, syncEngine, taskRunner, jobSvc, watch, sched)
+		r := api.SetupRouter(routerDeps)
 
 		addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 		log.Info("Server starting", zap.String("address", addr))

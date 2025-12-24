@@ -1,12 +1,19 @@
 import StatusIcon from '@/components/common/StatusIcon';
-import { Connection, TaskStatus } from '@/lib/types';
+import type { StatusType } from '@/lib/types';
 import { A } from '@solidjs/router';
 import { Component } from 'solid-js';
 import IconHardDrive from '~icons/lucide/hard-drive';
 
+// Connection type for sidebar display
+interface ConnectionInfo {
+  id: string;
+  name: string;
+  type: string;
+}
+
 interface ConnectionSidebarItemProps {
-  connection: Connection;
-  status: TaskStatus;
+  connection: ConnectionInfo;
+  status: StatusType;
 }
 
 export const ConnectionSidebarItem: Component<ConnectionSidebarItemProps> = (props) => {

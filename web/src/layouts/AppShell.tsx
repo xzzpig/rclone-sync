@@ -11,10 +11,9 @@ const AppShellInner: ParentComponent = (props) => {
   const [, actions] = useTasks();
 
   // Load all tasks on mount for sidebar status indicators
-  // and start global SSE subscription for real-time updates
+  // GraphQL subscription handles real-time updates automatically
   onMount(() => {
     actions.loadTasks();
-    actions.startGlobalSseSubscription();
   });
 
   return <>{props.children}</>;

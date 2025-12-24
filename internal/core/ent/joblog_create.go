@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/joblog"
 )
@@ -22,8 +23,14 @@ type JobLogCreate struct {
 	hooks    []Hook
 }
 
+// SetJobID sets the "job_id" field.
+func (_c *JobLogCreate) SetJobID(v uuid.UUID) *JobLogCreate {
+	_c.mutation.SetJobID(v)
+	return _c
+}
+
 // SetLevel sets the "level" field.
-func (_c *JobLogCreate) SetLevel(v joblog.Level) *JobLogCreate {
+func (_c *JobLogCreate) SetLevel(v model.LogLevel) *JobLogCreate {
 	_c.mutation.SetLevel(v)
 	return _c
 }
@@ -57,13 +64,13 @@ func (_c *JobLogCreate) SetNillablePath(v *string) *JobLogCreate {
 }
 
 // SetWhat sets the "what" field.
-func (_c *JobLogCreate) SetWhat(v joblog.What) *JobLogCreate {
+func (_c *JobLogCreate) SetWhat(v model.LogAction) *JobLogCreate {
 	_c.mutation.SetWhat(v)
 	return _c
 }
 
 // SetNillableWhat sets the "what" field if the given value is not nil.
-func (_c *JobLogCreate) SetNillableWhat(v *joblog.What) *JobLogCreate {
+func (_c *JobLogCreate) SetNillableWhat(v *model.LogAction) *JobLogCreate {
 	if v != nil {
 		_c.SetWhat(*v)
 	}
@@ -81,12 +88,6 @@ func (_c *JobLogCreate) SetNillableSize(v *int64) *JobLogCreate {
 	if v != nil {
 		_c.SetSize(*v)
 	}
-	return _c
-}
-
-// SetJobID sets the "job" edge to the Job entity by ID.
-func (_c *JobLogCreate) SetJobID(id uuid.UUID) *JobLogCreate {
-	_c.mutation.SetJobID(id)
 	return _c
 }
 
@@ -142,6 +143,9 @@ func (_c *JobLogCreate) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (_c *JobLogCreate) check() error {
+	if _, ok := _c.mutation.JobID(); !ok {
+		return &ValidationError{Name: "job_id", err: errors.New(`ent: missing required field "JobLog.job_id"`)}
+	}
 	if _, ok := _c.mutation.Level(); !ok {
 		return &ValidationError{Name: "level", err: errors.New(`ent: missing required field "JobLog.level"`)}
 	}
@@ -224,7 +228,7 @@ func (_c *JobLogCreate) createSpec() (*JobLog, *sqlgraph.CreateSpec) {
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_node.job_logs = &nodes[0]
+		_node.JobID = nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

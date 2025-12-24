@@ -7,6 +7,8 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/predicate"
 )
 
@@ -55,6 +57,11 @@ func IDLTE(id int) predicate.JobLog {
 	return predicate.JobLog(sql.FieldLTE(FieldID, id))
 }
 
+// JobID applies equality check predicate on the "job_id" field. It's identical to JobIDEQ.
+func JobID(v uuid.UUID) predicate.JobLog {
+	return predicate.JobLog(sql.FieldEQ(FieldJobID, v))
+}
+
 // Time applies equality check predicate on the "time" field. It's identical to TimeEQ.
 func Time(v time.Time) predicate.JobLog {
 	return predicate.JobLog(sql.FieldEQ(FieldTime, v))
@@ -70,24 +77,54 @@ func Size(v int64) predicate.JobLog {
 	return predicate.JobLog(sql.FieldEQ(FieldSize, v))
 }
 
+// JobIDEQ applies the EQ predicate on the "job_id" field.
+func JobIDEQ(v uuid.UUID) predicate.JobLog {
+	return predicate.JobLog(sql.FieldEQ(FieldJobID, v))
+}
+
+// JobIDNEQ applies the NEQ predicate on the "job_id" field.
+func JobIDNEQ(v uuid.UUID) predicate.JobLog {
+	return predicate.JobLog(sql.FieldNEQ(FieldJobID, v))
+}
+
+// JobIDIn applies the In predicate on the "job_id" field.
+func JobIDIn(vs ...uuid.UUID) predicate.JobLog {
+	return predicate.JobLog(sql.FieldIn(FieldJobID, vs...))
+}
+
+// JobIDNotIn applies the NotIn predicate on the "job_id" field.
+func JobIDNotIn(vs ...uuid.UUID) predicate.JobLog {
+	return predicate.JobLog(sql.FieldNotIn(FieldJobID, vs...))
+}
+
 // LevelEQ applies the EQ predicate on the "level" field.
-func LevelEQ(v Level) predicate.JobLog {
-	return predicate.JobLog(sql.FieldEQ(FieldLevel, v))
+func LevelEQ(v model.LogLevel) predicate.JobLog {
+	vc := v
+	return predicate.JobLog(sql.FieldEQ(FieldLevel, vc))
 }
 
 // LevelNEQ applies the NEQ predicate on the "level" field.
-func LevelNEQ(v Level) predicate.JobLog {
-	return predicate.JobLog(sql.FieldNEQ(FieldLevel, v))
+func LevelNEQ(v model.LogLevel) predicate.JobLog {
+	vc := v
+	return predicate.JobLog(sql.FieldNEQ(FieldLevel, vc))
 }
 
 // LevelIn applies the In predicate on the "level" field.
-func LevelIn(vs ...Level) predicate.JobLog {
-	return predicate.JobLog(sql.FieldIn(FieldLevel, vs...))
+func LevelIn(vs ...model.LogLevel) predicate.JobLog {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.JobLog(sql.FieldIn(FieldLevel, v...))
 }
 
 // LevelNotIn applies the NotIn predicate on the "level" field.
-func LevelNotIn(vs ...Level) predicate.JobLog {
-	return predicate.JobLog(sql.FieldNotIn(FieldLevel, vs...))
+func LevelNotIn(vs ...model.LogLevel) predicate.JobLog {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.JobLog(sql.FieldNotIn(FieldLevel, v...))
 }
 
 // TimeEQ applies the EQ predicate on the "time" field.
@@ -206,23 +243,33 @@ func PathContainsFold(v string) predicate.JobLog {
 }
 
 // WhatEQ applies the EQ predicate on the "what" field.
-func WhatEQ(v What) predicate.JobLog {
-	return predicate.JobLog(sql.FieldEQ(FieldWhat, v))
+func WhatEQ(v model.LogAction) predicate.JobLog {
+	vc := v
+	return predicate.JobLog(sql.FieldEQ(FieldWhat, vc))
 }
 
 // WhatNEQ applies the NEQ predicate on the "what" field.
-func WhatNEQ(v What) predicate.JobLog {
-	return predicate.JobLog(sql.FieldNEQ(FieldWhat, v))
+func WhatNEQ(v model.LogAction) predicate.JobLog {
+	vc := v
+	return predicate.JobLog(sql.FieldNEQ(FieldWhat, vc))
 }
 
 // WhatIn applies the In predicate on the "what" field.
-func WhatIn(vs ...What) predicate.JobLog {
-	return predicate.JobLog(sql.FieldIn(FieldWhat, vs...))
+func WhatIn(vs ...model.LogAction) predicate.JobLog {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.JobLog(sql.FieldIn(FieldWhat, v...))
 }
 
 // WhatNotIn applies the NotIn predicate on the "what" field.
-func WhatNotIn(vs ...What) predicate.JobLog {
-	return predicate.JobLog(sql.FieldNotIn(FieldWhat, vs...))
+func WhatNotIn(vs ...model.LogAction) predicate.JobLog {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.JobLog(sql.FieldNotIn(FieldWhat, v...))
 }
 
 // SizeEQ applies the EQ predicate on the "size" field.

@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/connection"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/task"
@@ -56,13 +57,13 @@ func (_c *TaskCreate) SetRemotePath(v string) *TaskCreate {
 }
 
 // SetDirection sets the "direction" field.
-func (_c *TaskCreate) SetDirection(v task.Direction) *TaskCreate {
+func (_c *TaskCreate) SetDirection(v model.SyncDirection) *TaskCreate {
 	_c.mutation.SetDirection(v)
 	return _c
 }
 
 // SetNillableDirection sets the "direction" field if the given value is not nil.
-func (_c *TaskCreate) SetNillableDirection(v *task.Direction) *TaskCreate {
+func (_c *TaskCreate) SetNillableDirection(v *model.SyncDirection) *TaskCreate {
 	if v != nil {
 		_c.SetDirection(*v)
 	}

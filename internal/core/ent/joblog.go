@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/joblog"
 )
@@ -19,20 +20,21 @@ type JobLog struct {
 	config `json:"-"`
 	// ID of the ent.
 	ID int `json:"id,omitempty"`
+	// JobID holds the value of the "job_id" field.
+	JobID uuid.UUID `json:"job_id,omitempty"`
 	// Level holds the value of the "level" field.
-	Level joblog.Level `json:"level,omitempty"`
+	Level model.LogLevel `json:"level,omitempty"`
 	// Time holds the value of the "time" field.
 	Time time.Time `json:"time,omitempty"`
 	// Path holds the value of the "path" field.
 	Path string `json:"path,omitempty"`
 	// What holds the value of the "what" field.
-	What joblog.What `json:"what,omitempty"`
+	What model.LogAction `json:"what,omitempty"`
 	// Size holds the value of the "size" field.
 	Size int64 `json:"size,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the JobLogQuery when eager-loading is set.
 	Edges        JobLogEdges `json:"edges"`
-	job_logs     *uuid.UUID
 	selectValues sql.SelectValues
 }
 
@@ -67,8 +69,8 @@ func (*JobLog) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullString)
 		case joblog.FieldTime:
 			values[i] = new(sql.NullTime)
-		case joblog.ForeignKeys[0]: // job_logs
-			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
+		case joblog.FieldJobID:
+			values[i] = new(uuid.UUID)
 		default:
 			values[i] = new(sql.UnknownType)
 		}
@@ -90,11 +92,17 @@ func (_m *JobLog) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field id", value)
 			}
 			_m.ID = int(value.Int64)
+		case joblog.FieldJobID:
+			if value, ok := values[i].(*uuid.UUID); !ok {
+				return fmt.Errorf("unexpected type %T for field job_id", values[i])
+			} else if value != nil {
+				_m.JobID = *value
+			}
 		case joblog.FieldLevel:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field level", values[i])
 			} else if value.Valid {
-				_m.Level = joblog.Level(value.String)
+				_m.Level = model.LogLevel(value.String)
 			}
 		case joblog.FieldTime:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -112,20 +120,13 @@ func (_m *JobLog) assignValues(columns []string, values []any) error {
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field what", values[i])
 			} else if value.Valid {
-				_m.What = joblog.What(value.String)
+				_m.What = model.LogAction(value.String)
 			}
 		case joblog.FieldSize:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field size", values[i])
 			} else if value.Valid {
 				_m.Size = value.Int64
-			}
-		case joblog.ForeignKeys[0]:
-			if value, ok := values[i].(*sql.NullScanner); !ok {
-				return fmt.Errorf("unexpected type %T for field job_logs", values[i])
-			} else if value.Valid {
-				_m.job_logs = new(uuid.UUID)
-				*_m.job_logs = *value.S.(*uuid.UUID)
 			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
@@ -168,6 +169,9 @@ func (_m *JobLog) String() string {
 	var builder strings.Builder
 	builder.WriteString("JobLog(")
 	builder.WriteString(fmt.Sprintf("id=%v, ", _m.ID))
+	builder.WriteString("job_id=")
+	builder.WriteString(fmt.Sprintf("%v", _m.JobID))
+	builder.WriteString(", ")
 	builder.WriteString("level=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Level))
 	builder.WriteString(", ")

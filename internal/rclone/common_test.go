@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
+	"github.com/xzzpig/rclone-sync/internal/core/db"
 	"github.com/xzzpig/rclone-sync/internal/core/services"
 	"github.com/xzzpig/rclone-sync/internal/rclone"
 
@@ -19,7 +20,7 @@ func setupTestConfig(t *testing.T) (*rclone.DBStorage, *services.ConnectionServi
 	t.Helper()
 
 	// Create test database client
-	client := enttest.Open(t, "sqlite3", "file:ent?mode=memory&cache=shared&_fk=1")
+	client := enttest.Open(t, "sqlite3", db.InMemoryDSN())
 	t.Cleanup(func() { client.Close() })
 
 	// Create encryptor (plaintext mode for testing)

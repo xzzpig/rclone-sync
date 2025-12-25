@@ -55,6 +55,14 @@ func init() {
 	jobDescBytesTransferred := jobFields[7].Descriptor()
 	// job.DefaultBytesTransferred holds the default value on creation for the bytes_transferred field.
 	job.DefaultBytesTransferred = jobDescBytesTransferred.Default.(int64)
+	// jobDescFilesDeleted is the schema descriptor for files_deleted field.
+	jobDescFilesDeleted := jobFields[8].Descriptor()
+	// job.DefaultFilesDeleted holds the default value on creation for the files_deleted field.
+	job.DefaultFilesDeleted = jobDescFilesDeleted.Default.(int)
+	// jobDescErrorCount is the schema descriptor for error_count field.
+	jobDescErrorCount := jobFields[9].Descriptor()
+	// job.DefaultErrorCount holds the default value on creation for the error_count field.
+	job.DefaultErrorCount = jobDescErrorCount.Default.(int)
 	// jobDescID is the schema descriptor for id field.
 	jobDescID := jobFields[0].Descriptor()
 	// job.DefaultID holds the default value on creation for the id field.

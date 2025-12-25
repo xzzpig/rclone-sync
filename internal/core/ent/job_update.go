@@ -150,6 +150,48 @@ func (_u *JobUpdate) AddBytesTransferred(v int64) *JobUpdate {
 	return _u
 }
 
+// SetFilesDeleted sets the "files_deleted" field.
+func (_u *JobUpdate) SetFilesDeleted(v int) *JobUpdate {
+	_u.mutation.ResetFilesDeleted()
+	_u.mutation.SetFilesDeleted(v)
+	return _u
+}
+
+// SetNillableFilesDeleted sets the "files_deleted" field if the given value is not nil.
+func (_u *JobUpdate) SetNillableFilesDeleted(v *int) *JobUpdate {
+	if v != nil {
+		_u.SetFilesDeleted(*v)
+	}
+	return _u
+}
+
+// AddFilesDeleted adds value to the "files_deleted" field.
+func (_u *JobUpdate) AddFilesDeleted(v int) *JobUpdate {
+	_u.mutation.AddFilesDeleted(v)
+	return _u
+}
+
+// SetErrorCount sets the "error_count" field.
+func (_u *JobUpdate) SetErrorCount(v int) *JobUpdate {
+	_u.mutation.ResetErrorCount()
+	_u.mutation.SetErrorCount(v)
+	return _u
+}
+
+// SetNillableErrorCount sets the "error_count" field if the given value is not nil.
+func (_u *JobUpdate) SetNillableErrorCount(v *int) *JobUpdate {
+	if v != nil {
+		_u.SetErrorCount(*v)
+	}
+	return _u
+}
+
+// AddErrorCount adds value to the "error_count" field.
+func (_u *JobUpdate) AddErrorCount(v int) *JobUpdate {
+	_u.mutation.AddErrorCount(v)
+	return _u
+}
+
 // SetErrors sets the "errors" field.
 func (_u *JobUpdate) SetErrors(v string) *JobUpdate {
 	_u.mutation.SetErrors(v)
@@ -305,6 +347,18 @@ func (_u *JobUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.AddedBytesTransferred(); ok {
 		_spec.AddField(job.FieldBytesTransferred, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.FilesDeleted(); ok {
+		_spec.SetField(job.FieldFilesDeleted, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedFilesDeleted(); ok {
+		_spec.AddField(job.FieldFilesDeleted, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.ErrorCount(); ok {
+		_spec.SetField(job.FieldErrorCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedErrorCount(); ok {
+		_spec.AddField(job.FieldErrorCount, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.Errors(); ok {
 		_spec.SetField(job.FieldErrors, field.TypeString, value)
@@ -524,6 +578,48 @@ func (_u *JobUpdateOne) AddBytesTransferred(v int64) *JobUpdateOne {
 	return _u
 }
 
+// SetFilesDeleted sets the "files_deleted" field.
+func (_u *JobUpdateOne) SetFilesDeleted(v int) *JobUpdateOne {
+	_u.mutation.ResetFilesDeleted()
+	_u.mutation.SetFilesDeleted(v)
+	return _u
+}
+
+// SetNillableFilesDeleted sets the "files_deleted" field if the given value is not nil.
+func (_u *JobUpdateOne) SetNillableFilesDeleted(v *int) *JobUpdateOne {
+	if v != nil {
+		_u.SetFilesDeleted(*v)
+	}
+	return _u
+}
+
+// AddFilesDeleted adds value to the "files_deleted" field.
+func (_u *JobUpdateOne) AddFilesDeleted(v int) *JobUpdateOne {
+	_u.mutation.AddFilesDeleted(v)
+	return _u
+}
+
+// SetErrorCount sets the "error_count" field.
+func (_u *JobUpdateOne) SetErrorCount(v int) *JobUpdateOne {
+	_u.mutation.ResetErrorCount()
+	_u.mutation.SetErrorCount(v)
+	return _u
+}
+
+// SetNillableErrorCount sets the "error_count" field if the given value is not nil.
+func (_u *JobUpdateOne) SetNillableErrorCount(v *int) *JobUpdateOne {
+	if v != nil {
+		_u.SetErrorCount(*v)
+	}
+	return _u
+}
+
+// AddErrorCount adds value to the "error_count" field.
+func (_u *JobUpdateOne) AddErrorCount(v int) *JobUpdateOne {
+	_u.mutation.AddErrorCount(v)
+	return _u
+}
+
 // SetErrors sets the "errors" field.
 func (_u *JobUpdateOne) SetErrors(v string) *JobUpdateOne {
 	_u.mutation.SetErrors(v)
@@ -709,6 +805,18 @@ func (_u *JobUpdateOne) sqlSave(ctx context.Context) (_node *Job, err error) {
 	}
 	if value, ok := _u.mutation.AddedBytesTransferred(); ok {
 		_spec.AddField(job.FieldBytesTransferred, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.FilesDeleted(); ok {
+		_spec.SetField(job.FieldFilesDeleted, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedFilesDeleted(); ok {
+		_spec.AddField(job.FieldFilesDeleted, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.ErrorCount(); ok {
+		_spec.SetField(job.FieldErrorCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedErrorCount(); ok {
+		_spec.AddField(job.FieldErrorCount, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.Errors(); ok {
 		_spec.SetField(job.FieldErrors, field.TypeString, value)

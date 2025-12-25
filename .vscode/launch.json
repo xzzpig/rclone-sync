@@ -14,6 +14,10 @@
                 "serve"
             ],
             "cwd": "${workspaceFolder}",
+            "env": {
+                "CGO_CFLAGS": "-O1",
+                "CGO_ENABLED": "1"
+            }
         },
     ]
 }

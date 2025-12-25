@@ -32,7 +32,7 @@ func (m *MockSyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger mo
 }
 
 func setupTest() {
-	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug)
+	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug, nil)
 }
 
 func TestRunner_StartAndStopTask(t *testing.T) {

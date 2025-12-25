@@ -18,7 +18,7 @@ func (r *importMutationResolver) Parse(ctx context.Context, obj *model.ImportMut
 	// Parse rclone.conf content
 	connections, err := rclone.ParseRcloneConf(input.Content)
 	if err != nil {
-		// Return parse error as business result (not GraphQL error)
+		//nolint:nilerr // Return parse error as union result, not as GraphQL error
 		return &model.ImportParseError{
 			Error: err.Error(),
 		}, nil

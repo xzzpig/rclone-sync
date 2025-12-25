@@ -140,6 +140,24 @@ port = 8080
 # "info" is recommended for production environments
 level = "info"
 
+# Maximum number of logs retained per connection
+# 0 = unlimited (no cleanup)
+# Default: 1000
+max_logs_per_connection = 1000
+
+# Cron expression for log cleanup task
+# Format: minute hour day month weekday
+# Default: "0 * * * *" (every hour)
+cleanup_schedule = "0 * * * *"
+
+# Hierarchical log levels by module name
+# Names are case-sensitive, separated by "."
+# Example: "core.db" matches "core.db", "core.db.query", etc.
+[log.levels]
+# "core.db" = "debug"        # core.db and sub-modules use debug level
+# "core.scheduler" = "warn"  # core.scheduler uses warn level
+# "rclone" = "error"         # rclone module uses error level
+
 [database]
 # Database migration mode
 # "auto": Automatic migration (Suitable for development or simple upgrades)

@@ -40,9 +40,22 @@ func Get() *zap.Logger {
 	return logger
 }
 
-// Named returns a named logger. If Init hasn't been called, returns a named default logger.
+// Named returns a named logger with level filtering based on hierarchical configuration.
+// If Init hasn't been called, returns a named default logger.
 func Named(name string) *zap.Logger {
-	return Get().Named(name)
+	baseLogger := Get()
+	namedLogger := baseLogger.Named(name)
+
+	// 获取该名称对应的日志级别
+	level := GetLevelForName(name)
+
+	// 使用 zap.WrapCore 包装核心，应用自定义级别过滤
+	return namedLogger.WithOptions(zap.WrapCore(func(core zapcore.Core) zapcore.Core {
+		return &levelFilterCore{
+			Core:  core,
+			level: level,
+		}
+	}))
 }
 
 // Environment represents the application environment type.
@@ -69,8 +82,9 @@ const (
 	Error LogLevel = "error"
 )
 
-// InitLogger initializes the global logger with the specified environment and log level.
-func InitLogger(environment Environment, logLevel LogLevel) {
+// InitLogger initializes the global logger with the specified environment, log level, and hierarchical level configuration.
+// The levels parameter is a map of logger names to their log levels (e.g., "core.db" -> "debug").
+func InitLogger(environment Environment, logLevel LogLevel, levels map[string]string) {
 	var cfg zap.Config
 
 	if environment == EnvironmentDevelopment {
@@ -79,7 +93,8 @@ func InitLogger(environment Environment, logLevel LogLevel) {
 		cfg = zap.NewProductionConfig()
 	}
 
-	cfg.Level.SetLevel(getZapLevel(string(logLevel)))
+	zapLevel := getZapLevel(string(logLevel))
+	cfg.Level.SetLevel(zapLevel)
 
 	var err error
 	logger, err = cfg.Build()
@@ -89,11 +104,19 @@ func InitLogger(environment Environment, logLevel LogLevel) {
 	}
 	defer func() { _ = logger.Sync() }()
 
+	// 初始化层级日志级别配置
+	InitLevelConfig(levels, zapLevel)
+
 	// Redirect standard log to zap
 	zap.RedirectStdLog(logger)
 
-	// Redirect slog to zap (for rclone)
-	slogHandler := zapslog.NewHandler(logger.Core())
+	// Redirect slog to zap (for rclone) with hierarchical level filtering
+	rcloneLevel := GetLevelForName("rclone")
+	rcloneCore := &levelFilterCore{
+		Core:  logger.Core(),
+		level: rcloneLevel,
+	}
+	slogHandler := zapslog.NewHandler(rcloneCore, zapslog.WithName("rclone"))
 	slogLogger := slog.New(slogHandler)
 	slog.SetDefault(slogLogger)
 }

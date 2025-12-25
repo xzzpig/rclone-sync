@@ -29,7 +29,7 @@ func (m *MockSyncEngineForPerf) RunTask(ctx context.Context, task *ent.Task, tri
 
 func setupPerfTest(t testing.TB) {
 	t.Helper()
-	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug)
+	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug, nil)
 }
 
 func BenchmarkRunner_StartTask_Concurrent(b *testing.B) {

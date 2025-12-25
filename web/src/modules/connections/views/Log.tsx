@@ -25,7 +25,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatRelativeTime } from '@/lib/date';
-import type { LogLevel, LogLevelFilter } from '@/lib/types';
+import type { LogAction, LogLevel, LogLevelFilter } from '@/lib/types';
 import { LOG_LEVEL_FILTERS } from '@/lib/types';
 import { formatBytes } from '@/lib/utils';
 import * as m from '@/paraglide/messages.js';
@@ -164,6 +164,19 @@ const Log: Component = () => {
     };
 
     return <Badge variant={variants[level] ?? 'outline'}>{labels[level] ?? level}</Badge>;
+  };
+
+  const getActionBadge = (action: LogAction) => {
+    const labels: Record<string, string> = {
+      UPLOAD: m.log_action_upload(),
+      DOWNLOAD: m.log_action_download(),
+      DELETE: m.log_action_delete(),
+      MOVE: m.log_action_move(),
+      ERROR: m.log_action_error(),
+      UNKNOWN: m.log_action_unknown(),
+    };
+
+    return <Badge variant="outline">{labels[action] ?? action}</Badge>;
   };
 
   return (
@@ -328,7 +341,7 @@ const Log: Component = () => {
                         {formatRelativeTime(log.time)}
                       </TableCell>
                       <TableCell class="py-2 align-top text-sm">
-                        <Badge variant="outline">{log.what}</Badge>
+                        {getActionBadge(log.what)}
                       </TableCell>
                       <TableCell class="py-2 align-top text-sm text-muted-foreground">
                         <Show

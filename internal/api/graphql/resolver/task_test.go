@@ -3,6 +3,7 @@ package resolver_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
@@ -66,58 +67,35 @@ func (s *TaskResolverTestSuite) TestTaskQuery_List() {
 
 // TestTaskQuery_ListWithPagination tests TaskQuery.list with pagination.
 func (s *TaskResolverTestSuite) TestTaskQuery_ListWithPagination() {
-	connID := s.Env.CreateTestConnection(s.T(), "test-conn")
-
-	// Create 5 tasks
-	for i := 0; i < 5; i++ {
-		s.Env.CreateTestTask(s.T(), "task-"+string(rune('A'+i)), connID)
+	testCases := []struct {
+		name       string
+		totalItems int
+		pageSize   int
+	}{
+		{"basic-pagination", 5, 2},
+		{"single-item-last-page", 5, 3},
 	}
 
-	query := `
-		query($pagination: PaginationInput) {
-			task {
-				list(pagination: $pagination) {
-					items {
-						id
-						name
-					}
-					totalCount
-					pageInfo {
-						hasNextPage
-						hasPreviousPage
-					}
-				}
-			}
-		}
-	`
+	for _, tc := range testCases {
+		s.T().Run(tc.name, func(t *testing.T) {
+			// Create a fresh TestEnv for each sub-test to avoid data leakage
+			env := NewTestEnv(t)
+			t.Cleanup(env.Cleanup)
 
-	// Test first page
-	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
-		"pagination": map[string]interface{}{
-			"limit":  2,
-			"offset": 0,
-		},
-	})
-	require.Empty(s.T(), resp.Errors)
-
-	data := string(resp.Data)
-	assert.Equal(s.T(), 5, int(gjson.Get(data, "task.list.totalCount").Int()))
-	assert.Equal(s.T(), 2, len(gjson.Get(data, "task.list.items").Array()))
-	assert.True(s.T(), gjson.Get(data, "task.list.pageInfo.hasNextPage").Bool())
-	assert.False(s.T(), gjson.Get(data, "task.list.pageInfo.hasPreviousPage").Bool())
-
-	// Test second page
-	resp = s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
-		"pagination": map[string]interface{}{
-			"limit":  2,
-			"offset": 2,
-		},
-	})
-	require.Empty(s.T(), resp.Errors)
-
-	data = string(resp.Data)
-	assert.True(s.T(), gjson.Get(data, "task.list.pageInfo.hasNextPage").Bool())
-	assert.True(s.T(), gjson.Get(data, "task.list.pageInfo.hasPreviousPage").Bool())
+			connID := env.CreateTestConnection(t, "test-conn-"+tc.name)
+			testPagination(env, t, PaginationTestCase{
+				EntityName: "Task",
+				Query:      GetCommonQueries().TaskListPagination,
+				DataPath:   "task.list",
+				CreateFunc: func(env *TestEnv, t *testing.T, i int) {
+					t.Helper()
+					env.CreateTestTask(t, fmt.Sprintf("task-paged-%s-%d", tc.name, i), connID)
+				},
+				PageSize:   tc.pageSize,
+				TotalItems: tc.totalItems,
+			})
+		})
+	}
 }
 
 // TestTaskQuery_Get tests TaskQuery.get resolver.
@@ -156,25 +134,14 @@ func (s *TaskResolverTestSuite) TestTaskQuery_Get() {
 
 // TestTaskQuery_GetNotFound tests TaskQuery.get with non-existent ID.
 func (s *TaskResolverTestSuite) TestTaskQuery_GetNotFound() {
-	query := `
-		query($id: ID!) {
-			task {
-				get(id: $id) {
-					id
-					name
-				}
-			}
-		}
-	`
-
-	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
-		"id": uuid.New().String(),
+	testGetNotFound(s.Env, s.T(), GetNotFoundTestCase{
+		Name:        "non-existent-task",
+		Entity:      "Task",
+		Query:       GetCommonQueries().TaskGet,
+		VariableKey: "id",
+		Variable:    func(t *testing.T) interface{} { return uuid.New().String() },
+		DataPath:    "task.get",
 	})
-	require.Empty(s.T(), resp.Errors)
-
-	data := string(resp.Data)
-	taskGet := gjson.Get(data, "task.get")
-	assert.True(s.T(), taskGet.Type == gjson.Null || !taskGet.Exists(), "task.get should be null for non-existent ID")
 }
 
 // TestTaskMutation_Create tests TaskMutation.create resolver.
@@ -1170,4 +1137,450 @@ func (s *TaskResolverTestSuite) TestTask_Realtime() {
 
 	data := string(resp.Data)
 	assert.True(s.T(), gjson.Get(data, "task.create.realtime").Bool())
+}
+
+// TestTask_JobsWithPagination tests Task.jobs field with pagination.
+func (s *TaskResolverTestSuite) TestTask_JobsWithPagination() {
+	connID := s.Env.CreateTestConnection(s.T(), "test-conn")
+	task := s.Env.CreateTestTask(s.T(), "task-many-jobs", connID)
+
+	// Create 10 jobs for this task
+	ctx := context.Background()
+	for i := 0; i < 10; i++ {
+		_, err := s.Env.JobService.CreateJob(ctx, task.ID, "MANUAL")
+		require.NoError(s.T(), err)
+	}
+
+	query := `
+		query($id: ID!, $pagination: PaginationInput) {
+			task {
+				get(id: $id) {
+					id
+					jobs(pagination: $pagination) {
+						items {
+							id
+							status
+						}
+						totalCount
+						pageInfo {
+							limit
+							offset
+							hasNextPage
+							hasPreviousPage
+						}
+					}
+				}
+			}
+		}
+	`
+
+	// Test first page
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
+		"id": task.ID.String(),
+		"pagination": map[string]interface{}{
+			"limit":  5,
+			"offset": 0,
+		},
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	assert.Equal(s.T(), 10, int(gjson.Get(data, "task.get.jobs.totalCount").Int()))
+	assert.Equal(s.T(), 5, len(gjson.Get(data, "task.get.jobs.items").Array()))
+	assert.True(s.T(), gjson.Get(data, "task.get.jobs.pageInfo.hasNextPage").Bool())
+	assert.False(s.T(), gjson.Get(data, "task.get.jobs.pageInfo.hasPreviousPage").Bool())
+
+	// Test second page
+	resp = s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
+		"id": task.ID.String(),
+		"pagination": map[string]interface{}{
+			"limit":  5,
+			"offset": 5,
+		},
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data = string(resp.Data)
+	assert.False(s.T(), gjson.Get(data, "task.get.jobs.pageInfo.hasNextPage").Bool())
+	assert.True(s.T(), gjson.Get(data, "task.get.jobs.pageInfo.hasPreviousPage").Bool())
+}
+
+// TestTask_JobsEmpty tests Task.jobs when no jobs exist.
+func (s *TaskResolverTestSuite) TestTask_JobsEmpty() {
+	connID := s.Env.CreateTestConnection(s.T(), "test-conn")
+	task := s.Env.CreateTestTask(s.T(), "task-no-jobs", connID)
+
+	query := `
+		query($id: ID!) {
+			task {
+				get(id: $id) {
+					id
+					jobs {
+						items {
+							id
+						}
+						totalCount
+					}
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
+		"id": task.ID.String(),
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	assert.Equal(s.T(), 0, int(gjson.Get(data, "task.get.jobs.totalCount").Int()))
+	assert.Equal(s.T(), 0, len(gjson.Get(data, "task.get.jobs.items").Array()))
+}
+
+// TestTaskMutation_DeleteWithJobs tests that deleting a task with jobs succeeds (jobs are cascade deleted).
+func (s *TaskResolverTestSuite) TestTaskMutation_DeleteWithJobs() {
+	connID := s.Env.CreateTestConnection(s.T(), "test-conn")
+	task := s.Env.CreateTestTask(s.T(), "task-with-jobs-delete", connID)
+
+	// Create a job for this task
+	ctx := context.Background()
+	_, err := s.Env.JobService.CreateJob(ctx, task.ID, "MANUAL")
+	require.NoError(s.T(), err)
+
+	// Delete the task
+	mutation := `
+		mutation($id: ID!) {
+			task {
+				delete(id: $id) {
+					id
+					name
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), mutation, map[string]interface{}{
+		"id": task.ID.String(),
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	assert.Equal(s.T(), task.ID.String(), gjson.Get(data, "task.delete.id").String())
+}
+
+// TestTaskMutation_DeleteWithRealtime tests deleting a task that has realtime enabled.
+func (s *TaskResolverTestSuite) TestTaskMutation_DeleteWithRealtime() {
+	connID := s.Env.CreateTestConnection(s.T(), "test-conn")
+
+	// Create task with realtime
+	createMutation := `
+		mutation($input: CreateTaskInput!) {
+			task {
+				create(input: $input) {
+					id
+					realtime
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), createMutation, map[string]interface{}{
+		"input": map[string]interface{}{
+			"name":         "realtime-task-delete",
+			"sourcePath":   "/local",
+			"connectionId": connID.String(),
+			"remotePath":   "/remote",
+			"direction":    "UPLOAD",
+			"realtime":     true,
+		},
+	})
+	require.Empty(s.T(), resp.Errors)
+	taskID := gjson.Get(string(resp.Data), "task.create.id").String()
+
+	// Delete the task
+	deleteMutation := `
+		mutation($id: ID!) {
+			task {
+				delete(id: $id) {
+					id
+				}
+			}
+		}
+	`
+
+	resp = s.Env.ExecuteGraphQLWithVars(s.T(), deleteMutation, map[string]interface{}{
+		"id": taskID,
+	})
+	require.Empty(s.T(), resp.Errors)
+}
+
+// TestTaskMutation_DeleteWithSchedule tests deleting a task that has schedule enabled.
+func (s *TaskResolverTestSuite) TestTaskMutation_DeleteWithSchedule() {
+	connID := s.Env.CreateTestConnection(s.T(), "test-conn")
+
+	// Create task with schedule
+	createMutation := `
+		mutation($input: CreateTaskInput!) {
+			task {
+				create(input: $input) {
+					id
+					schedule
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), createMutation, map[string]interface{}{
+		"input": map[string]interface{}{
+			"name":         "scheduled-task-delete",
+			"sourcePath":   "/local",
+			"connectionId": connID.String(),
+			"remotePath":   "/remote",
+			"direction":    "UPLOAD",
+			"schedule":     "0 * * * *",
+		},
+	})
+	require.Empty(s.T(), resp.Errors)
+	taskID := gjson.Get(string(resp.Data), "task.create.id").String()
+
+	// Delete the task
+	deleteMutation := `
+		mutation($id: ID!) {
+			task {
+				delete(id: $id) {
+					id
+				}
+			}
+		}
+	`
+
+	resp = s.Env.ExecuteGraphQLWithVars(s.T(), deleteMutation, map[string]interface{}{
+		"id": taskID,
+	})
+	require.Empty(s.T(), resp.Errors)
+}
+
+// TestTask_ConnectionError tests Task.connection resolver when connection is deleted (FK error).
+func (s *TaskResolverTestSuite) TestTask_ConnectionError() {
+	connID := s.Env.CreateTestConnection(s.T(), "test-conn")
+	task := s.Env.CreateTestTask(s.T(), "task-conn-error", connID)
+
+	query := `
+		query($id: ID!) {
+			task {
+				get(id: $id) {
+					id
+					connection {
+						id
+						name
+					}
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
+		"id": task.ID.String(),
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	assert.Equal(s.T(), connID.String(), gjson.Get(data, "task.get.connection.id").String())
+}
+
+// TestTask_AllFields tests all task fields in a single query.
+func (s *TaskResolverTestSuite) TestTask_AllFields() {
+	connID := s.Env.CreateTestConnection(s.T(), "test-conn")
+
+	// Create task with all fields
+	createMutation := `
+		mutation($input: CreateTaskInput!) {
+			task {
+				create(input: $input) {
+					id
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), createMutation, map[string]interface{}{
+		"input": map[string]interface{}{
+			"name":         "all-fields-task",
+			"sourcePath":   "/local/source",
+			"connectionId": connID.String(),
+			"remotePath":   "/remote/path",
+			"direction":    "BIDIRECTIONAL",
+			"schedule":     "0 12 * * *",
+			"realtime":     false,
+			"options": map[string]interface{}{
+				"conflictResolution": "NEWER",
+			},
+		},
+	})
+	require.Empty(s.T(), resp.Errors)
+	taskID := gjson.Get(string(resp.Data), "task.create.id").String()
+
+	// Create a job
+	ctx := context.Background()
+	_, err := s.Env.JobService.CreateJob(ctx, uuid.MustParse(taskID), "MANUAL")
+	require.NoError(s.T(), err)
+
+	query := `
+		query($id: ID!) {
+			task {
+				get(id: $id) {
+					id
+					name
+					sourcePath
+					remotePath
+					direction
+					schedule
+					realtime
+					createdAt
+					updatedAt
+					options {
+						conflictResolution
+					}
+					connection {
+						id
+						name
+						type
+					}
+					jobs {
+						items {
+							id
+						}
+						totalCount
+					}
+					latestJob {
+						id
+						status
+					}
+				}
+			}
+		}
+	`
+
+	resp = s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
+		"id": taskID,
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	assert.Equal(s.T(), taskID, gjson.Get(data, "task.get.id").String())
+	assert.Equal(s.T(), "all-fields-task", gjson.Get(data, "task.get.name").String())
+	assert.Equal(s.T(), "/local/source", gjson.Get(data, "task.get.sourcePath").String())
+	assert.Equal(s.T(), "/remote/path", gjson.Get(data, "task.get.remotePath").String())
+	assert.Equal(s.T(), "BIDIRECTIONAL", gjson.Get(data, "task.get.direction").String())
+	assert.Equal(s.T(), "0 12 * * *", gjson.Get(data, "task.get.schedule").String())
+	assert.False(s.T(), gjson.Get(data, "task.get.realtime").Bool())
+	assert.True(s.T(), gjson.Get(data, "task.get.createdAt").Exists())
+	assert.True(s.T(), gjson.Get(data, "task.get.updatedAt").Exists())
+	assert.Equal(s.T(), "NEWER", gjson.Get(data, "task.get.options.conflictResolution").String())
+	assert.Equal(s.T(), connID.String(), gjson.Get(data, "task.get.connection.id").String())
+	assert.Equal(s.T(), 1, int(gjson.Get(data, "task.get.jobs.totalCount").Int()))
+	assert.True(s.T(), gjson.Get(data, "task.get.latestJob").Exists())
+}
+
+// TestTask_OptionsNil tests Task.options resolver when options is nil.
+func (s *TaskResolverTestSuite) TestTask_OptionsNil() {
+	connID := s.Env.CreateTestConnection(s.T(), "test-conn")
+	task := s.Env.CreateTestTask(s.T(), "task-no-options", connID)
+
+	query := `
+		query($id: ID!) {
+			task {
+				get(id: $id) {
+					id
+					options {
+						conflictResolution
+					}
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
+		"id": task.ID.String(),
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	// Options should be null when not set
+	options := gjson.Get(data, "task.get.options")
+	assert.True(s.T(), options.Type == gjson.Null || !options.Exists())
+}
+
+// TestTaskQuery_ListEmpty tests TaskQuery.list with no tasks.
+func (s *TaskResolverTestSuite) TestTaskQuery_ListEmpty() {
+	query := `
+		query {
+			task {
+				list {
+					items {
+						id
+					}
+					totalCount
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQL(s.T(), GraphQLRequest{Query: query})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	assert.Equal(s.T(), 0, int(gjson.Get(data, "task.list.totalCount").Int()))
+	assert.Equal(s.T(), 0, len(gjson.Get(data, "task.list.items").Array()))
+}
+
+// TestTaskMutation_CreateWithInvalidConnection tests TaskMutation.create with non-existent connection.
+func (s *TaskResolverTestSuite) TestTaskMutation_CreateWithInvalidConnection() {
+	mutation := `
+		mutation($input: CreateTaskInput!) {
+			task {
+				create(input: $input) {
+					id
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), mutation, map[string]interface{}{
+		"input": map[string]interface{}{
+			"name":         "invalid-conn-task",
+			"sourcePath":   "/local",
+			"connectionId": uuid.New().String(),
+			"remotePath":   "/remote",
+			"direction":    "UPLOAD",
+		},
+	})
+	require.NotEmpty(s.T(), resp.Errors, "Should fail with non-existent connection")
+}
+
+// TestTaskMutation_UpdateInvalidConnection tests TaskMutation.update with non-existent connection.
+func (s *TaskResolverTestSuite) TestTaskMutation_UpdateInvalidConnection() {
+	connID := s.Env.CreateTestConnection(s.T(), "test-conn")
+	task := s.Env.CreateTestTask(s.T(), "task-update-invalid-conn", connID)
+
+	mutation := `
+		mutation($id: ID!, $input: UpdateTaskInput!) {
+			task {
+				update(id: $id, input: $input) {
+					id
+					connection {
+						id
+					}
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), mutation, map[string]interface{}{
+		"id": task.ID.String(),
+		"input": map[string]interface{}{
+			"connectionId": uuid.New().String(),
+		},
+	})
+	// Should fail because the connection doesn't exist
+	require.NotEmpty(s.T(), resp.Errors)
 }

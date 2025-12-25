@@ -42,12 +42,12 @@ func setupIntegrationTest(t *testing.T) *testContext {
 
 	// Initialize logger
 	{ // logger init block
-		logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug)
+		logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug, nil)
 	}
 
 	// Use in-memory sqlite for testing with db.InitDB
 	client, err := db.InitDB(db.InitDBOptions{
-		DSN:           "file:ent?mode=memory&cache=shared&_fk=1",
+		DSN:           db.InMemoryDSN(),
 		MigrationMode: db.MigrationModeAuto,
 	})
 	require.NoError(t, err)
@@ -67,7 +67,7 @@ func setupIntegrationTest(t *testing.T) *testContext {
 	storage.Install()
 
 	// Create SyncEngine and Runner
-	syncEngine := rclone.NewSyncEngine(jobService, nil, dataDir)
+	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, dataDir, false)
 	r := runner.NewRunner(syncEngine)
 
 	cleanup := func() {
@@ -137,7 +137,7 @@ func setupCancelTest(t *testing.T) *cancelTestContext {
 
 	// Initialize logger
 	{ // logger init block
-		logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug)
+		logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug, nil)
 	}
 
 	// Use in-memory sqlite for testing with db.InitDB
@@ -165,7 +165,7 @@ func setupCancelTest(t *testing.T) *cancelTestContext {
 	_ = storage // DBStorage is installed, slowfs backend will be created via ConnectionService
 
 	// Create SyncEngine and Runner
-	syncEngine := rclone.NewSyncEngine(jobService, nil, dataDir)
+	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, dataDir, false)
 	r := runner.NewRunner(syncEngine)
 
 	cleanup := func() {

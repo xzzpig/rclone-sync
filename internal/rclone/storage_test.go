@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
+	"github.com/xzzpig/rclone-sync/internal/core/db"
 	"github.com/xzzpig/rclone-sync/internal/core/services"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -17,7 +18,7 @@ func setupStorageTest(t *testing.T) (*DBStorage, *services.ConnectionService) {
 	t.Helper()
 
 	// Create test database client
-	client := enttest.Open(t, "sqlite3", "file:ent?mode=memory&cache=shared&_fk=1")
+	client := enttest.Open(t, "sqlite3", db.InMemoryDSN())
 	t.Cleanup(func() { client.Close() })
 
 	// Create encryptor (plaintext mode for testing)

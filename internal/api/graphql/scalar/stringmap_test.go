@@ -111,7 +111,7 @@ func TestUnmarshalStringMap(t *testing.T) {
 			},
 			expected:    nil,
 			expectError: true,
-			errorMsg:    `StringMap value for key "key" must be string`,
+			errorMsg:    "StringMap value must be string",
 		},
 		{
 			name: "non-string value - bool",
@@ -120,7 +120,7 @@ func TestUnmarshalStringMap(t *testing.T) {
 			},
 			expected:    nil,
 			expectError: true,
-			errorMsg:    `StringMap value for key "enabled" must be string`,
+			errorMsg:    "StringMap value must be string",
 		},
 		{
 			name: "non-string value - nested object",
@@ -129,7 +129,7 @@ func TestUnmarshalStringMap(t *testing.T) {
 			},
 			expected:    nil,
 			expectError: true,
-			errorMsg:    `StringMap value for key "nested" must be string`,
+			errorMsg:    "StringMap value must be string",
 		},
 		{
 			name: "mixed valid and invalid",

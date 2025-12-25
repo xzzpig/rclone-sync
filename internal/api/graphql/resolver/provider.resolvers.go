@@ -38,8 +38,7 @@ func (r *providerQueryResolver) Get(ctx context.Context, obj *model.ProviderQuer
 
 	provider, err := rclone.GetProviderOptions(name)
 	if err != nil {
-		// Return nil instead of error for not found providers
-		// This matches GraphQL convention for nullable single-item queries
+		//nolint:nilerr // Return nil for not found providers, this is valid for GraphQL nullable queries
 		return nil, nil
 	}
 

@@ -12,6 +12,7 @@ export const JobsListQuery = graphql(`
     $connectionId: ID
     $pagination: PaginationInput
     $withConnection: Boolean! = false
+    $withProgress: Boolean! = false
   ) {
     job {
       list(taskId: $taskId, connectionId: $connectionId, pagination: $pagination) {
@@ -23,6 +24,8 @@ export const JobsListQuery = graphql(`
           endTime
           filesTransferred
           bytesTransferred
+          filesDeleted
+          errorCount
           task {
             id
             name
@@ -30,6 +33,14 @@ export const JobsListQuery = graphql(`
               id
               name
             }
+          }
+          progress @include(if: $withProgress) {
+            filesTransferred
+            bytesTransferred
+            filesTotal
+            bytesTotal
+            filesDeleted
+            errorCount
           }
         }
         totalCount
@@ -56,11 +67,11 @@ export const JobProgressQuery = graphql(`
         connectionId
         status
         filesTransferred
+        filesTotal
         bytesTransferred
+        bytesTotal
         startTime
         endTime
-        currentFile
-        percentage
       }
     }
   }

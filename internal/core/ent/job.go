@@ -34,6 +34,10 @@ type Job struct {
 	FilesTransferred int `json:"files_transferred,omitempty"`
 	// BytesTransferred holds the value of the "bytes_transferred" field.
 	BytesTransferred int64 `json:"bytes_transferred,omitempty"`
+	// FilesDeleted holds the value of the "files_deleted" field.
+	FilesDeleted int `json:"files_deleted,omitempty"`
+	// ErrorCount holds the value of the "error_count" field.
+	ErrorCount int `json:"error_count,omitempty"`
 	// Errors holds the value of the "errors" field.
 	Errors string `json:"errors,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -78,7 +82,7 @@ func (*Job) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case job.FieldFilesTransferred, job.FieldBytesTransferred:
+		case job.FieldFilesTransferred, job.FieldBytesTransferred, job.FieldFilesDeleted, job.FieldErrorCount:
 			values[i] = new(sql.NullInt64)
 		case job.FieldStatus, job.FieldTrigger, job.FieldErrors:
 			values[i] = new(sql.NullString)
@@ -148,6 +152,18 @@ func (_m *Job) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field bytes_transferred", values[i])
 			} else if value.Valid {
 				_m.BytesTransferred = value.Int64
+			}
+		case job.FieldFilesDeleted:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field files_deleted", values[i])
+			} else if value.Valid {
+				_m.FilesDeleted = int(value.Int64)
+			}
+		case job.FieldErrorCount:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field error_count", values[i])
+			} else if value.Valid {
+				_m.ErrorCount = int(value.Int64)
 			}
 		case job.FieldErrors:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -221,6 +237,12 @@ func (_m *Job) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("bytes_transferred=")
 	builder.WriteString(fmt.Sprintf("%v", _m.BytesTransferred))
+	builder.WriteString(", ")
+	builder.WriteString("files_deleted=")
+	builder.WriteString(fmt.Sprintf("%v", _m.FilesDeleted))
+	builder.WriteString(", ")
+	builder.WriteString("error_count=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ErrorCount))
 	builder.WriteString(", ")
 	builder.WriteString("errors=")
 	builder.WriteString(_m.Errors)

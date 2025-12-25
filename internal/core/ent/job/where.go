@@ -82,6 +82,16 @@ func BytesTransferred(v int64) predicate.Job {
 	return predicate.Job(sql.FieldEQ(FieldBytesTransferred, v))
 }
 
+// FilesDeleted applies equality check predicate on the "files_deleted" field. It's identical to FilesDeletedEQ.
+func FilesDeleted(v int) predicate.Job {
+	return predicate.Job(sql.FieldEQ(FieldFilesDeleted, v))
+}
+
+// ErrorCount applies equality check predicate on the "error_count" field. It's identical to ErrorCountEQ.
+func ErrorCount(v int) predicate.Job {
+	return predicate.Job(sql.FieldEQ(FieldErrorCount, v))
+}
+
 // Errors applies equality check predicate on the "errors" field. It's identical to ErrorsEQ.
 func Errors(v string) predicate.Job {
 	return predicate.Job(sql.FieldEQ(FieldErrors, v))
@@ -335,6 +345,86 @@ func BytesTransferredLT(v int64) predicate.Job {
 // BytesTransferredLTE applies the LTE predicate on the "bytes_transferred" field.
 func BytesTransferredLTE(v int64) predicate.Job {
 	return predicate.Job(sql.FieldLTE(FieldBytesTransferred, v))
+}
+
+// FilesDeletedEQ applies the EQ predicate on the "files_deleted" field.
+func FilesDeletedEQ(v int) predicate.Job {
+	return predicate.Job(sql.FieldEQ(FieldFilesDeleted, v))
+}
+
+// FilesDeletedNEQ applies the NEQ predicate on the "files_deleted" field.
+func FilesDeletedNEQ(v int) predicate.Job {
+	return predicate.Job(sql.FieldNEQ(FieldFilesDeleted, v))
+}
+
+// FilesDeletedIn applies the In predicate on the "files_deleted" field.
+func FilesDeletedIn(vs ...int) predicate.Job {
+	return predicate.Job(sql.FieldIn(FieldFilesDeleted, vs...))
+}
+
+// FilesDeletedNotIn applies the NotIn predicate on the "files_deleted" field.
+func FilesDeletedNotIn(vs ...int) predicate.Job {
+	return predicate.Job(sql.FieldNotIn(FieldFilesDeleted, vs...))
+}
+
+// FilesDeletedGT applies the GT predicate on the "files_deleted" field.
+func FilesDeletedGT(v int) predicate.Job {
+	return predicate.Job(sql.FieldGT(FieldFilesDeleted, v))
+}
+
+// FilesDeletedGTE applies the GTE predicate on the "files_deleted" field.
+func FilesDeletedGTE(v int) predicate.Job {
+	return predicate.Job(sql.FieldGTE(FieldFilesDeleted, v))
+}
+
+// FilesDeletedLT applies the LT predicate on the "files_deleted" field.
+func FilesDeletedLT(v int) predicate.Job {
+	return predicate.Job(sql.FieldLT(FieldFilesDeleted, v))
+}
+
+// FilesDeletedLTE applies the LTE predicate on the "files_deleted" field.
+func FilesDeletedLTE(v int) predicate.Job {
+	return predicate.Job(sql.FieldLTE(FieldFilesDeleted, v))
+}
+
+// ErrorCountEQ applies the EQ predicate on the "error_count" field.
+func ErrorCountEQ(v int) predicate.Job {
+	return predicate.Job(sql.FieldEQ(FieldErrorCount, v))
+}
+
+// ErrorCountNEQ applies the NEQ predicate on the "error_count" field.
+func ErrorCountNEQ(v int) predicate.Job {
+	return predicate.Job(sql.FieldNEQ(FieldErrorCount, v))
+}
+
+// ErrorCountIn applies the In predicate on the "error_count" field.
+func ErrorCountIn(vs ...int) predicate.Job {
+	return predicate.Job(sql.FieldIn(FieldErrorCount, vs...))
+}
+
+// ErrorCountNotIn applies the NotIn predicate on the "error_count" field.
+func ErrorCountNotIn(vs ...int) predicate.Job {
+	return predicate.Job(sql.FieldNotIn(FieldErrorCount, vs...))
+}
+
+// ErrorCountGT applies the GT predicate on the "error_count" field.
+func ErrorCountGT(v int) predicate.Job {
+	return predicate.Job(sql.FieldGT(FieldErrorCount, v))
+}
+
+// ErrorCountGTE applies the GTE predicate on the "error_count" field.
+func ErrorCountGTE(v int) predicate.Job {
+	return predicate.Job(sql.FieldGTE(FieldErrorCount, v))
+}
+
+// ErrorCountLT applies the LT predicate on the "error_count" field.
+func ErrorCountLT(v int) predicate.Job {
+	return predicate.Job(sql.FieldLT(FieldErrorCount, v))
+}
+
+// ErrorCountLTE applies the LTE predicate on the "error_count" field.
+func ErrorCountLTE(v int) predicate.Job {
+	return predicate.Job(sql.FieldLTE(FieldErrorCount, v))
 }
 
 // ErrorsEQ applies the EQ predicate on the "errors" field.

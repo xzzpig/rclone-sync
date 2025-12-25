@@ -2,7 +2,6 @@ package graphql
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"runtime/debug"
 
@@ -10,8 +9,17 @@ import (
 	"github.com/vektah/gqlparser/v2/gqlerror"
 	"go.uber.org/zap"
 
+	"github.com/xzzpig/rclone-sync/internal/core/errs"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 	"github.com/xzzpig/rclone-sync/internal/i18n"
+)
+
+// ConstError is an alias to errs.ConstError for defining sentinel errors in this package.
+type ConstError = errs.ConstError
+
+const (
+	// ErrInternalServer is returned when an internal server error occurs during GraphQL execution.
+	ErrInternalServer ConstError = "internal server error"
 )
 
 // errorsLog returns a named logger for the graphql errors package.
@@ -43,7 +51,7 @@ func ErrorPresenter(ctx context.Context, err error) *gqlerror.Error {
 
 // RecoverFunc is a panic recovery function for GraphQL.
 // It logs the panic details including stack trace for debugging purposes.
-func RecoverFunc(ctx context.Context, p interface{}) error {
+func RecoverFunc(_ context.Context, p interface{}) error {
 	// Capture the stack trace
 	stack := string(debug.Stack())
 
@@ -55,5 +63,5 @@ func RecoverFunc(ctx context.Context, p interface{}) error {
 	)
 
 	// Return a generic error to the client (don't expose internal details)
-	return errors.New("internal server error")
+	return ErrInternalServer
 }

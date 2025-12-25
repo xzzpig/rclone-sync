@@ -31,10 +31,10 @@ import (
 func setupHandlerTest(t *testing.T) (*gin.Engine, *ent.Client, func()) {
 	t.Helper()
 
-	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug)
+	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug, nil)
 
 	client, err := db.InitDB(db.InitDBOptions{
-		DSN:           "file:ent?mode=memory&cache=shared&_fk=1",
+		DSN:           db.InMemoryDSN(),
 		MigrationMode: db.MigrationModeAuto,
 	})
 	require.NoError(t, err)
@@ -51,7 +51,7 @@ func setupHandlerTest(t *testing.T) (*gin.Engine, *ent.Client, func()) {
 	storage := rclone.NewDBStorage(connectionService)
 	storage.Install()
 
-	syncEngine := rclone.NewSyncEngine(jobService, nil, appDataDir)
+	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, appDataDir, false)
 	runnerInstance := runner.NewRunner(syncEngine)
 
 	mockWatcher := &mockWatcher{}

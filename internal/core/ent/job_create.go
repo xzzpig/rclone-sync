@@ -106,6 +106,34 @@ func (_c *JobCreate) SetNillableBytesTransferred(v *int64) *JobCreate {
 	return _c
 }
 
+// SetFilesDeleted sets the "files_deleted" field.
+func (_c *JobCreate) SetFilesDeleted(v int) *JobCreate {
+	_c.mutation.SetFilesDeleted(v)
+	return _c
+}
+
+// SetNillableFilesDeleted sets the "files_deleted" field if the given value is not nil.
+func (_c *JobCreate) SetNillableFilesDeleted(v *int) *JobCreate {
+	if v != nil {
+		_c.SetFilesDeleted(*v)
+	}
+	return _c
+}
+
+// SetErrorCount sets the "error_count" field.
+func (_c *JobCreate) SetErrorCount(v int) *JobCreate {
+	_c.mutation.SetErrorCount(v)
+	return _c
+}
+
+// SetNillableErrorCount sets the "error_count" field if the given value is not nil.
+func (_c *JobCreate) SetNillableErrorCount(v *int) *JobCreate {
+	if v != nil {
+		_c.SetErrorCount(*v)
+	}
+	return _c
+}
+
 // SetErrors sets the "errors" field.
 func (_c *JobCreate) SetErrors(v string) *JobCreate {
 	_c.mutation.SetErrors(v)
@@ -205,6 +233,14 @@ func (_c *JobCreate) defaults() {
 		v := job.DefaultBytesTransferred
 		_c.mutation.SetBytesTransferred(v)
 	}
+	if _, ok := _c.mutation.FilesDeleted(); !ok {
+		v := job.DefaultFilesDeleted
+		_c.mutation.SetFilesDeleted(v)
+	}
+	if _, ok := _c.mutation.ErrorCount(); !ok {
+		v := job.DefaultErrorCount
+		_c.mutation.SetErrorCount(v)
+	}
 	if _, ok := _c.mutation.ID(); !ok {
 		v := job.DefaultID()
 		_c.mutation.SetID(v)
@@ -240,6 +276,12 @@ func (_c *JobCreate) check() error {
 	}
 	if _, ok := _c.mutation.BytesTransferred(); !ok {
 		return &ValidationError{Name: "bytes_transferred", err: errors.New(`ent: missing required field "Job.bytes_transferred"`)}
+	}
+	if _, ok := _c.mutation.FilesDeleted(); !ok {
+		return &ValidationError{Name: "files_deleted", err: errors.New(`ent: missing required field "Job.files_deleted"`)}
+	}
+	if _, ok := _c.mutation.ErrorCount(); !ok {
+		return &ValidationError{Name: "error_count", err: errors.New(`ent: missing required field "Job.error_count"`)}
 	}
 	if len(_c.mutation.TaskIDs()) == 0 {
 		return &ValidationError{Name: "task", err: errors.New(`ent: missing required edge "Job.task"`)}
@@ -302,6 +344,14 @@ func (_c *JobCreate) createSpec() (*Job, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.BytesTransferred(); ok {
 		_spec.SetField(job.FieldBytesTransferred, field.TypeInt64, value)
 		_node.BytesTransferred = value
+	}
+	if value, ok := _c.mutation.FilesDeleted(); ok {
+		_spec.SetField(job.FieldFilesDeleted, field.TypeInt, value)
+		_node.FilesDeleted = value
+	}
+	if value, ok := _c.mutation.ErrorCount(); ok {
+		_spec.SetField(job.FieldErrorCount, field.TypeInt, value)
+		_node.ErrorCount = value
 	}
 	if value, ok := _c.mutation.Errors(); ok {
 		_spec.SetField(job.FieldErrors, field.TypeString, value)

@@ -19,15 +19,16 @@ import (
 
 // Dependencies holds all dependencies required by resolvers.
 type Dependencies struct {
-	SyncEngine        *rclone.SyncEngine
-	Runner            ports.Runner
-	Watcher           ports.Watcher
-	Scheduler         ports.Scheduler
-	Encryptor         *crypto.Encryptor
-	JobProgressBus    *subscription.JobProgressBus
-	ConnectionService *services.ConnectionService
-	TaskService       *services.TaskService
-	JobService        *services.JobService
+	SyncEngine          *rclone.SyncEngine
+	Runner              ports.Runner
+	Watcher             ports.Watcher
+	Scheduler           ports.Scheduler
+	Encryptor           *crypto.Encryptor
+	JobProgressBus      *subscription.JobProgressBus
+	TransferProgressBus *subscription.TransferProgressBus
+	ConnectionService   *services.ConnectionService
+	TaskService         *services.TaskService
+	JobService          *services.JobService
 }
 
 // Resolver is the root resolver that holds all dependencies.

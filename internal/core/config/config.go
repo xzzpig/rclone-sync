@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -20,8 +21,14 @@ type Config struct {
 		MigrationMode string `mapstructure:"migration_mode"`
 	} `mapstructure:"database"`
 	Log struct {
-		Level string `mapstructure:"level"`
+		Level                string    `mapstructure:"level"`
+		Levels               LogLevels `mapstructure:"levels"`
+		MaxLogsPerConnection int       `mapstructure:"max_logs_per_connection"`
+		CleanupSchedule      string    `mapstructure:"cleanup_schedule"`
 	} `mapstructure:"log"`
+	Job struct {
+		AutoDeleteEmptyJobs bool `mapstructure:"auto_delete_empty_jobs"`
+	} `mapstructure:"job"`
 	App struct {
 		DataDir     string `mapstructure:"data_dir"`
 		Environment string `mapstructure:"environment"`
@@ -57,8 +64,31 @@ func Load(cfgFile string) (*Config, error) {
 	}
 
 	var cfg Config
-	if err := viper.Unmarshal(&cfg); err != nil {
+	if err := viper.Unmarshal(&cfg, viper.DecodeHook(
+		mapstructure.ComposeDecodeHookFunc(
+			mapstructure.StringToTimeDurationHookFunc(),
+			mapstructure.StringToSliceHookFunc(","),
+			LogLevelsDecodeHook(),
+		),
+	)); err != nil {
 		return nil, fmt.Errorf("unable to decode into struct: %w", err)
+	}
+
+	// Workaround for viper issue: viper.AllSettings() (used by Unmarshal) converts
+	// dotted keys to nested maps, which causes conflicts when both parent and child
+	// keys exist (e.g., "api" and "api.graphql"). The child key gets lost.
+	// We need to directly get the log.levels value which preserves the flat map structure.
+	if rawLevels := viper.Get("log.levels"); rawLevels != nil {
+		if levelsMap, ok := rawLevels.(map[string]interface{}); ok {
+			cfg.Log.Levels = make(LogLevels)
+			for k, v := range levelsMap {
+				if strVal, ok := v.(string); ok {
+					cfg.Log.Levels[k] = strVal
+				} else {
+					cfg.Log.Levels[k] = fmt.Sprintf("%v", v)
+				}
+			}
+		}
 	}
 
 	return &cfg, nil
@@ -70,6 +100,9 @@ func setDefaults() {
 	viper.SetDefault("database.path", "cloud-sync.db")
 	viper.SetDefault("database.migration_mode", "versioned")
 	viper.SetDefault("log.level", "info")
+	viper.SetDefault("log.max_logs_per_connection", 1000)
+	viper.SetDefault("log.cleanup_schedule", "0 * * * *")
+	viper.SetDefault("job.auto_delete_empty_jobs", true)
 	viper.SetDefault("app.data_dir", "./app_data")
 	viper.SetDefault("app.environment", "production")
 	viper.SetDefault("security.encryption_key", "")

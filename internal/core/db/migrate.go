@@ -154,7 +154,7 @@ func GetPendingMigrations(db *sql.DB) ([]uint, error) {
 	var pending []uint
 	version, err := source.First()
 	if err != nil {
-		// No migrations available
+		//nolint:nilerr // No migrations available, not an error
 		return pending, nil
 	}
 
@@ -164,11 +164,12 @@ func GetPendingMigrations(db *sql.DB) ([]uint, error) {
 		}
 		nextVersion, err := source.Next(version)
 		if err != nil {
-			break // No more versions
+			break //nolint:nilerr // End of version iteration, not an error
 		}
 		version = nextVersion
 	}
 
+	//nolint:nilerr // Reached end of version iteration, returning collected pending versions
 	return pending, nil
 }
 

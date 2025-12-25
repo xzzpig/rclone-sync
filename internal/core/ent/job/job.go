@@ -31,6 +31,10 @@ const (
 	FieldFilesTransferred = "files_transferred"
 	// FieldBytesTransferred holds the string denoting the bytes_transferred field in the database.
 	FieldBytesTransferred = "bytes_transferred"
+	// FieldFilesDeleted holds the string denoting the files_deleted field in the database.
+	FieldFilesDeleted = "files_deleted"
+	// FieldErrorCount holds the string denoting the error_count field in the database.
+	FieldErrorCount = "error_count"
 	// FieldErrors holds the string denoting the errors field in the database.
 	FieldErrors = "errors"
 	// EdgeTask holds the string denoting the task edge name in mutations.
@@ -65,6 +69,8 @@ var Columns = []string{
 	FieldEndTime,
 	FieldFilesTransferred,
 	FieldBytesTransferred,
+	FieldFilesDeleted,
+	FieldErrorCount,
 	FieldErrors,
 }
 
@@ -85,6 +91,10 @@ var (
 	DefaultFilesTransferred int
 	// DefaultBytesTransferred holds the default value on creation for the "bytes_transferred" field.
 	DefaultBytesTransferred int64
+	// DefaultFilesDeleted holds the default value on creation for the "files_deleted" field.
+	DefaultFilesDeleted int
+	// DefaultErrorCount holds the default value on creation for the "error_count" field.
+	DefaultErrorCount int
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )
@@ -152,6 +162,16 @@ func ByFilesTransferred(opts ...sql.OrderTermOption) OrderOption {
 // ByBytesTransferred orders the results by the bytes_transferred field.
 func ByBytesTransferred(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldBytesTransferred, opts...).ToFunc()
+}
+
+// ByFilesDeleted orders the results by the files_deleted field.
+func ByFilesDeleted(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFilesDeleted, opts...).ToFunc()
+}
+
+// ByErrorCount orders the results by the error_count field.
+func ByErrorCount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldErrorCount, opts...).ToFunc()
 }
 
 // ByErrors orders the results by the errors field.

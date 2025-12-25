@@ -11,11 +11,12 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
+	"github.com/xzzpig/rclone-sync/internal/core/db"
 )
 
 // setupTestDB creates a test database and returns the client
 func setupTestDB(t *testing.T) *ent.Client {
-	client := enttest.Open(t, "sqlite3", "file:ent?mode=memory&cache=shared&_fk=1")
+	client := enttest.Open(t, "sqlite3", db.InMemoryDSN())
 	return client
 }
 

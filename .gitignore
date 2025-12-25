@@ -53,8 +53,8 @@ bin/
 build/
 dist/
 /cloud-sync
-/cloud-sync.db
-/cloud-sync.*.db
+/cloud-sync.db*
+/cloud-sync.*.db*
 tmp/
 /config.toml
 # Air

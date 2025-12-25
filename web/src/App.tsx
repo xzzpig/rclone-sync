@@ -9,6 +9,7 @@ import Settings from '@/modules/connections/views/Settings';
 import Tasks from '@/modules/connections/views/Tasks';
 import WelcomeView from '@/modules/core/views/WelcomeView';
 import { HistoryProvider } from '@/store/history';
+import { JobProgressProvider } from '@/store/jobProgress';
 import { LocaleProvider } from '@/store/locale';
 import { TaskProvider } from '@/store/tasks';
 import { ColorModeProvider, ColorModeScript } from '@kobalte/core';
@@ -21,22 +22,24 @@ const App: Component = () => {
       <ColorModeScript />
       <GraphQLProvider>
         <LocaleProvider>
-          <TaskProvider>
-            <HistoryProvider>
-              <Router root={AppShell}>
-                <Route path="/" component={WelcomeView} />
-                <Route path="/overview" component={WelcomeView} />
-                <Route path="/connections/:connectionId" component={ConnectionLayout}>
-                  <Route path="/" component={Overview} />
-                  <Route path="/tasks" component={Tasks} />
-                  <Route path="/history" component={History} />
-                  <Route path="/log" component={Log} />
-                  <Route path="/settings" component={Settings} />
-                </Route>
-              </Router>
-              <Toaster />
-            </HistoryProvider>
-          </TaskProvider>
+          <JobProgressProvider>
+            <TaskProvider>
+              <HistoryProvider>
+                <Router root={AppShell}>
+                  <Route path="/" component={WelcomeView} />
+                  <Route path="/overview" component={WelcomeView} />
+                  <Route path="/connections/:connectionId" component={ConnectionLayout}>
+                    <Route path="/" component={Overview} />
+                    <Route path="/tasks" component={Tasks} />
+                    <Route path="/history" component={History} />
+                    <Route path="/log" component={Log} />
+                    <Route path="/settings" component={Settings} />
+                  </Route>
+                </Router>
+                <Toaster />
+              </HistoryProvider>
+            </TaskProvider>
+          </JobProgressProvider>
         </LocaleProvider>
       </GraphQLProvider>
     </ColorModeProvider>

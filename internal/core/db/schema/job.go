@@ -36,6 +36,10 @@ func (Job) Fields() []ent.Field {
 			Default(0),
 		field.Int64("bytes_transferred").
 			Default(0),
+		field.Int("files_deleted").
+			Default(0),
+		field.Int("error_count").
+			Default(0),
 		field.Text("errors").
 			Optional(),
 	}

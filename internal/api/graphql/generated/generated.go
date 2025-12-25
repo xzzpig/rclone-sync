@@ -96,9 +96,12 @@ type ComplexityRoot struct {
 	}
 
 	ConnectionQuota struct {
-		Free  func(childComplexity int) int
-		Total func(childComplexity int) int
-		Used  func(childComplexity int) int
+		Free    func(childComplexity int) int
+		Objects func(childComplexity int) int
+		Other   func(childComplexity int) int
+		Total   func(childComplexity int) int
+		Trashed func(childComplexity int) int
+		Used    func(childComplexity int) int
 	}
 
 	ConnectionTestFailure struct {
@@ -142,10 +145,13 @@ type ComplexityRoot struct {
 	Job struct {
 		BytesTransferred func(childComplexity int) int
 		EndTime          func(childComplexity int) int
+		ErrorCount       func(childComplexity int) int
 		Errors           func(childComplexity int) int
+		FilesDeleted     func(childComplexity int) int
 		FilesTransferred func(childComplexity int) int
 		ID               func(childComplexity int) int
 		Logs             func(childComplexity int, pagination *model.PaginationInput) int
+		Progress         func(childComplexity int) int
 		StartTime        func(childComplexity int) int
 		Status           func(childComplexity int) int
 		Task             func(childComplexity int) int
@@ -175,9 +181,13 @@ type ComplexityRoot struct {
 	}
 
 	JobProgressEvent struct {
+		BytesTotal       func(childComplexity int) int
 		BytesTransferred func(childComplexity int) int
 		ConnectionID     func(childComplexity int) int
 		EndTime          func(childComplexity int) int
+		ErrorCount       func(childComplexity int) int
+		FilesDeleted     func(childComplexity int) int
+		FilesTotal       func(childComplexity int) int
 		FilesTransferred func(childComplexity int) int
 		JobID            func(childComplexity int) int
 		StartTime        func(childComplexity int) int
@@ -254,7 +264,8 @@ type ComplexityRoot struct {
 	}
 
 	Subscription struct {
-		JobProgress func(childComplexity int, taskID *uuid.UUID, connectionID *uuid.UUID) int
+		JobProgress      func(childComplexity int, taskID *uuid.UUID, connectionID *uuid.UUID) int
+		TransferProgress func(childComplexity int, connectionID *uuid.UUID, taskID *uuid.UUID, jobID *uuid.UUID) int
 	}
 
 	Task struct {
@@ -294,6 +305,19 @@ type ComplexityRoot struct {
 	TaskSyncOptions struct {
 		ConflictResolution func(childComplexity int) int
 	}
+
+	TransferItem struct {
+		Bytes func(childComplexity int) int
+		Name  func(childComplexity int) int
+		Size  func(childComplexity int) int
+	}
+
+	TransferProgressEvent struct {
+		ConnectionID func(childComplexity int) int
+		JobID        func(childComplexity int) int
+		TaskID       func(childComplexity int) int
+		Transfers    func(childComplexity int) int
+	}
 }
 
 type ConnectionResolver interface {
@@ -326,6 +350,7 @@ type ImportMutationResolver interface {
 type JobResolver interface {
 	Task(ctx context.Context, obj *model.Job) (*model.Task, error)
 	Logs(ctx context.Context, obj *model.Job, pagination *model.PaginationInput) (*model.JobLogConnection, error)
+	Progress(ctx context.Context, obj *model.Job) (*model.JobProgressEvent, error)
 }
 type JobLogResolver interface {
 	Job(ctx context.Context, obj *model.JobLog) (*model.Job, error)
@@ -357,6 +382,7 @@ type QueryResolver interface {
 }
 type SubscriptionResolver interface {
 	JobProgress(ctx context.Context, taskID *uuid.UUID, connectionID *uuid.UUID) (<-chan *model.JobProgressEvent, error)
+	TransferProgress(ctx context.Context, connectionID *uuid.UUID, taskID *uuid.UUID, jobID *uuid.UUID) (<-chan *model.TransferProgressEvent, error)
 }
 type TaskResolver interface {
 	Options(ctx context.Context, obj *model.Task) (*model.TaskSyncOptions, error)
@@ -565,12 +591,30 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.ConnectionQuota.Free(childComplexity), true
+	case "ConnectionQuota.objects":
+		if e.complexity.ConnectionQuota.Objects == nil {
+			break
+		}
+
+		return e.complexity.ConnectionQuota.Objects(childComplexity), true
+	case "ConnectionQuota.other":
+		if e.complexity.ConnectionQuota.Other == nil {
+			break
+		}
+
+		return e.complexity.ConnectionQuota.Other(childComplexity), true
 	case "ConnectionQuota.total":
 		if e.complexity.ConnectionQuota.Total == nil {
 			break
 		}
 
 		return e.complexity.ConnectionQuota.Total(childComplexity), true
+	case "ConnectionQuota.trashed":
+		if e.complexity.ConnectionQuota.Trashed == nil {
+			break
+		}
+
+		return e.complexity.ConnectionQuota.Trashed(childComplexity), true
 	case "ConnectionQuota.used":
 		if e.complexity.ConnectionQuota.Used == nil {
 			break
@@ -702,12 +746,24 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Job.EndTime(childComplexity), true
+	case "Job.errorCount":
+		if e.complexity.Job.ErrorCount == nil {
+			break
+		}
+
+		return e.complexity.Job.ErrorCount(childComplexity), true
 	case "Job.errors":
 		if e.complexity.Job.Errors == nil {
 			break
 		}
 
 		return e.complexity.Job.Errors(childComplexity), true
+	case "Job.filesDeleted":
+		if e.complexity.Job.FilesDeleted == nil {
+			break
+		}
+
+		return e.complexity.Job.FilesDeleted(childComplexity), true
 	case "Job.filesTransferred":
 		if e.complexity.Job.FilesTransferred == nil {
 			break
@@ -731,6 +787,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Job.Logs(childComplexity, args["pagination"].(*model.PaginationInput)), true
+	case "Job.progress":
+		if e.complexity.Job.Progress == nil {
+			break
+		}
+
+		return e.complexity.Job.Progress(childComplexity), true
 	case "Job.startTime":
 		if e.complexity.Job.StartTime == nil {
 			break
@@ -837,6 +899,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.JobLogConnection.TotalCount(childComplexity), true
 
+	case "JobProgressEvent.bytesTotal":
+		if e.complexity.JobProgressEvent.BytesTotal == nil {
+			break
+		}
+
+		return e.complexity.JobProgressEvent.BytesTotal(childComplexity), true
 	case "JobProgressEvent.bytesTransferred":
 		if e.complexity.JobProgressEvent.BytesTransferred == nil {
 			break
@@ -855,6 +923,24 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.JobProgressEvent.EndTime(childComplexity), true
+	case "JobProgressEvent.errorCount":
+		if e.complexity.JobProgressEvent.ErrorCount == nil {
+			break
+		}
+
+		return e.complexity.JobProgressEvent.ErrorCount(childComplexity), true
+	case "JobProgressEvent.filesDeleted":
+		if e.complexity.JobProgressEvent.FilesDeleted == nil {
+			break
+		}
+
+		return e.complexity.JobProgressEvent.FilesDeleted(childComplexity), true
+	case "JobProgressEvent.filesTotal":
+		if e.complexity.JobProgressEvent.FilesTotal == nil {
+			break
+		}
+
+		return e.complexity.JobProgressEvent.FilesTotal(childComplexity), true
 	case "JobProgressEvent.filesTransferred":
 		if e.complexity.JobProgressEvent.FilesTransferred == nil {
 			break
@@ -1160,6 +1246,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Subscription.JobProgress(childComplexity, args["taskId"].(*uuid.UUID), args["connectionId"].(*uuid.UUID)), true
+	case "Subscription.transferProgress":
+		if e.complexity.Subscription.TransferProgress == nil {
+			break
+		}
+
+		args, err := ec.field_Subscription_transferProgress_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Subscription.TransferProgress(childComplexity, args["connectionId"].(*uuid.UUID), args["taskId"].(*uuid.UUID), args["jobId"].(*uuid.UUID)), true
 
 	case "Task.connection":
 		if e.complexity.Task.Connection == nil {
@@ -1338,6 +1435,50 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.TaskSyncOptions.ConflictResolution(childComplexity), true
+
+	case "TransferItem.bytes":
+		if e.complexity.TransferItem.Bytes == nil {
+			break
+		}
+
+		return e.complexity.TransferItem.Bytes(childComplexity), true
+	case "TransferItem.name":
+		if e.complexity.TransferItem.Name == nil {
+			break
+		}
+
+		return e.complexity.TransferItem.Name(childComplexity), true
+	case "TransferItem.size":
+		if e.complexity.TransferItem.Size == nil {
+			break
+		}
+
+		return e.complexity.TransferItem.Size(childComplexity), true
+
+	case "TransferProgressEvent.connectionId":
+		if e.complexity.TransferProgressEvent.ConnectionID == nil {
+			break
+		}
+
+		return e.complexity.TransferProgressEvent.ConnectionID(childComplexity), true
+	case "TransferProgressEvent.jobId":
+		if e.complexity.TransferProgressEvent.JobID == nil {
+			break
+		}
+
+		return e.complexity.TransferProgressEvent.JobID(childComplexity), true
+	case "TransferProgressEvent.taskId":
+		if e.complexity.TransferProgressEvent.TaskID == nil {
+			break
+		}
+
+		return e.complexity.TransferProgressEvent.TaskID(childComplexity), true
+	case "TransferProgressEvent.transfers":
+		if e.complexity.TransferProgressEvent.Transfers == nil {
+			break
+		}
+
+		return e.complexity.TransferProgressEvent.Transfers(childComplexity), true
 
 	}
 	return 0, false
@@ -1550,17 +1691,29 @@ type Connection {
 """
 type ConnectionQuota {
 	"""
-	总空间（字节）
+	总空间（字节），可能为 null 如果存储不支持
 	"""
-	total: BigInt!
+	total: BigInt
 	"""
-	已使用空间（字节）
+	已使用空间（字节），可能为 null 如果存储不支持
 	"""
-	used: BigInt!
+	used: BigInt
 	"""
-	可用空间（字节）
+	可用空间（字节），可能为 null 如果存储不支持
 	"""
-	free: BigInt!
+	free: BigInt
+	"""
+	回收站占用空间（字节），可能为 null 如果存储不支持
+	"""
+	trashed: BigInt
+	"""
+	其他空间占用（字节），如版本控制、元数据等，可能为 null
+	"""
+	other: BigInt
+	"""
+	对象/文件数量，可能为 null 如果存储不支持
+	"""
+	objects: BigInt
 }
 
 """
@@ -2053,6 +2206,14 @@ type Job @goExtraField(name: "TaskID", type: "github.com/google/uuid.UUID") {
 	"""
 	bytesTransferred: BigInt!
 	"""
+	删除的文件数
+	"""
+	filesDeleted: Int!
+	"""
+	错误数量
+	"""
+	errorCount: Int!
+	"""
 	错误信息
 	"""
 	errors: String
@@ -2064,6 +2225,10 @@ type Job @goExtraField(name: "TaskID", type: "github.com/google/uuid.UUID") {
 	执行日志（分页查询）
 	"""
 	logs(pagination: PaginationInput): JobLogConnection! @goField(forceResolver: true)
+	"""
+	运行时进度（仅 RUNNING 状态的 job 有值，其他状态返回 null）
+	"""
+	progress: JobProgressEvent @goField(forceResolver: true)
 }
 
 """
@@ -2169,6 +2334,22 @@ type JobProgressEvent {
 	"""
 	bytesTransferred: BigInt!
 	"""
+	总文件数（队列+已完成+进行中），会随扫描动态增加
+	"""
+	filesTotal: Int!
+	"""
+	总字节数（队列大小+已传输+正在传输的总大小）
+	"""
+	bytesTotal: BigInt!
+	"""
+	删除的文件数
+	"""
+	filesDeleted: Int!
+	"""
+	错误数量
+	"""
+	errorCount: Int!
+	"""
 	开始时间
 	"""
 	startTime: DateTime!
@@ -2176,6 +2357,46 @@ type JobProgressEvent {
 	结束时间
 	"""
 	endTime: DateTime
+}
+
+"""
+当前正在传输的文件项
+"""
+type TransferItem {
+	"""
+	文件名称（含路径），如 "documents/report.pdf"
+	"""
+	name: String!
+	"""
+	文件总大小（字节）
+	"""
+	size: BigInt!
+	"""
+	已传输字节数
+	"""
+	bytes: BigInt!
+}
+
+"""
+传输进度事件 - 当前正在传输的文件列表
+"""
+type TransferProgressEvent {
+	"""
+	关联的作业 ID
+	"""
+	jobId: ID!
+	"""
+	关联的任务 ID
+	"""
+	taskId: ID!
+	"""
+	关联的连接 ID
+	"""
+	connectionId: ID!
+	"""
+	当前正在传输的文件列表
+	"""
+	transfers: [TransferItem!]!
 }
 
 # =============================================================================
@@ -2277,6 +2498,30 @@ extend type Subscription {
 		"""
 		connectionId: ID
 	): JobProgressEvent!
+
+	"""
+	订阅传输进度事件
+
+	推送机制：
+	- 增量推送：仅推送有变化的传输项（新增、进度更新）
+	- 传输完成时推送：每个文件传输完成时推送一次（此时 bytes == size）
+	- 前端应根据 name 合并/更新传输列表，当 bytes == size 时可移除该项
+
+	"""
+	transferProgress(
+		"""
+		按连接 ID 筛选
+		"""
+		connectionId: ID
+		"""
+		按任务 ID 筛选
+		"""
+		taskId: ID
+		"""
+		按作业 ID 筛选
+		"""
+		jobId: ID
+	): TransferProgressEvent!
 }
 `, BuiltIn: false},
 	{Name: "../schema/provider.graphql", Input: `# GraphQL Schema: Provider 相关类型定义
@@ -3071,6 +3316,27 @@ func (ec *executionContext) field_Subscription_jobProgress_args(ctx context.Cont
 	return args, nil
 }
 
+func (ec *executionContext) field_Subscription_transferProgress_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "connectionId", ec.unmarshalOID2ᚖgithubᚗcomᚋgoogleᚋuuidᚐUUID)
+	if err != nil {
+		return nil, err
+	}
+	args["connectionId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "taskId", ec.unmarshalOID2ᚖgithubᚗcomᚋgoogleᚋuuidᚐUUID)
+	if err != nil {
+		return nil, err
+	}
+	args["taskId"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "jobId", ec.unmarshalOID2ᚖgithubᚗcomᚋgoogleᚋuuidᚐUUID)
+	if err != nil {
+		return nil, err
+	}
+	args["jobId"] = arg2
+	return args, nil
+}
+
 func (ec *executionContext) field_TaskMutation_create_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -3516,6 +3782,12 @@ func (ec *executionContext) fieldContext_Connection_quota(_ context.Context, fie
 				return ec.fieldContext_ConnectionQuota_used(ctx, field)
 			case "free":
 				return ec.fieldContext_ConnectionQuota_free(ctx, field)
+			case "trashed":
+				return ec.fieldContext_ConnectionQuota_trashed(ctx, field)
+			case "other":
+				return ec.fieldContext_ConnectionQuota_other(ctx, field)
+			case "objects":
+				return ec.fieldContext_ConnectionQuota_objects(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type ConnectionQuota", field.Name)
 		},
@@ -4035,9 +4307,9 @@ func (ec *executionContext) _ConnectionQuota_total(ctx context.Context, field gr
 			return obj.Total, nil
 		},
 		nil,
-		ec.marshalNBigInt2int64,
+		ec.marshalOBigInt2ᚖint64,
 		true,
-		true,
+		false,
 	)
 }
 
@@ -4064,9 +4336,9 @@ func (ec *executionContext) _ConnectionQuota_used(ctx context.Context, field gra
 			return obj.Used, nil
 		},
 		nil,
-		ec.marshalNBigInt2int64,
+		ec.marshalOBigInt2ᚖint64,
 		true,
-		true,
+		false,
 	)
 }
 
@@ -4093,13 +4365,100 @@ func (ec *executionContext) _ConnectionQuota_free(ctx context.Context, field gra
 			return obj.Free, nil
 		},
 		nil,
-		ec.marshalNBigInt2int64,
+		ec.marshalOBigInt2ᚖint64,
 		true,
-		true,
+		false,
 	)
 }
 
 func (ec *executionContext) fieldContext_ConnectionQuota_free(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConnectionQuota",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type BigInt does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ConnectionQuota_trashed(ctx context.Context, field graphql.CollectedField, obj *model.ConnectionQuota) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ConnectionQuota_trashed,
+		func(ctx context.Context) (any, error) {
+			return obj.Trashed, nil
+		},
+		nil,
+		ec.marshalOBigInt2ᚖint64,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_ConnectionQuota_trashed(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConnectionQuota",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type BigInt does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ConnectionQuota_other(ctx context.Context, field graphql.CollectedField, obj *model.ConnectionQuota) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ConnectionQuota_other,
+		func(ctx context.Context) (any, error) {
+			return obj.Other, nil
+		},
+		nil,
+		ec.marshalOBigInt2ᚖint64,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_ConnectionQuota_other(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConnectionQuota",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type BigInt does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ConnectionQuota_objects(ctx context.Context, field graphql.CollectedField, obj *model.ConnectionQuota) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ConnectionQuota_objects,
+		func(ctx context.Context) (any, error) {
+			return obj.Objects, nil
+		},
+		nil,
+		ec.marshalOBigInt2ᚖint64,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_ConnectionQuota_objects(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ConnectionQuota",
 		Field:      field,
@@ -4821,6 +5180,64 @@ func (ec *executionContext) fieldContext_Job_bytesTransferred(_ context.Context,
 	return fc, nil
 }
 
+func (ec *executionContext) _Job_filesDeleted(ctx context.Context, field graphql.CollectedField, obj *model.Job) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Job_filesDeleted,
+		func(ctx context.Context) (any, error) {
+			return obj.FilesDeleted, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Job_filesDeleted(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Job",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Job_errorCount(ctx context.Context, field graphql.CollectedField, obj *model.Job) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Job_errorCount,
+		func(ctx context.Context) (any, error) {
+			return obj.ErrorCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Job_errorCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Job",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Job_errors(ctx context.Context, field graphql.CollectedField, obj *model.Job) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4956,6 +5373,61 @@ func (ec *executionContext) fieldContext_Job_logs(ctx context.Context, field gra
 	return fc, nil
 }
 
+func (ec *executionContext) _Job_progress(ctx context.Context, field graphql.CollectedField, obj *model.Job) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Job_progress,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Job().Progress(ctx, obj)
+		},
+		nil,
+		ec.marshalOJobProgressEvent2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐJobProgressEvent,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Job_progress(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Job",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "jobId":
+				return ec.fieldContext_JobProgressEvent_jobId(ctx, field)
+			case "taskId":
+				return ec.fieldContext_JobProgressEvent_taskId(ctx, field)
+			case "connectionId":
+				return ec.fieldContext_JobProgressEvent_connectionId(ctx, field)
+			case "status":
+				return ec.fieldContext_JobProgressEvent_status(ctx, field)
+			case "filesTransferred":
+				return ec.fieldContext_JobProgressEvent_filesTransferred(ctx, field)
+			case "bytesTransferred":
+				return ec.fieldContext_JobProgressEvent_bytesTransferred(ctx, field)
+			case "filesTotal":
+				return ec.fieldContext_JobProgressEvent_filesTotal(ctx, field)
+			case "bytesTotal":
+				return ec.fieldContext_JobProgressEvent_bytesTotal(ctx, field)
+			case "filesDeleted":
+				return ec.fieldContext_JobProgressEvent_filesDeleted(ctx, field)
+			case "errorCount":
+				return ec.fieldContext_JobProgressEvent_errorCount(ctx, field)
+			case "startTime":
+				return ec.fieldContext_JobProgressEvent_startTime(ctx, field)
+			case "endTime":
+				return ec.fieldContext_JobProgressEvent_endTime(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type JobProgressEvent", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _JobConnection_items(ctx context.Context, field graphql.CollectedField, obj *model.JobConnection) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4994,12 +5466,18 @@ func (ec *executionContext) fieldContext_JobConnection_items(_ context.Context, 
 				return ec.fieldContext_Job_filesTransferred(ctx, field)
 			case "bytesTransferred":
 				return ec.fieldContext_Job_bytesTransferred(ctx, field)
+			case "filesDeleted":
+				return ec.fieldContext_Job_filesDeleted(ctx, field)
+			case "errorCount":
+				return ec.fieldContext_Job_errorCount(ctx, field)
 			case "errors":
 				return ec.fieldContext_Job_errors(ctx, field)
 			case "task":
 				return ec.fieldContext_Job_task(ctx, field)
 			case "logs":
 				return ec.fieldContext_Job_logs(ctx, field)
+			case "progress":
+				return ec.fieldContext_Job_progress(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Job", field.Name)
 		},
@@ -5287,12 +5765,18 @@ func (ec *executionContext) fieldContext_JobLog_job(_ context.Context, field gra
 				return ec.fieldContext_Job_filesTransferred(ctx, field)
 			case "bytesTransferred":
 				return ec.fieldContext_Job_bytesTransferred(ctx, field)
+			case "filesDeleted":
+				return ec.fieldContext_Job_filesDeleted(ctx, field)
+			case "errorCount":
+				return ec.fieldContext_Job_errorCount(ctx, field)
 			case "errors":
 				return ec.fieldContext_Job_errors(ctx, field)
 			case "task":
 				return ec.fieldContext_Job_task(ctx, field)
 			case "logs":
 				return ec.fieldContext_Job_logs(ctx, field)
+			case "progress":
+				return ec.fieldContext_Job_progress(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Job", field.Name)
 		},
@@ -5587,6 +6071,122 @@ func (ec *executionContext) fieldContext_JobProgressEvent_bytesTransferred(_ con
 	return fc, nil
 }
 
+func (ec *executionContext) _JobProgressEvent_filesTotal(ctx context.Context, field graphql.CollectedField, obj *model.JobProgressEvent) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_JobProgressEvent_filesTotal,
+		func(ctx context.Context) (any, error) {
+			return obj.FilesTotal, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_JobProgressEvent_filesTotal(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "JobProgressEvent",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _JobProgressEvent_bytesTotal(ctx context.Context, field graphql.CollectedField, obj *model.JobProgressEvent) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_JobProgressEvent_bytesTotal,
+		func(ctx context.Context) (any, error) {
+			return obj.BytesTotal, nil
+		},
+		nil,
+		ec.marshalNBigInt2int64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_JobProgressEvent_bytesTotal(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "JobProgressEvent",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type BigInt does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _JobProgressEvent_filesDeleted(ctx context.Context, field graphql.CollectedField, obj *model.JobProgressEvent) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_JobProgressEvent_filesDeleted,
+		func(ctx context.Context) (any, error) {
+			return obj.FilesDeleted, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_JobProgressEvent_filesDeleted(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "JobProgressEvent",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _JobProgressEvent_errorCount(ctx context.Context, field graphql.CollectedField, obj *model.JobProgressEvent) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_JobProgressEvent_errorCount,
+		func(ctx context.Context) (any, error) {
+			return obj.ErrorCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_JobProgressEvent_errorCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "JobProgressEvent",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _JobProgressEvent_startTime(ctx context.Context, field graphql.CollectedField, obj *model.JobProgressEvent) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5732,12 +6332,18 @@ func (ec *executionContext) fieldContext_JobQuery_get(ctx context.Context, field
 				return ec.fieldContext_Job_filesTransferred(ctx, field)
 			case "bytesTransferred":
 				return ec.fieldContext_Job_bytesTransferred(ctx, field)
+			case "filesDeleted":
+				return ec.fieldContext_Job_filesDeleted(ctx, field)
+			case "errorCount":
+				return ec.fieldContext_Job_errorCount(ctx, field)
 			case "errors":
 				return ec.fieldContext_Job_errors(ctx, field)
 			case "task":
 				return ec.fieldContext_Job_task(ctx, field)
 			case "logs":
 				return ec.fieldContext_Job_logs(ctx, field)
+			case "progress":
+				return ec.fieldContext_Job_progress(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Job", field.Name)
 		},
@@ -5793,6 +6399,14 @@ func (ec *executionContext) fieldContext_JobQuery_progress(ctx context.Context, 
 				return ec.fieldContext_JobProgressEvent_filesTransferred(ctx, field)
 			case "bytesTransferred":
 				return ec.fieldContext_JobProgressEvent_bytesTransferred(ctx, field)
+			case "filesTotal":
+				return ec.fieldContext_JobProgressEvent_filesTotal(ctx, field)
+			case "bytesTotal":
+				return ec.fieldContext_JobProgressEvent_bytesTotal(ctx, field)
+			case "filesDeleted":
+				return ec.fieldContext_JobProgressEvent_filesDeleted(ctx, field)
+			case "errorCount":
+				return ec.fieldContext_JobProgressEvent_errorCount(ctx, field)
 			case "startTime":
 				return ec.fieldContext_JobProgressEvent_startTime(ctx, field)
 			case "endTime":
@@ -7119,6 +7733,14 @@ func (ec *executionContext) fieldContext_Subscription_jobProgress(ctx context.Co
 				return ec.fieldContext_JobProgressEvent_filesTransferred(ctx, field)
 			case "bytesTransferred":
 				return ec.fieldContext_JobProgressEvent_bytesTransferred(ctx, field)
+			case "filesTotal":
+				return ec.fieldContext_JobProgressEvent_filesTotal(ctx, field)
+			case "bytesTotal":
+				return ec.fieldContext_JobProgressEvent_bytesTotal(ctx, field)
+			case "filesDeleted":
+				return ec.fieldContext_JobProgressEvent_filesDeleted(ctx, field)
+			case "errorCount":
+				return ec.fieldContext_JobProgressEvent_errorCount(ctx, field)
 			case "startTime":
 				return ec.fieldContext_JobProgressEvent_startTime(ctx, field)
 			case "endTime":
@@ -7135,6 +7757,57 @@ func (ec *executionContext) fieldContext_Subscription_jobProgress(ctx context.Co
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Subscription_jobProgress_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_transferProgress(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Subscription_transferProgress,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Subscription().TransferProgress(ctx, fc.Args["connectionId"].(*uuid.UUID), fc.Args["taskId"].(*uuid.UUID), fc.Args["jobId"].(*uuid.UUID))
+		},
+		nil,
+		ec.marshalNTransferProgressEvent2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐTransferProgressEvent,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Subscription_transferProgress(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "jobId":
+				return ec.fieldContext_TransferProgressEvent_jobId(ctx, field)
+			case "taskId":
+				return ec.fieldContext_TransferProgressEvent_taskId(ctx, field)
+			case "connectionId":
+				return ec.fieldContext_TransferProgressEvent_connectionId(ctx, field)
+			case "transfers":
+				return ec.fieldContext_TransferProgressEvent_transfers(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TransferProgressEvent", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Subscription_transferProgress_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -7573,12 +8246,18 @@ func (ec *executionContext) fieldContext_Task_latestJob(_ context.Context, field
 				return ec.fieldContext_Job_filesTransferred(ctx, field)
 			case "bytesTransferred":
 				return ec.fieldContext_Job_bytesTransferred(ctx, field)
+			case "filesDeleted":
+				return ec.fieldContext_Job_filesDeleted(ctx, field)
+			case "errorCount":
+				return ec.fieldContext_Job_errorCount(ctx, field)
 			case "errors":
 				return ec.fieldContext_Job_errors(ctx, field)
 			case "task":
 				return ec.fieldContext_Job_task(ctx, field)
 			case "logs":
 				return ec.fieldContext_Job_logs(ctx, field)
+			case "progress":
+				return ec.fieldContext_Job_progress(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Job", field.Name)
 		},
@@ -7957,12 +8636,18 @@ func (ec *executionContext) fieldContext_TaskMutation_run(ctx context.Context, f
 				return ec.fieldContext_Job_filesTransferred(ctx, field)
 			case "bytesTransferred":
 				return ec.fieldContext_Job_bytesTransferred(ctx, field)
+			case "filesDeleted":
+				return ec.fieldContext_Job_filesDeleted(ctx, field)
+			case "errorCount":
+				return ec.fieldContext_Job_errorCount(ctx, field)
 			case "errors":
 				return ec.fieldContext_Job_errors(ctx, field)
 			case "task":
 				return ec.fieldContext_Job_task(ctx, field)
 			case "logs":
 				return ec.fieldContext_Job_logs(ctx, field)
+			case "progress":
+				return ec.fieldContext_Job_progress(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Job", field.Name)
 		},
@@ -8123,6 +8808,217 @@ func (ec *executionContext) fieldContext_TaskSyncOptions_conflictResolution(_ co
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type ConflictResolution does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TransferItem_name(ctx context.Context, field graphql.CollectedField, obj *model.TransferItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TransferItem_name,
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TransferItem_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TransferItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TransferItem_size(ctx context.Context, field graphql.CollectedField, obj *model.TransferItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TransferItem_size,
+		func(ctx context.Context) (any, error) {
+			return obj.Size, nil
+		},
+		nil,
+		ec.marshalNBigInt2int64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TransferItem_size(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TransferItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type BigInt does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TransferItem_bytes(ctx context.Context, field graphql.CollectedField, obj *model.TransferItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TransferItem_bytes,
+		func(ctx context.Context) (any, error) {
+			return obj.Bytes, nil
+		},
+		nil,
+		ec.marshalNBigInt2int64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TransferItem_bytes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TransferItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type BigInt does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TransferProgressEvent_jobId(ctx context.Context, field graphql.CollectedField, obj *model.TransferProgressEvent) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TransferProgressEvent_jobId,
+		func(ctx context.Context) (any, error) {
+			return obj.JobID, nil
+		},
+		nil,
+		ec.marshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TransferProgressEvent_jobId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TransferProgressEvent",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TransferProgressEvent_taskId(ctx context.Context, field graphql.CollectedField, obj *model.TransferProgressEvent) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TransferProgressEvent_taskId,
+		func(ctx context.Context) (any, error) {
+			return obj.TaskID, nil
+		},
+		nil,
+		ec.marshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TransferProgressEvent_taskId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TransferProgressEvent",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TransferProgressEvent_connectionId(ctx context.Context, field graphql.CollectedField, obj *model.TransferProgressEvent) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TransferProgressEvent_connectionId,
+		func(ctx context.Context) (any, error) {
+			return obj.ConnectionID, nil
+		},
+		nil,
+		ec.marshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TransferProgressEvent_connectionId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TransferProgressEvent",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TransferProgressEvent_transfers(ctx context.Context, field graphql.CollectedField, obj *model.TransferProgressEvent) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TransferProgressEvent_transfers,
+		func(ctx context.Context) (any, error) {
+			return obj.Transfers, nil
+		},
+		nil,
+		ec.marshalNTransferItem2ᚕᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐTransferItemᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TransferProgressEvent_transfers(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TransferProgressEvent",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "name":
+				return ec.fieldContext_TransferItem_name(ctx, field)
+			case "size":
+				return ec.fieldContext_TransferItem_size(ctx, field)
+			case "bytes":
+				return ec.fieldContext_TransferItem_bytes(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TransferItem", field.Name)
 		},
 	}
 	return fc, nil
@@ -10676,19 +11572,16 @@ func (ec *executionContext) _ConnectionQuota(ctx context.Context, sel ast.Select
 			out.Values[i] = graphql.MarshalString("ConnectionQuota")
 		case "total":
 			out.Values[i] = ec._ConnectionQuota_total(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
 		case "used":
 			out.Values[i] = ec._ConnectionQuota_used(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
 		case "free":
 			out.Values[i] = ec._ConnectionQuota_free(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
+		case "trashed":
+			out.Values[i] = ec._ConnectionQuota_trashed(ctx, field, obj)
+		case "other":
+			out.Values[i] = ec._ConnectionQuota_other(ctx, field, obj)
+		case "objects":
+			out.Values[i] = ec._ConnectionQuota_objects(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -11218,6 +12111,16 @@ func (ec *executionContext) _Job(ctx context.Context, sel ast.SelectionSet, obj 
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "filesDeleted":
+			out.Values[i] = ec._Job_filesDeleted(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "errorCount":
+			out.Values[i] = ec._Job_errorCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
 		case "errors":
 			out.Values[i] = ec._Job_errors(ctx, field, obj)
 		case "task":
@@ -11269,6 +12172,39 @@ func (ec *executionContext) _Job(ctx context.Context, sel ast.SelectionSet, obj 
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "progress":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Job_progress(ctx, field, obj)
 				return res
 			}
 
@@ -11551,6 +12487,26 @@ func (ec *executionContext) _JobProgressEvent(ctx context.Context, sel ast.Selec
 			}
 		case "bytesTransferred":
 			out.Values[i] = ec._JobProgressEvent_bytesTransferred(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "filesTotal":
+			out.Values[i] = ec._JobProgressEvent_filesTotal(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "bytesTotal":
+			out.Values[i] = ec._JobProgressEvent_bytesTotal(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "filesDeleted":
+			out.Values[i] = ec._JobProgressEvent_filesDeleted(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "errorCount":
+			out.Values[i] = ec._JobProgressEvent_errorCount(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -12395,6 +13351,8 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 	switch fields[0].Name {
 	case "jobProgress":
 		return ec._Subscription_jobProgress(ctx, fields[0])
+	case "transferProgress":
+		return ec._Subscription_transferProgress(ctx, fields[0])
 	default:
 		panic("unknown field " + strconv.Quote(fields[0].Name))
 	}
@@ -12957,6 +13915,109 @@ func (ec *executionContext) _TaskSyncOptions(ctx context.Context, sel ast.Select
 			out.Values[i] = graphql.MarshalString("TaskSyncOptions")
 		case "conflictResolution":
 			out.Values[i] = ec._TaskSyncOptions_conflictResolution(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var transferItemImplementors = []string{"TransferItem"}
+
+func (ec *executionContext) _TransferItem(ctx context.Context, sel ast.SelectionSet, obj *model.TransferItem) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, transferItemImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TransferItem")
+		case "name":
+			out.Values[i] = ec._TransferItem_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "size":
+			out.Values[i] = ec._TransferItem_size(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "bytes":
+			out.Values[i] = ec._TransferItem_bytes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var transferProgressEventImplementors = []string{"TransferProgressEvent"}
+
+func (ec *executionContext) _TransferProgressEvent(ctx context.Context, sel ast.SelectionSet, obj *model.TransferProgressEvent) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, transferProgressEventImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TransferProgressEvent")
+		case "jobId":
+			out.Values[i] = ec._TransferProgressEvent_jobId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "taskId":
+			out.Values[i] = ec._TransferProgressEvent_taskId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "connectionId":
+			out.Values[i] = ec._TransferProgressEvent_connectionId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "transfers":
+			out.Values[i] = ec._TransferProgressEvent_transfers(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -14232,6 +15293,74 @@ func (ec *executionContext) marshalNTestConnectionResult2githubᚗcomᚋxzzpig�
 	return ec._TestConnectionResult(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNTransferItem2ᚕᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐTransferItemᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.TransferItem) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNTransferItem2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐTransferItem(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNTransferItem2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐTransferItem(ctx context.Context, sel ast.SelectionSet, v *model.TransferItem) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._TransferItem(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNTransferProgressEvent2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐTransferProgressEvent(ctx context.Context, sel ast.SelectionSet, v model.TransferProgressEvent) graphql.Marshaler {
+	return ec._TransferProgressEvent(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNTransferProgressEvent2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐTransferProgressEvent(ctx context.Context, sel ast.SelectionSet, v *model.TransferProgressEvent) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._TransferProgressEvent(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNUpdateConnectionInput2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐUpdateConnectionInput(ctx context.Context, v any) (model.UpdateConnectionInput, error) {
 	res, err := ec.unmarshalInputUpdateConnectionInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -14492,6 +15621,24 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
 		}
 	}
+	return res
+}
+
+func (ec *executionContext) unmarshalOBigInt2ᚖint64(ctx context.Context, v any) (*int64, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalInt64(v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOBigInt2ᚖint64(ctx context.Context, sel ast.SelectionSet, v *int64) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	_ = sel
+	_ = ctx
+	res := graphql.MarshalInt64(*v)
 	return res
 }
 

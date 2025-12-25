@@ -7,13 +7,13 @@ package resolver
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/dataloader"
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/generated"
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/subscription"
+	"github.com/xzzpig/rclone-sync/internal/core/logger"
 )
 
 // Task is the resolver for the task field.
@@ -68,6 +68,12 @@ func (r *jobResolver) Logs(ctx context.Context, obj *model.Job, pagination *mode
 			HasPreviousPage: hasPreviousPage,
 		},
 	}, nil
+}
+
+// Progress is the resolver for the progress field.
+func (r *jobResolver) Progress(ctx context.Context, obj *model.Job) (*model.JobProgressEvent, error) {
+	// Get progress from SyncEngine - only returns non-nil for RUNNING jobs
+	return r.deps.SyncEngine.GetJobProgress(obj.ID), nil
 }
 
 // Job is the resolver for the job field.
@@ -132,40 +138,8 @@ func (r *jobQueryResolver) List(ctx context.Context, obj *model.JobQuery, taskID
 
 // Progress is the resolver for the progress field.
 func (r *jobQueryResolver) Progress(ctx context.Context, obj *model.JobQuery, id uuid.UUID) (*model.JobProgressEvent, error) {
-	// Get progress from SyncEngine
-	progress, ok := r.deps.SyncEngine.GetJobProgress(id)
-	if !ok {
-		// Job not currently running, return nil
-		return nil, nil
-	}
-
-	// Get the job to retrieve task/connection info
-	entJob, err := r.deps.JobService.GetJob(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get the task with connection
-	entTask, err := r.deps.TaskService.GetTaskWithConnection(ctx, entJob.QueryTask().OnlyIDX(ctx))
-	if err != nil {
-		return nil, err
-	}
-
-	var endTime *time.Time
-	if !entJob.EndTime.IsZero() {
-		endTime = &entJob.EndTime
-	}
-
-	return &model.JobProgressEvent{
-		JobID:            id,
-		TaskID:           entTask.ID,
-		ConnectionID:     entTask.ConnectionID,
-		Status:           model.JobStatus(entJob.Status),
-		FilesTransferred: int(progress.Transfers),
-		BytesTransferred: progress.Bytes,
-		StartTime:        entJob.StartTime,
-		EndTime:          endTime,
-	}, nil
+	// Get progress from SyncEngine - returns the cached JobProgressEvent directly
+	return r.deps.SyncEngine.GetJobProgress(id), nil
 }
 
 // List is the resolver for the list field.
@@ -253,6 +227,53 @@ func (r *subscriptionResolver) JobProgress(ctx context.Context, taskID *uuid.UUI
 
 	go func() {
 		defer r.deps.JobProgressBus.Unsubscribe(sub.ID)
+		defer close(out)
+
+		for {
+			select {
+			case <-ctx.Done():
+				// Client disconnected
+				return
+			case event, ok := <-sub.Events:
+				if !ok {
+					// Subscription closed
+					return
+				}
+				select {
+				case out <- event:
+					// Event sent
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+
+	return out, nil
+}
+
+// TransferProgress is the resolver for the transferProgress field.
+func (r *subscriptionResolver) TransferProgress(ctx context.Context, connectionID *uuid.UUID, taskID *uuid.UUID, jobID *uuid.UUID) (<-chan *model.TransferProgressEvent, error) {
+	// Check if TransferProgressBus is available
+	if r.deps.TransferProgressBus == nil {
+		// Fallback: return an empty channel that immediately closes
+		logger.Named("api.graphql.resolver.job").Warn("TransferProgressBus is not available, returning empty subscription channel")
+		ch := make(chan *model.TransferProgressEvent)
+		close(ch)
+		return ch, nil
+	}
+
+	// Create filter based on connectionID, taskID, and jobID
+	filter := subscription.TransferProgressFilter(connectionID, taskID, jobID)
+
+	// Subscribe to transfer progress events with the filter
+	sub := r.deps.TransferProgressBus.Subscribe(filter)
+
+	// Create output channel that will be closed when context is done
+	out := make(chan *model.TransferProgressEvent)
+
+	go func() {
+		defer r.deps.TransferProgressBus.Unsubscribe(sub.ID)
 		defer close(out)
 
 		for {

@@ -1,5 +1,4 @@
-import { client, onWsReconnect } from '@/api/graphql/client';
-import { JOB_PROGRESS_SUBSCRIPTION } from '@/api/graphql/queries/subscriptions';
+import { client } from '@/api/graphql/client';
 import {
   TaskCreateMutation,
   TaskDeleteMutation,
@@ -7,11 +6,17 @@ import {
   TaskUpdateMutation,
   TasksListQuery,
 } from '@/api/graphql/queries/tasks';
-import type { CreateTaskInput, StatusType, TaskListItem, UpdateTaskInput } from '@/lib/types';
+import type {
+  CreateTaskInput,
+  JobProgressEvent,
+  StatusType,
+  TaskListItem,
+  UpdateTaskInput,
+} from '@/lib/types';
 import * as m from '@/paraglide/messages.js';
-import { createSubscription } from '@urql/solid';
-import { ParentComponent, createContext, createEffect, useContext } from 'solid-js';
+import { ParentComponent, createContext, onCleanup, onMount, useContext } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
+import { useJobProgress } from './jobProgress';
 
 interface TaskState {
   tasks: TaskListItem[];
@@ -38,18 +43,10 @@ const TaskContext = createContext<[TaskState, TaskActions]>();
 
 export const TaskProvider: ParentComponent = (props) => {
   const [state, setState] = createStore<TaskState>(initialState);
+  const jobProgress = useJobProgress();
 
-  // GraphQL subscription for job progress using @urql/solid
-  const [subscriptionResult] = createSubscription({
-    query: JOB_PROGRESS_SUBSCRIPTION,
-    variables: {},
-  });
-
-  // Handle subscription data updates
-  createEffect(() => {
-    const data = subscriptionResult.data?.jobProgress;
-    if (!data) return;
-
+  // Handle job progress events from centralized subscription
+  const handleJobProgress = (data: JobProgressEvent) => {
     setState(
       produce((s) => {
         const taskIndex = s.tasks.findIndex((t) => t.id === data.taskId);
@@ -68,7 +65,7 @@ export const TaskProvider: ParentComponent = (props) => {
         }
       })
     );
-  });
+  };
 
   const actions: TaskActions = {
     loadTasks: async (_connectionId?: string) => {
@@ -216,12 +213,20 @@ export const TaskProvider: ParentComponent = (props) => {
     },
   };
 
-  // Listen for WebSocket reconnection events to reload tasks
-  onWsReconnect(() => {
-    console.info('WebSocket reconnected, reloading tasks...');
-    // Clear old tasks first to avoid stale subscription data being preserved
-    setState('tasks', []);
-    actions.loadTasks();
+  // Subscribe to job progress events (no filter - all events)
+  onMount(() => {
+    const subscription = jobProgress.subscribe(handleJobProgress);
+    const unsubscribeReconnect = jobProgress.onReconnect(() => {
+      console.info('WebSocket reconnected, reloading tasks...');
+      // Clear old tasks first to avoid stale subscription data being preserved
+      setState('tasks', []);
+      actions.loadTasks();
+    });
+
+    onCleanup(() => {
+      subscription.unsubscribe();
+      unsubscribeReconnect();
+    });
   });
 
   return <TaskContext.Provider value={[state, actions]}>{props.children}</TaskContext.Provider>;

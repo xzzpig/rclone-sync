@@ -13,7 +13,7 @@ import (
 
 func init() {
 	// Initialize logger for tests
-	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug)
+	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug, nil)
 }
 
 func createTestDB(t *testing.T) (*sql.DB, func()) {

@@ -1,6 +1,6 @@
 import { client } from '@/api/graphql/client';
 import { ConnectionGetBasicQuery } from '@/api/graphql/queries/connections';
-import { FilesLocalQuery, FilesRemoteQuery } from '@/api/graphql/queries/files';
+import { FilesListQuery } from '@/api/graphql/queries/files';
 import { FileBrowser } from '@/components/common/FileBrowser';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,14 +12,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { showToast } from '@/components/ui/toast';
-import type { CreateTaskInput } from '@/lib/types';
+import type { CreateTaskInput, UpdateTaskInput } from '@/lib/types';
 import * as m from '@/paraglide/messages.js';
 import { createQuery } from '@urql/solid';
 import { Component, createSignal, Show } from 'solid-js';
 import IconChevronLeft from '~icons/lucide/chevron-left';
 import IconChevronRight from '~icons/lucide/chevron-right';
 import IconHardDrive from '~icons/lucide/hard-drive';
-import { TaskSettingsForm, TaskSettingsFormData } from './TaskSettingsForm';
+import { TaskSettingsForm } from './TaskSettingsForm';
+
+type TaskSettingsFormData = UpdateTaskInput;
 
 // Re-export CreateTaskInput for backward compatibility
 export type { CreateTaskInput };
@@ -44,24 +46,25 @@ export const CreateTaskWizard: Component<CreateTaskWizardProps> = (props) => {
   const connectionName = () => connectionResult.data?.connection?.get?.name ?? props.connectionId;
 
   // Helper functions to load directory contents via GraphQL
+  // Using unified FilesListQuery - connectionId: null for local, connectionId for remote
   const loadLocalFiles = async (path: string, refresh?: boolean) => {
     const result = await client.query(
-      FilesLocalQuery,
-      { path },
+      FilesListQuery,
+      { connectionId: null, path },
       { requestPolicy: refresh ? 'network-only' : 'cache-first' }
     );
     if (result.error) throw new Error(result.error.message);
-    return result.data?.file?.local ?? [];
+    return result.data?.file?.list ?? [];
   };
 
   const loadRemoteFiles = async (path: string, refresh?: boolean) => {
     const result = await client.query(
-      FilesRemoteQuery,
+      FilesListQuery,
       { connectionId: props.connectionId, path },
       { requestPolicy: refresh ? 'network-only' : 'cache-first' }
     );
     if (result.error) throw new Error(result.error.message);
-    return result.data?.file?.remote ?? [];
+    return result.data?.file?.list ?? [];
   };
 
   const [currentStep, setCurrentStep] = createSignal<WizardStep>('paths');
@@ -116,7 +119,7 @@ export const CreateTaskWizard: Component<CreateTaskWizardProps> = (props) => {
         sourcePath: sourcePath(),
         connectionId: props.connectionId,
         remotePath: remotePath(),
-        direction: data.direction,
+        direction: data.direction ?? 'UPLOAD',
         schedule: data.schedule,
         realtime: data.realtime,
         options: data.options,

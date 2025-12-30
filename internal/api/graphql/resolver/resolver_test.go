@@ -79,7 +79,7 @@ func NewTestEnv(t *testing.T) *TestEnv {
 	storage := rclone.NewDBStorage(connectionService)
 	storage.Install()
 
-	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, appDataDir, false)
+	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, appDataDir, false, 0)
 	runnerInstance := runner.NewRunner(syncEngine)
 
 	// Create mock watcher and scheduler for testing

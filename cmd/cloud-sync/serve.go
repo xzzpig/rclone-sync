@@ -85,7 +85,7 @@ var serveCmd = &cobra.Command{
 		jobSvc := services.NewJobService(dbClient)
 		jobProgressBus := subscription.NewJobProgressBus()
 		transferProgressBus := subscription.NewTransferProgressBus()
-		syncEngine := rclone.NewSyncEngine(jobSvc, jobProgressBus, transferProgressBus, cfg.App.DataDir, cfg.Job.AutoDeleteEmptyJobs)
+		syncEngine := rclone.NewSyncEngine(jobSvc, jobProgressBus, transferProgressBus, cfg.App.DataDir, cfg.App.Job.AutoDeleteEmptyJobs, cfg.App.Sync.Transfers)
 		taskRunner := runner.NewRunner(syncEngine)
 
 		// Reset any stuck jobs from previous crash/shutdown
@@ -107,10 +107,9 @@ var serveCmd = &cobra.Command{
 		defer watch.Stop()
 
 		// 10. Initialize and start log cleanup service
-		if cfg.Log.MaxLogsPerConnection > 0 && cfg.Log.CleanupSchedule != "" {
-			logCleanupSvc := services.NewLogCleanupService(dbClient, cfg.Log.MaxLogsPerConnection)
-			if err := logCleanupSvc.Start(cfg.Log.CleanupSchedule); err != nil {
-				log.Error("Failed to start log cleanup service", zap.Error(err))
+		if cfg.App.Job.MaxLogsPerConnection > 0 && cfg.App.Job.CleanupSchedule != "" {
+			logCleanupSvc := services.NewLogCleanupService(dbClient, cfg.App.Job.MaxLogsPerConnection)
+			if err := logCleanupSvc.Start(cfg.App.Job.CleanupSchedule); err != nil {
 			} else {
 				defer logCleanupSvc.Stop()
 			}

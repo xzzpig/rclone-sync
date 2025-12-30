@@ -14,6 +14,10 @@
   - **单向上传**: 本地 -> 云端 (适合备份)
   - **单向下载**: 云端 -> 本地 (适合拉取资源)
   - **双向同步**: 保持两端数据一致 (适合多端协作)
+- **高级任务选项**:
+  - **文件过滤器**: 使用强大的 rclone 过滤规则 Include/Exclude 文件
+  - **保留删除文件**: 防止删除目标端的文件（仅单向同步模式）
+  - **并行传输数量**: 为每个任务配置并发传输数量 (1-64)
 - **智能触发机制**:
   - **实时同步**: 监听文件系统变动，即时触发同步。
   - **计划任务**: 支持自定义时间表 (Cron)，按计划自动执行。
@@ -140,6 +144,15 @@ port = 8080
 # 生产环境建议使用 "info"
 level = "info"
 
+# 按模块名称设置层级日志级别
+# 名称区分大小写，以 "." 分隔
+# 示例: "core.db" 匹配 "core.db", "core.db.query" 等
+[log.levels]
+# "core.db" = "debug"        # core.db 及其子模块使用 debug 级别
+# "core.scheduler" = "warn"  # core.scheduler 使用 warn 级别
+# "rclone" = "error"         # rclone 模块使用 error 级别
+
+[app.job]
 # 每个连接保留的最大日志条数
 # 0 = 无限制（不清理）
 # 默认值: 1000
@@ -150,13 +163,11 @@ max_logs_per_connection = 1000
 # 默认值: "0 * * * *" (每小时整点)
 cleanup_schedule = "0 * * * *"
 
-# 按模块名称设置层级日志级别
-# 名称区分大小写，以 "." 分隔
-# 示例: "core.db" 匹配 "core.db", "core.db.query" 等
-[log.levels]
-# "core.db" = "debug"        # core.db 及其子模块使用 debug 级别
-# "core.scheduler" = "warn"  # core.scheduler 使用 warn 级别
-# "rclone" = "error"         # rclone 模块使用 error 级别
+[app.sync]
+# 全局默认并行传输数量
+# 范围: 1-64
+# 默认值: 4
+transfers = 4
 
 [database]
 # 数据库迁移模式

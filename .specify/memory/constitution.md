@@ -1,8 +1,8 @@
 <!--
 SYNC IMPACT REPORT
-Version change: 1.3.0 -> 1.4.0
-Modified principles: Added X. Schema-First API Contract
-Added sections: None
+Version change: 1.4.0 -> 1.5.0
+Modified principles: None
+Added sections: Frontend GraphQL entry in Technology Stack
 Removed sections: None
 Templates requiring updates: ✅ None
 Follow-up TODOs: None
@@ -67,6 +67,7 @@ All API interactions MUST be defined via GraphQL Schema first. Code generation M
 - Configuration: TOML files with Viper
 - Frontend i18n: Paraglide (inlang)
 - Backend i18n: go-i18n with TOML locales
+- Frontend GraphQL: gql.tada (type-safe queries) + urql (client)
 
 ### Performance Requirements
 
@@ -107,4 +108,4 @@ All API interactions MUST be defined via GraphQL Schema first. Code generation M
 
 This constitution supersedes all other development practices. Amendments REQUIRE documentation, team approval, and migration plan. Versioning follows Semantic Versioning (MAJOR.MINOR.PATCH). All code reviews MUST verify compliance with these principles. Complexity MUST be justified with clear business value.
 
-**Version**: 1.4.0 | **Ratified**: 2025-12-04 | **Last Amended**: 2025-12-24
+**Version**: 1.5.0 | **Ratified**: 2025-12-04 | **Last Amended**: 2025-12-28

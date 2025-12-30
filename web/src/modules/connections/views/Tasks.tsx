@@ -27,10 +27,13 @@ import IconCalendarPlus from '~icons/lucide/calendar-plus';
 import IconClock from '~icons/lucide/clock';
 import IconCloud from '~icons/lucide/cloud';
 import IconEdit from '~icons/lucide/edit';
+import IconFilter from '~icons/lucide/filter';
 import IconHardDrive from '~icons/lucide/hard-drive';
 import IconHistory from '~icons/lucide/history';
+import IconLayers from '~icons/lucide/layers';
 import IconPlay from '~icons/lucide/play';
 import IconSearch from '~icons/lucide/search';
+import IconShieldCheck from '~icons/lucide/shield-check';
 import IconTrash2 from '~icons/lucide/trash-2';
 import { CreateTaskWizard } from '../components/CreateTaskWizard';
 import { EditTaskDialog } from '../components/EditTaskDialog';
@@ -45,7 +48,7 @@ const DirectionArrow = (props: { direction: string; class?: string }) => {
         <Match when={dir() === 'DOWNLOAD'}>
           <IconArrowLeft class="size-4" />
         </Match>
-        <Match when={dir() === 'BIDIRECT' || dir() === 'BIDIRECTIONAL'}>
+        <Match when={dir() === 'BIDIRECTIONAL'}>
           <IconArrowLeftRight class="size-4" />
         </Match>
       </Switch>
@@ -242,7 +245,7 @@ function Tasks() {
                                   >
                                     {task.name}
                                   </h3>
-                                  <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                                  <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-muted-foreground">
                                     <div class="flex items-center gap-1">
                                       <IconClock class="size-3" />
                                       <span>
@@ -276,6 +279,51 @@ function Tasks() {
                                         <span class="font-mono">{task.schedule}</span>
                                       </Show>
                                     </div>
+
+                                    {/* Extended Options */}
+                                    <Show
+                                      when={
+                                        task.options?.filters && task.options.filters.length > 0
+                                      }
+                                    >
+                                      <div class="flex items-center gap-1">
+                                        <IconFilter class="size-3" />
+                                        <Badge
+                                          variant="outline"
+                                          class="h-4 border-blue-500/30 bg-blue-500/5 px-1 text-[10px] text-blue-600"
+                                        >
+                                          {m.task_filterRulesCount({
+                                            count: task.options?.filters?.length ?? 0,
+                                          })}
+                                        </Badge>
+                                      </div>
+                                    </Show>
+                                    <Show when={task.options?.noDelete}>
+                                      <div class="flex items-center gap-1">
+                                        <IconShieldCheck class="size-3" />
+                                        <Badge
+                                          variant="outline"
+                                          class="h-4 border-green-500/30 bg-green-500/5 px-1 text-[10px] text-green-600"
+                                        >
+                                          {m.task_noDeleteEnabled()}
+                                        </Badge>
+                                      </div>
+                                    </Show>
+                                    <Show
+                                      when={task.options?.transfers && task.options.transfers !== 4}
+                                    >
+                                      <div class="flex items-center gap-1">
+                                        <IconLayers class="size-3" />
+                                        <Badge
+                                          variant="outline"
+                                          class="h-4 border-purple-500/30 bg-purple-500/5 px-1 text-[10px] text-purple-600"
+                                        >
+                                          {m.task_transfersCount({
+                                            count: task.options?.transfers ?? 4,
+                                          })}
+                                        </Badge>
+                                      </div>
+                                    </Show>
                                   </div>
                                 </div>
                               </div>

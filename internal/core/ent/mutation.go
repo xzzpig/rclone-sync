@@ -2549,7 +2549,7 @@ type TaskMutation struct {
 	direction         *model.SyncDirection
 	schedule          *string
 	realtime          *bool
-	options           *map[string]interface{}
+	options           **model.TaskSyncOptions
 	created_at        *time.Time
 	updated_at        *time.Time
 	clearedFields     map[string]struct{}
@@ -2946,12 +2946,12 @@ func (m *TaskMutation) ResetRealtime() {
 }
 
 // SetOptions sets the "options" field.
-func (m *TaskMutation) SetOptions(value map[string]interface{}) {
-	m.options = &value
+func (m *TaskMutation) SetOptions(mso *model.TaskSyncOptions) {
+	m.options = &mso
 }
 
 // Options returns the value of the "options" field in the mutation.
-func (m *TaskMutation) Options() (r map[string]interface{}, exists bool) {
+func (m *TaskMutation) Options() (r *model.TaskSyncOptions, exists bool) {
 	v := m.options
 	if v == nil {
 		return
@@ -2962,7 +2962,7 @@ func (m *TaskMutation) Options() (r map[string]interface{}, exists bool) {
 // OldOptions returns the old "options" field's value of the Task entity.
 // If the Task object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TaskMutation) OldOptions(ctx context.Context) (v map[string]interface{}, err error) {
+func (m *TaskMutation) OldOptions(ctx context.Context) (v *model.TaskSyncOptions, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOptions is only allowed on UpdateOne operations")
 	}
@@ -3328,7 +3328,7 @@ func (m *TaskMutation) SetField(name string, value ent.Value) error {
 		m.SetRealtime(v)
 		return nil
 	case task.FieldOptions:
-		v, ok := value.(map[string]interface{})
+		v, ok := value.(*model.TaskSyncOptions)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}

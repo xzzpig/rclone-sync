@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
+	"github.com/xzzpig/rclone-sync/internal/core/db"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
-	"github.com/xzzpig/rclone-sync/internal/core/db"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/task"
 	"github.com/xzzpig/rclone-sync/internal/core/errs"
@@ -412,9 +412,16 @@ func TestTaskService_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("CreateTask_WithOptions", func(t *testing.T) {
-		options := map[string]interface{}{
-			"exclude":   []string{"*.tmp", "*.log"},
-			"bandwidth": 1024,
+		// Create a task with options
+		newResolution := model.ConflictResolutionNewer
+		filters := []string{"- *.tmp", "- *.log"}
+		noDelete := true
+		transfers := 10
+		options := &model.TaskSyncOptions{
+			ConflictResolution: &newResolution,
+			Filters:            filters,
+			NoDelete:           &noDelete,
+			Transfers:          &transfers,
 		}
 		task, err := service.CreateTask(ctx, "Task With Options", "/src", testConn.ID, "/dst", string(model.SyncDirectionUpload), "", false, options)
 		assert.NoError(t, err)
@@ -442,7 +449,10 @@ func TestTaskService_EdgeCases(t *testing.T) {
 		require.NoError(t, err)
 
 		// Update all fields
-		newOptions := map[string]interface{}{"new": "option"}
+		newResolution := model.ConflictResolutionLocal
+		newOptions := &model.TaskSyncOptions{
+			ConflictResolution: &newResolution,
+		}
 		updated, err := service.UpdateTask(
 			ctx,
 			task.ID,

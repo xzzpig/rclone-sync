@@ -85,6 +85,12 @@ other = "No connections to import"
 [error_connection_has_dependent_tasks]
 other = "Cannot delete connection with dependent tasks"
 
+[error_filter_rule_invalid]
+other = "Filter rule #{{.Index}} \"{{.Rule}}\" is invalid: {{.Reason}}"
+
+[error_transfers_out_of_range]
+other = "Transfers must be between 1 and 64, got {{.Value}}"
+
 # Status messages
 [status_syncing]
 other = "Syncing"

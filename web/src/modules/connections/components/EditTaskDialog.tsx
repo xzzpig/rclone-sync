@@ -7,10 +7,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { showToast } from '@/components/ui/toast';
-import { type SyncDirection, type Task, type UpdateTaskInput } from '@/lib/types';
+import { type Task, type UpdateTaskInput } from '@/lib/types';
 import * as m from '@/paraglide/messages.js';
 import { createEffect, createSignal } from 'solid-js';
-import { TaskSettingsForm, TaskSettingsFormData } from './TaskSettingsForm';
+import { TaskSettingsForm, taskToUpdateInput } from './TaskSettingsForm';
 
 interface EditTaskDialogProps {
   task: Task | null;
@@ -20,7 +20,7 @@ interface EditTaskDialogProps {
 }
 
 export function EditTaskDialog(props: EditTaskDialogProps) {
-  const [formData, setFormData] = createSignal<TaskSettingsFormData>({
+  const [formData, setFormData] = createSignal<UpdateTaskInput>({
     name: '',
     direction: 'UPLOAD',
     schedule: '',
@@ -33,13 +33,7 @@ export function EditTaskDialog(props: EditTaskDialogProps) {
   createEffect(() => {
     const task = props.task;
     if (task) {
-      setFormData({
-        name: task.name ?? '',
-        direction: task.direction as SyncDirection,
-        schedule: task.schedule ?? '',
-        realtime: task.realtime ?? false,
-        options: {},
-      });
+      setFormData(taskToUpdateInput(task));
     }
   });
 
@@ -49,17 +43,10 @@ export function EditTaskDialog(props: EditTaskDialogProps) {
 
     setIsSubmitting(true);
     try {
-      const data = formData();
-      await props.onSave(task.id, {
-        name: data.name,
-        direction: data.direction,
-        schedule: data.schedule,
-        realtime: data.realtime,
-        options: data.options,
-      });
+      await props.onSave(task.id, formData());
       showToast({
         title: m.toast_taskUpdated(),
-        description: m.toast_taskUpdatedDesc({ name: data.name }),
+        description: m.toast_taskUpdatedDesc({ name: formData().name ?? '' }),
       });
       props.onOpenChange(false);
     } catch (error) {
@@ -80,7 +67,13 @@ export function EditTaskDialog(props: EditTaskDialogProps) {
           <DialogTitle>{m.wizard_editTask()}</DialogTitle>
         </DialogHeader>
         <div class="py-4">
-          <TaskSettingsForm value={formData()} onChange={setFormData} />
+          <TaskSettingsForm
+            value={formData()}
+            onChange={setFormData}
+            connectionId={props.task?.connection?.id}
+            remotePath={props.task?.remotePath}
+            sourcePath={props.task?.sourcePath}
+          />
         </div>
         <DialogFooter>
           <Button

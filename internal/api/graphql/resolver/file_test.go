@@ -36,12 +36,12 @@ func (s *FileResolverTestSuite) SetupTest() {
 	require.NoError(s.T(), os.WriteFile(filepath.Join(s.testDir, "subdir", "nested.txt"), []byte("nested"), 0644))
 }
 
-// TestFileQuery_Local tests FileQuery.local resolver.
-func (s *FileResolverTestSuite) TestFileQuery_Local() {
+// TestFileQuery_List tests the unified list endpoint.
+func (s *FileResolverTestSuite) TestFileQuery_List() {
 	query := `
-		query($path: String!) {
+		query($connectionId: ID, $path: String!) {
 			file {
-				local(path: $path) {
+				list(connectionId: $connectionId, path: $path) {
 					name
 					path
 					isDir
@@ -50,143 +50,76 @@ func (s *FileResolverTestSuite) TestFileQuery_Local() {
 		}
 	`
 
+	// Test: Local listing (connectionId = null)
 	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
-		"path": s.testDir,
+		"connectionId": nil,
+		"path":         s.testDir,
 	})
 	require.Empty(s.T(), resp.Errors)
 
 	data := string(resp.Data)
-	files := gjson.Get(data, "file.local")
-	assert.True(s.T(), files.IsArray())
+	files := gjson.Get(data, "file.list").Array()
+	// By default, only directories are returned
+	assert.GreaterOrEqual(s.T(), len(files), 1)
 
-	// Should have 1: file1.txt, file2.txt, subdir
-	assert.Equal(s.T(), 1, len(files.Array()))
-}
-
-// TestFileQuery_LocalWithDirectory tests that only directories are returned by Local resolver.
-func (s *FileResolverTestSuite) TestFileQuery_LocalWithDirectory() {
-	query := `
-		query($path: String!) {
-			file {
-				local(path: $path) {
-					name
-					isDir
-				}
-			}
-		}
-	`
-
-	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
-		"path": s.testDir,
-	})
-	require.Empty(s.T(), resp.Errors)
-
-	data := string(resp.Data)
-	files := gjson.Get(data, "file.local").Array()
-
-	// Local resolver only returns directories, not files
-	// Find the subdir entry
-	var foundSubdir bool
+	// Find subdir
+	foundSubdir := false
 	for _, f := range files {
-		name := f.Get("name").String()
-		isDir := f.Get("isDir").Bool()
-		if name == "subdir" {
+		if f.Get("name").String() == "subdir" {
 			foundSubdir = true
-			assert.True(s.T(), isDir, "subdir should be a directory")
+			assert.True(s.T(), f.Get("isDir").Bool())
 		}
-		// file1.txt should NOT be in the list (Local only returns directories)
-		assert.NotEqual(s.T(), "file1.txt", name, "files should not be in Local listing")
 	}
-	assert.True(s.T(), foundSubdir, "should find subdir")
+	assert.True(s.T(), foundSubdir, "Should find subdir")
 }
 
-// TestFileQuery_LocalSubdirectory tests browsing subdirectory.
-func (s *FileResolverTestSuite) TestFileQuery_LocalSubdirectory() {
-	// Create a nested directory inside subdir for testing
-	require.NoError(s.T(), os.MkdirAll(filepath.Join(s.testDir, "subdir", "nested_dir"), 0755))
+// TestFileQuery_ListLocalWithFilters tests list endpoint with local path and filters.
+func (s *FileResolverTestSuite) TestFileQuery_ListLocalWithFilters() {
+	// Create test files
+	filterDir := filepath.Join(s.testDir, "filter_local_test")
+	require.NoError(s.T(), os.MkdirAll(filterDir, 0755))
+	require.NoError(s.T(), os.WriteFile(filepath.Join(filterDir, "keep.txt"), []byte("keep"), 0644))
+	require.NoError(s.T(), os.WriteFile(filepath.Join(filterDir, "ignore.tmp"), []byte("ignore"), 0644))
+	require.NoError(s.T(), os.MkdirAll(filepath.Join(filterDir, "keepdir"), 0755))
 
 	query := `
-		query($path: String!) {
+		query($connectionId: ID, $path: String!, $filters: [String!], $includeFiles: Boolean) {
 			file {
-				local(path: $path) {
+				list(connectionId: $connectionId, path: $path, filters: $filters, includeFiles: $includeFiles) {
 					name
-					path
 					isDir
 				}
 			}
 		}
 	`
 
+	// Test with filter to exclude .tmp files
 	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
-		"path": filepath.Join(s.testDir, "subdir"),
+		"connectionId": nil,
+		"path":         filterDir,
+		"includeFiles": true,
+		"filters":      []interface{}{"- *.tmp", "+ **"},
 	})
 	require.Empty(s.T(), resp.Errors)
 
 	data := string(resp.Data)
-	files := gjson.Get(data, "file.local").Array()
+	files := gjson.Get(data, "file.list").Array()
+	// Should return keepdir + keep.txt (exclude ignore.tmp) = 2 entries
+	assert.Equal(s.T(), 2, len(files))
 
-	// Local only returns directories, so should have 1 item: nested_dir
-	// (nested.txt is a file and should not be returned)
-	assert.Equal(s.T(), 1, len(files))
-	assert.Equal(s.T(), "nested_dir", files[0].Get("name").String())
-	assert.True(s.T(), files[0].Get("isDir").Bool())
-}
-
-// TestFileQuery_LocalNonExistentPath tests FileQuery.local with non-existent path.
-func (s *FileResolverTestSuite) TestFileQuery_LocalNonExistentPath() {
-	query := `
-		query($path: String!) {
-			file {
-				local(path: $path) {
-					name
-				}
-			}
-		}
-	`
-
-	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
-		"path": "/nonexistent/path/that/does/not/exist",
-	})
-	// Should return error or empty list
-	if len(resp.Errors) == 0 {
-		data := string(resp.Data)
-		files := gjson.Get(data, "file.local")
-		// Either null or empty array is acceptable
-		if files.Exists() {
-			assert.True(s.T(), files.IsArray())
-			assert.Equal(s.T(), 0, len(files.Array()))
-		}
+	for _, f := range files {
+		assert.NotContains(s.T(), f.Get("name").String(), ".tmp", "Should not contain .tmp files")
 	}
 }
 
-// TestFileQuery_LocalEmptyPath tests FileQuery.local with empty path.
-func (s *FileResolverTestSuite) TestFileQuery_LocalEmptyPath() {
-	query := `
-		query($path: String!) {
-			file {
-				local(path: $path) {
-					name
-				}
-			}
-		}
-	`
-
-	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
-		"path": "",
-	})
-	// Should return error or empty list
-	// Empty path is likely invalid
-	_ = resp
-}
-
-// TestFileQuery_Remote tests FileQuery.remote resolver.
-func (s *FileResolverTestSuite) TestFileQuery_Remote() {
-	connID := s.Env.CreateTestConnection(s.T(), "local-conn")
+// TestFileQuery_ListRemoteWithConnectionId tests list endpoint with connection ID.
+func (s *FileResolverTestSuite) TestFileQuery_ListRemoteWithConnectionId() {
+	connID := s.Env.CreateTestConnection(s.T(), "local-conn-list-test")
 
 	query := `
-		query($connectionId: ID!, $path: String!) {
+		query($connectionId: ID, $path: String!, $includeFiles: Boolean) {
 			file {
-				remote(connectionId: $connectionId, path: $path) {
+				list(connectionId: $connectionId, path: $path, includeFiles: $includeFiles) {
 					name
 					path
 					isDir
@@ -198,26 +131,23 @@ func (s *FileResolverTestSuite) TestFileQuery_Remote() {
 	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
 		"connectionId": connID.String(),
 		"path":         s.testDir,
+		"includeFiles": true,
 	})
 
-	// Remote file listing may work or fail depending on connection setup
-	// Just verify the query is valid
 	if len(resp.Errors) == 0 {
 		data := string(resp.Data)
-		files := gjson.Get(data, "file.remote")
-		if files.Exists() && files.IsArray() {
-			// Local connection should work
-			assert.GreaterOrEqual(s.T(), len(files.Array()), 0)
-		}
+		files := gjson.Get(data, "file.list").Array()
+		// Should have files and directories
+		assert.GreaterOrEqual(s.T(), len(files), 3) // file1.txt, file2.txt, subdir
 	}
 }
 
-// TestFileQuery_RemoteNonExistentConnection tests FileQuery.remote with non-existent connection.
-func (s *FileResolverTestSuite) TestFileQuery_RemoteNonExistentConnection() {
+// TestFileQuery_ListNonExistentConnection tests list endpoint with non-existent connection.
+func (s *FileResolverTestSuite) TestFileQuery_ListNonExistentConnection() {
 	query := `
-		query($connectionId: ID!, $path: String!) {
+		query($connectionId: ID, $path: String!) {
 			file {
-				remote(connectionId: $connectionId, path: $path) {
+				list(connectionId: $connectionId, path: $path) {
 					name
 				}
 			}
@@ -232,44 +162,12 @@ func (s *FileResolverTestSuite) TestFileQuery_RemoteNonExistentConnection() {
 	require.NotEmpty(s.T(), resp.Errors)
 }
 
-// TestFileQuery_LocalDirectoryMetadata tests that directory metadata is returned correctly.
-func (s *FileResolverTestSuite) TestFileQuery_LocalDirectoryMetadata() {
+// TestFileQuery_ListWithIncludeFiles tests list endpoint with includeFiles parameter.
+func (s *FileResolverTestSuite) TestFileQuery_ListWithIncludeFiles() {
 	query := `
-		query($path: String!) {
+		query($connectionId: ID, $path: String!, $includeFiles: Boolean) {
 			file {
-				local(path: $path) {
-					name
-					path
-					isDir
-				}
-			}
-		}
-	`
-
-	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
-		"path": s.testDir,
-	})
-	require.Empty(s.T(), resp.Errors)
-
-	data := string(resp.Data)
-	files := gjson.Get(data, "file.local").Array()
-
-	// Local only returns directories, find subdir and check metadata
-	for _, f := range files {
-		if f.Get("name").String() == "subdir" {
-			assert.True(s.T(), f.Get("isDir").Bool())
-			return
-		}
-	}
-	s.T().Error("subdir not found in listing")
-}
-
-// TestFileQuery_LocalRootPath tests listing root path.
-func (s *FileResolverTestSuite) TestFileQuery_LocalRootPath() {
-	query := `
-		query($path: String!) {
-			file {
-				local(path: $path) {
+				list(connectionId: $connectionId, path: $path, includeFiles: $includeFiles) {
 					name
 					isDir
 				}
@@ -277,153 +175,54 @@ func (s *FileResolverTestSuite) TestFileQuery_LocalRootPath() {
 		}
 	`
 
+	// Test 1: Without includeFiles (should only return directories)
 	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
-		"path": "/",
-	})
-	// Should return files from root (if accessible)
-	if len(resp.Errors) == 0 {
-		data := string(resp.Data)
-		files := gjson.Get(data, "file.local")
-		if files.Exists() && files.IsArray() {
-			// Root should have some entries
-			assert.Greater(s.T(), len(files.Array()), 0)
-		}
-	}
-}
-
-// TestFileQuery_LocalFilePath tests FileQuery.local with a file path instead of directory.
-func (s *FileResolverTestSuite) TestFileQuery_LocalFilePath() {
-	// Try to list a file (not a directory)
-	query := `
-		query($path: String!) {
-			file {
-				local(path: $path) {
-					name
-				}
-			}
-		}
-	`
-
-	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
-		"path": filepath.Join(s.testDir, "file1.txt"),
-	})
-	// Should return error or empty list (file is not a directory)
-	if len(resp.Errors) == 0 {
-		data := string(resp.Data)
-		files := gjson.Get(data, "file.local")
-		// Should be null or empty for non-directory paths
-		if files.Exists() && files.IsArray() {
-			assert.Equal(s.T(), 0, len(files.Array()))
-		}
-	}
-}
-
-// TestFileQuery_LocalSymlink tests FileQuery.local with a symlink directory.
-func (s *FileResolverTestSuite) TestFileQuery_LocalSymlink() {
-	// Create a symlink to subdir
-	symlinkPath := filepath.Join(s.testDir, "symlink_dir")
-	err := os.Symlink(filepath.Join(s.testDir, "subdir"), symlinkPath)
-	if err != nil {
-		// Skip if symlinks are not supported
-		s.T().Skip("Symlinks not supported on this platform")
-		return
-	}
-
-	query := `
-		query($path: String!) {
-			file {
-				local(path: $path) {
-					name
-					path
-					isDir
-				}
-			}
-		}
-	`
-
-	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
-		"path": s.testDir,
-	})
-	require.Empty(s.T(), resp.Errors)
-
-	data := string(resp.Data)
-	files := gjson.Get(data, "file.local").Array()
-
-	// Should include symlink_dir as a directory
-	foundSymlink := false
-	for _, f := range files {
-		if f.Get("name").String() == "symlink_dir" {
-			foundSymlink = true
-			// Symlink to directory should be treated as directory
-			break
-		}
-	}
-	// Note: symlinks might not be included depending on how the resolver handles them
-	_ = foundSymlink
-}
-
-// TestFileQuery_LocalPermissionDenied tests FileQuery.local with a directory without read permissions.
-func (s *FileResolverTestSuite) TestFileQuery_LocalPermissionDenied() {
-	// Create a directory with no read permissions
-	noPermDir := filepath.Join(s.testDir, "no_perm_dir")
-	require.NoError(s.T(), os.MkdirAll(noPermDir, 0000))
-	defer os.Chmod(noPermDir, 0755) // Restore permissions for cleanup
-
-	query := `
-		query($path: String!) {
-			file {
-				local(path: $path) {
-					name
-				}
-			}
-		}
-	`
-
-	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
-		"path": noPermDir,
-	})
-	// Should return error due to permission denied
-	// Note: This may succeed on some systems (e.g., running as root)
-	_ = resp
-}
-
-// TestFileQuery_RemoteWithPath tests FileQuery.remote with specific path.
-func (s *FileResolverTestSuite) TestFileQuery_RemoteWithPath() {
-	connID := s.Env.CreateTestConnection(s.T(), "local-conn-remote")
-
-	query := `
-		query($connectionId: ID!, $path: String!) {
-			file {
-				remote(connectionId: $connectionId, path: $path) {
-					name
-					path
-					isDir
-				}
-			}
-		}
-	`
-
-	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
-		"connectionId": connID.String(),
+		"connectionId": nil,
 		"path":         s.testDir,
 	})
-	// Remote listing should work for local connection
-	if len(resp.Errors) == 0 {
-		data := string(resp.Data)
-		files := gjson.Get(data, "file.remote").Array()
-		// Should have at least 1 item (subdir)
-		assert.GreaterOrEqual(s.T(), len(files), 1)
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	files := gjson.Get(data, "file.list").Array()
+	// Should only return subdir (directories only by default)
+	assert.Equal(s.T(), 1, len(files))
+	if len(files) == 1 {
+		assert.Equal(s.T(), "subdir", files[0].Get("name").String())
+		assert.True(s.T(), files[0].Get("isDir").Bool())
 	}
+
+	// Test 2: With includeFiles=true (should return all entries)
+	resp = s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
+		"connectionId": nil,
+		"path":         s.testDir,
+		"includeFiles": true,
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data = string(resp.Data)
+	files = gjson.Get(data, "file.list").Array()
+	// Should return 1 directory + 2 files = 3 entries
+	assert.Equal(s.T(), 3, len(files))
+
+	hasFile := false
+	hasDir := false
+	for _, f := range files {
+		if f.Get("isDir").Bool() {
+			hasDir = true
+		} else {
+			hasFile = true
+		}
+	}
+	assert.True(s.T(), hasFile, "Should have at least one file")
+	assert.True(s.T(), hasDir, "Should have at least one directory")
 }
 
-// TestFileQuery_RemoteEmptyPath tests FileQuery.remote with empty path.
-func (s *FileResolverTestSuite) TestFileQuery_RemoteEmptyPath() {
-	connID := s.Env.CreateTestConnection(s.T(), "local-conn-empty-path")
-
+// TestFileQuery_ListNonExistentPath tests list endpoint with non-existent path.
+func (s *FileResolverTestSuite) TestFileQuery_ListNonExistentPath() {
 	query := `
-		query($connectionId: ID!, $path: String!) {
+		query($connectionId: ID, $path: String!) {
 			file {
-				remote(connectionId: $connectionId, path: $path) {
+				list(connectionId: $connectionId, path: $path) {
 					name
 				}
 			}
@@ -431,23 +230,43 @@ func (s *FileResolverTestSuite) TestFileQuery_RemoteEmptyPath() {
 	`
 
 	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
-		"connectionId": connID.String(),
-		"path":         "",
+		"connectionId": nil,
+		"path":         "/nonexistent/path/that/does/not/exist",
 	})
-	// Empty path should return root or error
-	_ = resp
+	// Should return error for non-existent path
+	require.NotEmpty(s.T(), resp.Errors)
 }
 
-// TestFileQuery_LocalDeepNesting tests FileQuery.local with deeply nested directories.
-func (s *FileResolverTestSuite) TestFileQuery_LocalDeepNesting() {
+// TestFileQuery_ListEmptyPath tests list endpoint with empty path.
+func (s *FileResolverTestSuite) TestFileQuery_ListEmptyPath() {
+	query := `
+		query($connectionId: ID, $path: String!) {
+			file {
+				list(connectionId: $connectionId, path: $path) {
+					name
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
+		"connectionId": nil,
+		"path":         "",
+	})
+	// Empty path should return error
+	require.NotEmpty(s.T(), resp.Errors)
+}
+
+// TestFileQuery_ListDeepNesting tests list endpoint with deeply nested directories.
+func (s *FileResolverTestSuite) TestFileQuery_ListDeepNesting() {
 	// Create deeply nested directories
 	deepPath := filepath.Join(s.testDir, "level1", "level2", "level3", "level4")
 	require.NoError(s.T(), os.MkdirAll(deepPath, 0755))
 
 	query := `
-		query($path: String!) {
+		query($connectionId: ID, $path: String!) {
 			file {
-				local(path: $path) {
+				list(connectionId: $connectionId, path: $path) {
 					name
 					path
 					isDir
@@ -458,19 +277,20 @@ func (s *FileResolverTestSuite) TestFileQuery_LocalDeepNesting() {
 
 	// List level3 directory
 	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
-		"path": filepath.Join(s.testDir, "level1", "level2", "level3"),
+		"connectionId": nil,
+		"path":         filepath.Join(s.testDir, "level1", "level2", "level3"),
 	})
 	require.Empty(s.T(), resp.Errors)
 
 	data := string(resp.Data)
-	files := gjson.Get(data, "file.local").Array()
+	files := gjson.Get(data, "file.list").Array()
 	assert.Equal(s.T(), 1, len(files))
 	assert.Equal(s.T(), "level4", files[0].Get("name").String())
 	assert.True(s.T(), files[0].Get("isDir").Bool())
 }
 
-// TestFileQuery_LocalSpecialCharacters tests FileQuery.local with special characters in directory names.
-func (s *FileResolverTestSuite) TestFileQuery_LocalSpecialCharacters() {
+// TestFileQuery_ListSpecialCharacters tests list endpoint with special characters in directory names.
+func (s *FileResolverTestSuite) TestFileQuery_ListSpecialCharacters() {
 	// Create directories with special characters
 	specialDirs := []string{
 		"dir with spaces",
@@ -483,9 +303,9 @@ func (s *FileResolverTestSuite) TestFileQuery_LocalSpecialCharacters() {
 	}
 
 	query := `
-		query($path: String!) {
+		query($connectionId: ID, $path: String!) {
 			file {
-				local(path: $path) {
+				list(connectionId: $connectionId, path: $path) {
 					name
 					isDir
 				}
@@ -494,12 +314,13 @@ func (s *FileResolverTestSuite) TestFileQuery_LocalSpecialCharacters() {
 	`
 
 	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
-		"path": s.testDir,
+		"connectionId": nil,
+		"path":         s.testDir,
 	})
 	require.Empty(s.T(), resp.Errors)
 
 	data := string(resp.Data)
-	files := gjson.Get(data, "file.local").Array()
+	files := gjson.Get(data, "file.list").Array()
 
 	// Should have at least the special directories plus existing subdir
 	assert.GreaterOrEqual(s.T(), len(files), len(specialDirs)+1)
@@ -515,16 +336,16 @@ func (s *FileResolverTestSuite) TestFileQuery_LocalSpecialCharacters() {
 	}
 }
 
-// TestFileQuery_LocalEmptyDirectory tests FileQuery.local with an empty directory.
-func (s *FileResolverTestSuite) TestFileQuery_LocalEmptyDirectory() {
+// TestFileQuery_ListEmptyDirectory tests list endpoint with an empty directory.
+func (s *FileResolverTestSuite) TestFileQuery_ListEmptyDirectory() {
 	// Create an empty directory
 	emptyDir := filepath.Join(s.testDir, "empty_dir")
 	require.NoError(s.T(), os.MkdirAll(emptyDir, 0755))
 
 	query := `
-		query($path: String!) {
+		query($connectionId: ID, $path: String!) {
 			file {
-				local(path: $path) {
+				list(connectionId: $connectionId, path: $path) {
 					name
 					isDir
 				}
@@ -533,22 +354,23 @@ func (s *FileResolverTestSuite) TestFileQuery_LocalEmptyDirectory() {
 	`
 
 	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
-		"path": emptyDir,
+		"connectionId": nil,
+		"path":         emptyDir,
 	})
 	require.Empty(s.T(), resp.Errors)
 
 	data := string(resp.Data)
-	files := gjson.Get(data, "file.local").Array()
+	files := gjson.Get(data, "file.list").Array()
 	// Empty directory should return empty array
 	assert.Equal(s.T(), 0, len(files))
 }
 
-// TestFileQuery_RemoteInvalidUUID tests FileQuery.remote with invalid connection UUID.
-func (s *FileResolverTestSuite) TestFileQuery_RemoteInvalidUUID() {
+// TestFileQuery_ListInvalidUUID tests list endpoint with invalid connection UUID.
+func (s *FileResolverTestSuite) TestFileQuery_ListInvalidUUID() {
 	query := `
-		query($connectionId: ID!, $path: String!) {
+		query($connectionId: ID, $path: String!) {
 			file {
-				remote(connectionId: $connectionId, path: $path) {
+				list(connectionId: $connectionId, path: $path) {
 					name
 				}
 			}
@@ -561,4 +383,240 @@ func (s *FileResolverTestSuite) TestFileQuery_RemoteInvalidUUID() {
 	})
 	// Should return error for invalid UUID
 	require.NotEmpty(s.T(), resp.Errors)
+}
+
+// TestFileQuery_ListInvalidFilter tests list endpoint with invalid filter rules.
+func (s *FileResolverTestSuite) TestFileQuery_ListInvalidFilter() {
+	query := `
+		query($connectionId: ID, $path: String!, $filters: [String!]) {
+			file {
+				list(connectionId: $connectionId, path: $path, filters: $filters) {
+					name
+				}
+			}
+		}
+	`
+
+	// Test with invalid filter rule (missing + or - prefix)
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
+		"connectionId": nil,
+		"path":         s.testDir,
+		"filters":      []interface{}{"*.tmp"}, // Invalid: missing prefix
+	})
+	// Should return error for invalid filter rule
+	require.NotEmpty(s.T(), resp.Errors)
+	assert.Contains(s.T(), resp.Errors[0].Message, "Filter")
+}
+
+// TestFileQuery_ListFilterPreview tests filter preview functionality for task configuration.
+func (s *FileResolverTestSuite) TestFileQuery_ListFilterPreview() {
+	// Create a directory structure that mimics a typical project
+	projectDir := filepath.Join(s.testDir, "project")
+	require.NoError(s.T(), os.MkdirAll(filepath.Join(projectDir, "src"), 0755))
+	require.NoError(s.T(), os.MkdirAll(filepath.Join(projectDir, "node_modules", "package"), 0755))
+	require.NoError(s.T(), os.MkdirAll(filepath.Join(projectDir, ".git", "objects"), 0755))
+	require.NoError(s.T(), os.WriteFile(filepath.Join(projectDir, "index.js"), []byte("code"), 0644))
+	require.NoError(s.T(), os.WriteFile(filepath.Join(projectDir, "package.json"), []byte("{}"), 0644))
+
+	query := `
+		query($connectionId: ID, $path: String!, $filters: [String!], $includeFiles: Boolean) {
+			file {
+				list(connectionId: $connectionId, path: $path, filters: $filters, includeFiles: $includeFiles) {
+					name
+					isDir
+				}
+			}
+		}
+	`
+
+	// Test typical ignore pattern: exclude node_modules and .git
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
+		"connectionId": nil,
+		"path":         projectDir,
+		"includeFiles": true,
+		"filters":      []interface{}{"- node_modules", "- .git", "+ **"},
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	files := gjson.Get(data, "file.list").Array()
+
+	// Should include src, index.js, package.json but NOT node_modules and .git
+	names := make(map[string]bool)
+	for _, f := range files {
+		names[f.Get("name").String()] = true
+	}
+
+	assert.True(s.T(), names["src"], "Should include src directory")
+	assert.True(s.T(), names["index.js"], "Should include index.js")
+	assert.True(s.T(), names["package.json"], "Should include package.json")
+	assert.False(s.T(), names["node_modules"], "Should exclude node_modules")
+	assert.False(s.T(), names[".git"], "Should exclude .git")
+}
+
+// TestFileQuery_ListRootPath tests listing root path.
+func (s *FileResolverTestSuite) TestFileQuery_ListRootPath() {
+	query := `
+		query($connectionId: ID, $path: String!) {
+			file {
+				list(connectionId: $connectionId, path: $path) {
+					name
+					isDir
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
+		"connectionId": nil,
+		"path":         "/",
+	})
+	// Should return files from root (if accessible)
+	if len(resp.Errors) == 0 {
+		data := string(resp.Data)
+		files := gjson.Get(data, "file.list")
+		if files.Exists() && files.IsArray() {
+			// Root should have some entries
+			assert.Greater(s.T(), len(files.Array()), 0)
+		}
+	}
+}
+
+// TestFileQuery_ListFilePath tests list endpoint with a file path instead of directory.
+func (s *FileResolverTestSuite) TestFileQuery_ListFilePath() {
+	// Try to list a file (not a directory)
+	query := `
+		query($connectionId: ID, $path: String!) {
+			file {
+				list(connectionId: $connectionId, path: $path) {
+					name
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
+		"connectionId": nil,
+		"path":         filepath.Join(s.testDir, "file1.txt"),
+	})
+	// Should return error for non-directory paths
+	require.NotEmpty(s.T(), resp.Errors)
+}
+
+// TestFileQuery_ListSymlink tests list endpoint with a symlink directory.
+func (s *FileResolverTestSuite) TestFileQuery_ListSymlink() {
+	// Create a symlink to subdir
+	symlinkPath := filepath.Join(s.testDir, "symlink_dir")
+	err := os.Symlink(filepath.Join(s.testDir, "subdir"), symlinkPath)
+	if err != nil {
+		// Skip if symlinks are not supported
+		s.T().Skip("Symlinks not supported on this platform")
+		return
+	}
+
+	query := `
+		query($connectionId: ID, $path: String!) {
+			file {
+				list(connectionId: $connectionId, path: $path) {
+					name
+					path
+					isDir
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
+		"connectionId": nil,
+		"path":         s.testDir,
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	files := gjson.Get(data, "file.list").Array()
+
+	// rclone does not follow symlinks by default (-L/--copy-links is not set)
+	// so symlink_dir may not be included in the listing
+	// Just verify the query completes without error and returns some entries
+	assert.GreaterOrEqual(s.T(), len(files), 1, "Should return at least one entry (subdir)")
+
+	// Verify subdir is in the list (the real directory)
+	foundSubdir := false
+	for _, f := range files {
+		if f.Get("name").String() == "subdir" {
+			foundSubdir = true
+			break
+		}
+	}
+	assert.True(s.T(), foundSubdir, "Should include subdir")
+}
+
+// TestFileQuery_ListWithFilters tests list endpoint with various filter rules.
+func (s *FileResolverTestSuite) TestFileQuery_ListWithFilters() {
+	// Create a test directory with specific files for filter testing
+	filterDir := filepath.Join(s.testDir, "filter_test")
+	require.NoError(s.T(), os.MkdirAll(filterDir, 0755))
+	require.NoError(s.T(), os.WriteFile(filepath.Join(filterDir, "include.txt"), []byte("include"), 0644))
+	require.NoError(s.T(), os.WriteFile(filepath.Join(filterDir, "exclude.tmp"), []byte("exclude"), 0644))
+	require.NoError(s.T(), os.WriteFile(filepath.Join(filterDir, "data.json"), []byte("{}"), 0644))
+	require.NoError(s.T(), os.MkdirAll(filepath.Join(filterDir, "subdir"), 0755))
+
+	query := `
+		query($connectionId: ID, $path: String!, $filters: [String!], $includeFiles: Boolean) {
+			file {
+				list(connectionId: $connectionId, path: $path, filters: $filters, includeFiles: $includeFiles) {
+					name
+					path
+					isDir
+				}
+			}
+		}
+	`
+
+	// Test 1: Without includeFiles (should only return directories)
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
+		"connectionId": nil,
+		"path":         filterDir,
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	files := gjson.Get(data, "file.list").Array()
+	// Should only return subdir (directories only by default)
+	assert.Equal(s.T(), 1, len(files))
+	if len(files) == 1 {
+		assert.Equal(s.T(), "subdir", files[0].Get("name").String())
+		assert.True(s.T(), files[0].Get("isDir").Bool())
+	}
+
+	// Test 2: With includeFiles=true (should return all entries)
+	resp = s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
+		"connectionId": nil,
+		"path":         filterDir,
+		"includeFiles": true,
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data = string(resp.Data)
+	files = gjson.Get(data, "file.list").Array()
+	// Should return 1 directory + 3 files = 4 entries
+	assert.Equal(s.T(), 4, len(files))
+
+	// Test 3: With filter to exclude .tmp files
+	resp = s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
+		"connectionId": nil,
+		"path":         filterDir,
+		"includeFiles": true,
+		"filters":      []interface{}{"- *.tmp", "+ **"},
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data = string(resp.Data)
+	files = gjson.Get(data, "file.list").Array()
+	// Should return 1 directory + 2 files (exclude.tmp excluded) = 3 entries
+	assert.Equal(s.T(), 3, len(files))
+
+	for _, f := range files {
+		assert.NotContains(s.T(), f.Get("name").String(), ".tmp", "Should not contain .tmp files")
+	}
 }

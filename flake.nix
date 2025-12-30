@@ -27,6 +27,9 @@
               pkgs.air
               atlas
             ];
+
+            CGO_ENABLED = "1";
+            CGO_CFLAGS = "-O1";
           };
         };
     };

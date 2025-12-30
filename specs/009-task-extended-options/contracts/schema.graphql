@@ -1,0 +1,196 @@
+# GraphQL Schema Changes for Task Extended Options
+# Feature: 009-task-extended-options
+# Created: 2025-12-28
+#
+# This file contains the schema CHANGES only. 
+# For the complete schema, see internal/api/graphql/schema/*.graphql
+
+# =============================================================================
+# MODIFIED TYPES
+# =============================================================================
+
+"""
+任务同步选项 (MODIFIED - 新增 filters, noDelete, transfers)
+"""
+type TaskSyncOptions {
+  """
+  冲突解决策略（默认 NEWER，仅用于双向同步）
+  """
+  conflictResolution: ConflictResolution
+  """
+  文件过滤规则列表 [NEW] - rclone filter 语法
+  每个元素为一条规则，格式: "- pattern" (排除) 或 "+ pattern" (包含)
+  规则按顺序匹配，第一个匹配的规则生效
+  """
+  filters: [String!]
+  """
+  保留删除文件 [NEW] - 仅单向同步有效
+  启用后，同步不会删除目标端的多余文件
+  """
+  noDelete: Boolean
+  """
+  并行传输数量 [NEW] - 范围 1-64
+  为 null 时使用全局配置默认值
+  """
+  transfers: Int
+}
+
+"""
+任务同步选项输入 (MODIFIED - 新增 filters, noDelete, transfers)
+"""
+input TaskSyncOptionsInput {
+  """
+  冲突解决策略（默认 NEWER，仅用于双向同步）
+  """
+  conflictResolution: ConflictResolution
+  """
+  文件过滤规则列表 [NEW] - rclone filter 语法
+  """
+  filters: [String!]
+  """
+  保留删除文件 [NEW] - 仅单向同步有效
+  """
+  noDelete: Boolean
+  """
+  并行传输数量 [NEW] - 范围 1-64
+  """
+  transfers: Int
+}
+
+# =============================================================================
+# FILE QUERY EXTENSION FOR FILTER PREVIEW
+# =============================================================================
+
+"""
+远程文件查询（MODIFIED - 新增 filters 和 includeFiles 参数用于过滤器预览）
+扩展现有的 file.remote 接口，支持过滤器实时预览功能
+"""
+extend type FileQuery {
+  """
+  列出远程目录内容（支持过滤器预览）
+  
+  当提供 filters 参数时，返回的文件列表会根据过滤规则进行筛选
+  配合 includeFiles 参数可以在目录浏览时同时显示符合条件的文件
+  """
+  remote(
+    """
+    连接 ID
+    """
+    connectionId: ID!
+    """
+    远程路径
+    """
+    path: String!
+    """
+    分页参数
+    """
+    pagination: PaginationInput
+    """
+    过滤规则列表 [NEW] - rclone filter 语法
+    每个元素为一条规则，格式: "- pattern" (排除) 或 "+ pattern" (包含)
+    规则按顺序匹配，第一个匹配的规则生效
+    """
+    filters: [String!]
+    """
+    是否包含文件 [NEW] - 默认 false（仅返回目录）
+    当为 true 时，返回目录和文件（用于过滤器预览）
+    """
+    includeFiles: Boolean
+  ): RemoteFileConnection!
+}
+
+# =============================================================================
+# QUERY EXAMPLES
+# =============================================================================
+
+# Example: Query task with extended options
+#
+# query TaskWithOptions($id: ID!) {
+#   task {
+#     get(id: $id) {
+#       id
+#       name
+#       direction
+#       options {
+#         conflictResolution
+#         filters             # NEW - 字符串数组
+#         noDelete            # NEW
+#         transfers           # NEW
+#       }
+#     }
+#   }
+# }
+
+# Example: Create task with filters
+#
+# mutation CreateTaskWithFilters {
+#   task {
+#     create(input: {
+#       name: "Backup Documents"
+#       sourcePath: "/home/user/documents"
+#       connectionId: "..."
+#       remotePath: "/backup"
+#       direction: UPLOAD
+#       options: {
+#         filters: ["- node_modules/**", "- .git/**", "+ **"]
+#         noDelete: true
+#         transfers: 8
+#       }
+#     }) {
+#       id
+#       options {
+#         filters
+#         noDelete
+#         transfers
+#       }
+#     }
+#   }
+# }
+
+# Example: Update task with new filter rules
+#
+# mutation UpdateTaskFilters($id: ID!) {
+#   task {
+#     update(id: $id, input: {
+#       options: {
+#         filters: ["- *.tmp", "- ~$*", "+ **"]
+#       }
+#     }) {
+#       id
+#       options {
+#         filters
+#       }
+#     }
+#   }
+# }
+
+# Example: Preview filter rules using file.remote with filters
+#
+# query PreviewFilterRules($connectionId: ID!, $path: String!, $filters: [String!]!) {
+#   file {
+#     remote(
+#       connectionId: $connectionId
+#       path: $path
+#       filters: $filters
+#       includeFiles: true
+#       pagination: { first: 100 }
+#     ) {
+#       items {
+#         name
+#         isDir
+#         size
+#         modTime
+#       }
+#       pageInfo {
+#         hasNextPage
+#       }
+#     }
+#   }
+# }
+#
+# Variables:
+# {
+#   "connectionId": "...",
+#   "path": "/backup",
+#   "filters": ["+ *.jpg", "+ *.png", "- *"]
+# }

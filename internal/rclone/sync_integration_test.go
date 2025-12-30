@@ -79,7 +79,7 @@ func TestSyncEngine_RunTask_Integration(t *testing.T) {
 
 	// 3. Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, dataDir, false)
+	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, dataDir, false, 0)
 
 	// 4. Reload task with Connection edge before running
 	testTask, err = taskService.GetTaskWithConnection(ctx, testTask.ID)
@@ -188,7 +188,7 @@ func TestSyncEngine_RunTask_AutoDeleteEmptyJob(t *testing.T) {
 
 			// 3. Setup SyncEngine
 			dataDir := t.TempDir()
-			syncEngine := rclone.NewSyncEngine(jobService, nil, nil, dataDir, tt.autoDeleteEmptyJobs)
+			syncEngine := rclone.NewSyncEngine(jobService, nil, nil, dataDir, tt.autoDeleteEmptyJobs, 0)
 
 			// 4. Reload task with Connection edge before running
 			testTask, err = taskService.GetTaskWithConnection(ctx, testTask.ID)
@@ -241,7 +241,7 @@ func TestSyncEngine_RunTask_Failure(t *testing.T) {
 
 	// 3. Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, dataDir, false)
+	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, dataDir, false, 0)
 
 	// 4. Reload task with Connection edge before running
 	testTask, err = taskService.GetTaskWithConnection(ctx, testTask.ID)
@@ -292,7 +292,7 @@ func TestSyncEngine_RunTask_Cancel(t *testing.T) {
 
 	// 3. Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, dataDir, false)
+	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, dataDir, false, 0)
 
 	// 4. Reload task with Connection edge before running
 	testTask, err = taskService.GetTaskWithConnection(ctx, testTask.ID)
@@ -361,7 +361,7 @@ func TestSyncEngine_RunTask_CancelDuringSync(t *testing.T) {
 
 	// 6. Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, dataDir, false)
+	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, dataDir, false, 0)
 
 	// 7. Create cancellable context
 	taskCtx, cancel := context.WithCancel(context.Background())
@@ -419,6 +419,116 @@ func TestSyncEngine_RunTask_CancelDuringSync(t *testing.T) {
 	assert.Equal(t, string(model.JobStatusCancelled), string(job.Status), "Job status should be cancelled after context cancellation")
 	assert.Contains(t, job.Errors, "cancelled", "Job errors should mention cancellation")
 	t.Logf("Final job status: %s, errors: %s", job.Status, job.Errors)
+}
+
+// TestSyncEngine_RunTask_NoDelete tests the noDelete option behavior.
+// When noDelete=true, files deleted from source should NOT be deleted from destination.
+// When noDelete=false (default), files deleted from source should be deleted from destination.
+// This test covers the noDelete logic in sync.go runOneWay function.
+func TestSyncEngine_RunTask_NoDelete(t *testing.T) {
+	tests := []struct {
+		name                 string
+		noDelete             bool
+		expectDestFileExists bool // whether the deleted source file should still exist in dest
+	}{
+		{
+			name:                 "noDelete=true preserves destination files",
+			noDelete:             true,
+			expectDestFileExists: true, // file should still exist in dest
+		},
+		{
+			name:                 "noDelete=false (default) deletes destination files",
+			noDelete:             false,
+			expectDestFileExists: false, // file should be deleted from dest
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			connService, taskService, jobService, _ := setupIntegrationTest(t)
+			ctx := context.Background()
+
+			// 1. Setup test directories
+			sourceDir := t.TempDir()
+			destDir := t.TempDir()
+
+			// Create test files - one to keep, one to delete later
+			keepFilePath := filepath.Join(sourceDir, "keep.txt")
+			err := os.WriteFile(keepFilePath, []byte("keep this file"), 0644)
+			require.NoError(t, err)
+
+			deleteFilePath := filepath.Join(sourceDir, "delete.txt")
+			err = os.WriteFile(deleteFilePath, []byte("delete this file"), 0644)
+			require.NoError(t, err)
+
+			// 2. Create Connection and Task
+			testConn, err := connService.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"})
+			require.NoError(t, err)
+
+			// Create options with noDelete setting
+			options := &model.TaskSyncOptions{
+				NoDelete: &tt.noDelete,
+			}
+
+			testTask, err := taskService.CreateTask(ctx,
+				tt.name,
+				sourceDir,
+				testConn.ID,
+				destDir,
+				string(model.SyncDirectionUpload), // noDelete only applies to one-way sync
+				"",
+				false,
+				options,
+			)
+			require.NoError(t, err)
+
+			// 3. Setup SyncEngine
+			dataDir := t.TempDir()
+			syncEngine := rclone.NewSyncEngine(jobService, nil, nil, dataDir, false, 0)
+
+			// 4. Reload task with Connection edge
+			testTask, err = taskService.GetTaskWithConnection(ctx, testTask.ID)
+			require.NoError(t, err)
+
+			// 5. Run initial sync - both files should be copied to dest
+			err = syncEngine.RunTask(ctx, testTask, model.JobTriggerManual)
+			require.NoError(t, err)
+
+			// Verify both files exist in destination after initial sync
+			destKeepPath := filepath.Join(destDir, "keep.txt")
+			destDeletePath := filepath.Join(destDir, "delete.txt")
+
+			_, err = os.Stat(destKeepPath)
+			assert.NoError(t, err, "keep.txt should exist in destination after initial sync")
+			_, err = os.Stat(destDeletePath)
+			assert.NoError(t, err, "delete.txt should exist in destination after initial sync")
+
+			// 6. Delete the file from source
+			err = os.Remove(deleteFilePath)
+			require.NoError(t, err)
+
+			// Verify source file is deleted
+			_, err = os.Stat(deleteFilePath)
+			assert.True(t, os.IsNotExist(err), "delete.txt should not exist in source after deletion")
+
+			// 7. Run sync again after deletion
+			err = syncEngine.RunTask(ctx, testTask, model.JobTriggerManual)
+			require.NoError(t, err)
+
+			// 8. Verify results based on noDelete setting
+			// keep.txt should always exist
+			_, err = os.Stat(destKeepPath)
+			assert.NoError(t, err, "keep.txt should always exist in destination")
+
+			// delete.txt behavior depends on noDelete setting
+			_, err = os.Stat(destDeletePath)
+			if tt.expectDestFileExists {
+				assert.NoError(t, err, "delete.txt should still exist in destination when noDelete=true")
+			} else {
+				assert.True(t, os.IsNotExist(err), "delete.txt should be deleted from destination when noDelete=false")
+			}
+		})
+	}
 }
 
 // TestSyncEngine_RunTask_ProgressEvents tests that JobProgressEvent and TransferProgressEvent
@@ -500,7 +610,7 @@ func TestSyncEngine_RunTask_ProgressEvents(t *testing.T) {
 
 	// 6. Setup SyncEngine with real buses
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobService, jobProgressBus, transferProgressBus, dataDir, false)
+	syncEngine := rclone.NewSyncEngine(jobService, jobProgressBus, transferProgressBus, dataDir, false, 0)
 
 	// 7. Reload task with Connection edge before running
 	testTask, err = taskService.GetTaskWithConnection(ctx, testTask.ID)

@@ -10,7 +10,7 @@ import type {
   ConnectionGetQuotaQuery,
   ConnectionsListQuery,
 } from '@/api/graphql/queries/connections';
-import type { FilesLocalQuery } from '@/api/graphql/queries/files';
+import type { FilesListQuery } from '@/api/graphql/queries/files';
 import type { IMPORT_PARSE } from '@/api/graphql/queries/import';
 import type { JobProgressQuery, JobsListQuery, LogsListQuery } from '@/api/graphql/queries/jobs';
 import type { ProviderGetQuery, ProvidersListQuery } from '@/api/graphql/queries/providers';
@@ -98,9 +98,9 @@ export type ProviderDetail = NonNullable<
 
 export type ProviderOption = NonNullable<ProviderDetail['options']>[number];
 
-// File types (from FilesLocalQuery)
+// File types (from FilesListQuery)
 export type FileEntry = NonNullable<
-  NonNullable<ResultOf<typeof FilesLocalQuery>['file']>['local']
+  NonNullable<ResultOf<typeof FilesListQuery>['file']>['list']
 >[number];
 
 // Import types (from IMPORT_PARSE mutation)

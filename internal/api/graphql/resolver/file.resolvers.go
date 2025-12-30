@@ -7,8 +7,6 @@ package resolver
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 
 	"github.com/google/uuid"
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/generated"
@@ -16,55 +14,34 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/rclone"
 )
 
-// Local is the resolver for the local field.
-func (r *fileQueryResolver) Local(ctx context.Context, obj *model.FileQuery, path string) ([]*model.FileEntry, error) {
-	// Check if path exists and is a directory
-	info, err := os.Stat(path)
-	if err != nil {
-		if os.IsNotExist(err) {
+// List is the resolver for the list field.
+// It provides a unified interface for listing both local and remote directories.
+// When connectionID is nil, it lists local filesystem.
+// When connectionID is provided, it lists the remote via that connection.
+func (r *fileQueryResolver) List(ctx context.Context, obj *model.FileQuery, connectionID *uuid.UUID, path string, basePath *string, filters []string, includeFiles *bool) ([]*model.FileEntry, error) {
+	wantFiles := includeFiles != nil && *includeFiles
+
+	// Determine remote name: empty for local, connection name for remote
+	var remoteName string
+	if connectionID != nil {
+		conn, err := r.deps.ConnectionService.GetConnectionByID(ctx, *connectionID)
+		if err != nil {
 			return nil, err
 		}
-		return nil, err
+		remoteName = conn.Name
 	}
 
-	if !info.IsDir() {
-		return nil, err
+	opts := rclone.ListRemoteDirOptions{
+		RemoteName:   remoteName,
+		Path:         path,
+		Filters:      filters,
+		IncludeFiles: wantFiles,
+	}
+	if basePath != nil {
+		opts.BasePath = *basePath
 	}
 
-	// Read directory contents
-	entries, err := os.ReadDir(path)
-	if err != nil {
-		return nil, err
-	}
-
-	// Map to FileEntry (directories only to match REST API behavior)
-	var result []*model.FileEntry
-	for _, entry := range entries {
-		// Skip if not a directory
-		if !entry.IsDir() {
-			continue
-		}
-
-		result = append(result, &model.FileEntry{
-			Name:  entry.Name(),
-			Path:  filepath.Join(path, entry.Name()),
-			IsDir: true,
-		})
-	}
-
-	return result, nil
-}
-
-// Remote is the resolver for the remote field.
-func (r *fileQueryResolver) Remote(ctx context.Context, obj *model.FileQuery, connectionID uuid.UUID, path string) ([]*model.FileEntry, error) {
-	// Get connection by ID to retrieve the remote name
-	conn, err := r.deps.ConnectionService.GetConnectionByID(ctx, connectionID)
-	if err != nil {
-		return nil, err
-	}
-
-	// List remote directory using rclone
-	entries, err := rclone.ListRemoteDir(ctx, conn.Name, path)
+	entries, err := rclone.ListRemoteDir(ctx, opts)
 	if err != nil {
 		return nil, err
 	}

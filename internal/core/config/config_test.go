@@ -123,9 +123,11 @@ func TestLoad_Defaults(t *testing.T) {
 	assert.Equal(t, "cloud-sync.db", cfg.Database.Path)
 	assert.Equal(t, "versioned", cfg.Database.MigrationMode)
 	assert.Equal(t, "info", cfg.Log.Level)
-	assert.Equal(t, 1000, cfg.Log.MaxLogsPerConnection)
-	assert.Equal(t, "0 * * * *", cfg.Log.CleanupSchedule)
 	assert.Equal(t, "./app_data", cfg.App.DataDir)
+	assert.Equal(t, true, cfg.App.Job.AutoDeleteEmptyJobs)
+	assert.Equal(t, 1000, cfg.App.Job.MaxLogsPerConnection)
+	assert.Equal(t, "0 * * * *", cfg.App.Job.CleanupSchedule)
+	assert.Equal(t, 4, cfg.App.Sync.Transfers)
 	assert.Equal(t, "production", cfg.App.Environment)
 }
 
@@ -197,12 +199,18 @@ migration_mode = "auto"
 
 [log]
 level = "debug"
-max_logs_per_connection = 500
-cleanup_schedule = "*/30 * * * *"
 
 [app]
 data_dir = "/custom/data"
 environment = "development"
+
+[app.job]
+auto_delete_empty_jobs = false
+max_logs_per_connection = 500
+cleanup_schedule = "*/30 * * * *"
+
+[app.sync]
+transfers = 8
 
 [security]
 encryption_key = "secret-key"
@@ -218,9 +226,11 @@ encryption_key = "secret-key"
 	assert.Equal(t, "custom.db", cfg.Database.Path)
 	assert.Equal(t, "auto", cfg.Database.MigrationMode)
 	assert.Equal(t, "debug", cfg.Log.Level)
-	assert.Equal(t, 500, cfg.Log.MaxLogsPerConnection)
-	assert.Equal(t, "*/30 * * * *", cfg.Log.CleanupSchedule)
 	assert.Equal(t, "/custom/data", cfg.App.DataDir)
 	assert.Equal(t, "development", cfg.App.Environment)
+	assert.Equal(t, false, cfg.App.Job.AutoDeleteEmptyJobs)
+	assert.Equal(t, 500, cfg.App.Job.MaxLogsPerConnection)
+	assert.Equal(t, "*/30 * * * *", cfg.App.Job.CleanupSchedule)
+	assert.Equal(t, 8, cfg.App.Sync.Transfers)
 	assert.Equal(t, "secret-key", cfg.Security.EncryptionKey)
 }

@@ -143,7 +143,7 @@ func (_u *TaskUpdate) SetNillableRealtime(v *bool) *TaskUpdate {
 }
 
 // SetOptions sets the "options" field.
-func (_u *TaskUpdate) SetOptions(v map[string]interface{}) *TaskUpdate {
+func (_u *TaskUpdate) SetOptions(v *model.TaskSyncOptions) *TaskUpdate {
 	_u.mutation.SetOptions(v)
 	return _u
 }
@@ -537,7 +537,7 @@ func (_u *TaskUpdateOne) SetNillableRealtime(v *bool) *TaskUpdateOne {
 }
 
 // SetOptions sets the "options" field.
-func (_u *TaskUpdateOne) SetOptions(v map[string]interface{}) *TaskUpdateOne {
+func (_u *TaskUpdateOne) SetOptions(v *model.TaskSyncOptions) *TaskUpdateOne {
 	_u.mutation.SetOptions(v)
 	return _u
 }

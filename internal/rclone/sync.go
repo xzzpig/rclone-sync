@@ -15,6 +15,7 @@ import (
 	"github.com/rclone/rclone/cmd/bisync/bilib"
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/fs/accounting"
+	"github.com/rclone/rclone/fs/filter"
 	rclonesync "github.com/rclone/rclone/fs/sync"
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/subscription"
@@ -22,9 +23,28 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/errs"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 	"github.com/xzzpig/rclone-sync/internal/core/ports"
+	"github.com/xzzpig/rclone-sync/internal/i18n"
 	"github.com/xzzpig/rclone-sync/internal/utils"
 	"go.uber.org/zap"
 )
+
+// SyncOptions contains configuration options for sync operations.
+// These options are applied per-task and can override global defaults.
+type SyncOptions struct {
+	// Filters contains rclone filter rules (e.g., "- node_modules/**", "+ **").
+	// Each rule should start with "+" (include) or "-" (exclude) followed by a pattern.
+	// Rules are applied in order; the first matching rule wins.
+	Filters []string
+
+	// NoDelete prevents deletion of files in the destination that don't exist in the source.
+	// Only applies to one-way sync (Upload/Download). Ignored for bidirectional sync.
+	// When true, uses CopyDir instead of Sync.
+	NoDelete bool
+
+	// Transfers is the number of parallel file transfers (1-64).
+	// If 0, the global default from config is used.
+	Transfers int
+}
 
 // SyncEngine handles file synchronization operations using rclone.
 type SyncEngine struct {
@@ -34,14 +54,23 @@ type SyncEngine struct {
 	logger              *zap.Logger
 	workDir             string
 	autoDeleteEmptyJobs bool
+	defaultTransfers    int // Global default for parallel transfers (from config)
 	statsMu             sync.RWMutex
 	lastEvents          map[uuid.UUID]*model.JobProgressEvent
 	lastTransferEvents  map[uuid.UUID]*model.TransferProgressEvent
 }
 
+// DefaultTransfers is the built-in default for parallel transfers when not configured.
+const DefaultTransfers = 4
+
 // NewSyncEngine creates a new SyncEngine instance.
-func NewSyncEngine(jobService ports.JobService, jobProgressBus *subscription.JobProgressBus, transferProgressBus *subscription.TransferProgressBus, dataDir string, autoDeleteEmptyJobs bool) *SyncEngine {
+// defaultTransfers specifies the global default for parallel transfers (from config).
+// If defaultTransfers is 0 or negative, DefaultTransfers (4) will be used.
+func NewSyncEngine(jobService ports.JobService, jobProgressBus *subscription.JobProgressBus, transferProgressBus *subscription.TransferProgressBus, dataDir string, autoDeleteEmptyJobs bool, defaultTransfers int) *SyncEngine {
 	workDir := filepath.Join(dataDir, "bisync_state")
+	if defaultTransfers <= 0 {
+		defaultTransfers = DefaultTransfers
+	}
 	return &SyncEngine{
 		jobService:          jobService,
 		jobProgressBus:      jobProgressBus,
@@ -49,6 +78,7 @@ func NewSyncEngine(jobService ports.JobService, jobProgressBus *subscription.Job
 		logger:              logger.Named("sync.engine"),
 		workDir:             workDir,
 		autoDeleteEmptyJobs: autoDeleteEmptyJobs,
+		defaultTransfers:    defaultTransfers,
 		lastEvents:          make(map[uuid.UUID]*model.JobProgressEvent),
 		lastTransferEvents:  make(map[uuid.UUID]*model.TransferProgressEvent),
 	}
@@ -64,33 +94,28 @@ func (e *SyncEngine) GetJobProgress(jobID uuid.UUID) *model.JobProgressEvent {
 
 // getConflictResolutionFromOptions extracts conflict resolution setting from task options.
 // Returns the default value (PreferNewer) if not specified.
-func getConflictResolutionFromOptions(options map[string]any) (bisync.Prefer, bisync.ConflictLoserAction) {
+func getConflictResolutionFromOptions(options *model.TaskSyncOptions) (bisync.Prefer, bisync.ConflictLoserAction) {
 	conflictResolve := bisync.PreferNewer
 	conflictLoser := bisync.ConflictLoserNumber // Default: rename conflicting files
 
-	if options == nil {
+	if options == nil || options.ConflictResolution == nil {
 		return conflictResolve, conflictLoser
 	}
 
-	resolution, ok := options["conflict_resolution"].(string)
-	if !ok {
-		return conflictResolve, conflictLoser
-	}
-
-	switch resolution {
-	case "newer":
+	switch *options.ConflictResolution {
+	case model.ConflictResolutionNewer:
 		// Keep newer file, rename the older one
 		conflictResolve = bisync.PreferNewer
 		conflictLoser = bisync.ConflictLoserNumber
-	case "local":
+	case model.ConflictResolutionLocal:
 		// Keep local (path1), delete remote
 		conflictResolve = bisync.PreferPath1
 		conflictLoser = bisync.ConflictLoserDelete
-	case "remote":
+	case model.ConflictResolutionRemote:
 		// Keep remote (path2), delete local
 		conflictResolve = bisync.PreferPath2
 		conflictLoser = bisync.ConflictLoserDelete
-	case "both":
+	case model.ConflictResolutionBoth:
 		// Keep both files, rename them with conflict suffix
 		conflictResolve = bisync.PreferNone
 		conflictLoser = bisync.ConflictLoserNumber
@@ -166,17 +191,31 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger model.
 		return err
 	}
 
+	// 6. Extract sync options from task
+	syncOpts := getSyncOptionsFromTask(task.Options)
+	e.logger.Debug("Sync options extracted",
+		zap.Strings("filters", syncOpts.Filters),
+		zap.Bool("noDelete", syncOpts.NoDelete),
+		zap.Int("transfers", syncOpts.Transfers),
+	)
+
+	// 7. Apply common rclone config (transfers) to context
+	transfers := determineTransfers(syncOpts.Transfers, e.defaultTransfers)
+	statsCtx, rcloneCfg := fs.AddConfig(statsCtx)
+	rcloneCfg.Transfers = transfers
+	e.logger.Debug("Transfers configured", zap.Int("transfers", transfers))
+
 	// 8. Run sync based on task direction
 	var syncErr error
 	switch task.Direction {
 	case model.SyncDirectionBidirectional:
-		syncErr = e.runBidirectional(statsCtx, task, fSrc, fDst)
+		syncErr = e.runBidirectional(statsCtx, task, fSrc, fDst, syncOpts)
 	case model.SyncDirectionUpload:
-		syncErr = e.runOneWay(statsCtx, fSrc, fDst)
+		syncErr = e.runOneWay(statsCtx, fSrc, fDst, syncOpts)
 	case model.SyncDirectionDownload:
-		syncErr = e.runOneWay(statsCtx, fDst, fSrc)
+		syncErr = e.runOneWay(statsCtx, fDst, fSrc, syncOpts)
 	default:
-		syncErr = fmt.Errorf("unsupported sync direction: %s", task.Direction) //nolint:err113
+		syncErr = i18n.NewI18nError(i18n.ErrInvalidInput).WithCause(fmt.Errorf("unsupported sync direction: %s", task.Direction)) //nolint:err113
 	}
 
 	// 9. Wait for poller to finish (it stops when statsCtx is cancelled or done)
@@ -316,8 +355,74 @@ func shouldDeleteEmptyJob(autoDeleteEmptyJobs bool, status model.JobStatus, file
 	return true
 }
 
+// getSyncOptionsFromTask extracts SyncOptions from task.Options.
+// Returns default SyncOptions if options are not set or invalid.
+func getSyncOptionsFromTask(options *model.TaskSyncOptions) SyncOptions {
+	opts := SyncOptions{}
+
+	if options == nil {
+		return opts
+	}
+
+	// Extract filters
+	opts.Filters = options.Filters
+
+	// Extract noDelete
+	if options.NoDelete != nil {
+		opts.NoDelete = *options.NoDelete
+	}
+
+	// Extract transfers
+	if options.Transfers != nil {
+		opts.Transfers = *options.Transfers
+	}
+
+	return opts
+}
+
+// determineTransfers returns the effective transfers count using three-level fallback:
+// 1. Task-level value (opts.Transfers) if > 0
+// 2. Global config value (defaultTransfers) if > 0
+// 3. Built-in default (DefaultTransfers = 4)
+func determineTransfers(taskTransfers, defaultTransfers int) int {
+	if taskTransfers > 0 {
+		return taskTransfers
+	}
+	if defaultTransfers > 0 {
+		return defaultTransfers
+	}
+	return DefaultTransfers
+}
+
+// applyFilterRules creates a filter from rules and injects it into the context.
+// Returns the modified context and any error encountered.
+func applyFilterRules(ctx context.Context, rules []string) (context.Context, error) {
+	if len(rules) == 0 {
+		return ctx, nil
+	}
+
+	fi, err := createFilterFromRules(rules)
+	if err != nil {
+		return ctx, err
+	}
+
+	return filter.ReplaceConfig(ctx, fi), nil
+}
+
 // runBidirectional executes a bidirectional sync using bisync.
-func (e *SyncEngine) runBidirectional(ctx context.Context, task *ent.Task, f1, f2 fs.Fs) error {
+// It applies SyncOptions including filters.
+// Note: noDelete is ignored for bidirectional sync as deletion propagation is inherent to bisync.
+// Note: transfers setting is applied in RunTask before calling this method.
+func (e *SyncEngine) runBidirectional(ctx context.Context, task *ent.Task, f1, f2 fs.Fs, opts SyncOptions) error {
+	// Apply filter rules if specified
+	var err error
+	if len(opts.Filters) > 0 {
+		ctx, err = applyFilterRules(ctx, opts.Filters)
+		if err != nil {
+			return i18n.NewI18nError(i18n.ErrSyncFailed).WithCause(err)
+		}
+	}
+
 	// Determine Resync necessity
 	// Calculate base path and listing file names to check if they exist
 	basePath := bilib.BasePath(ctx, e.workDir, f1, f2)
@@ -354,8 +459,30 @@ func (e *SyncEngine) runBidirectional(ctx context.Context, task *ent.Task, f1, f
 }
 
 // runOneWay executes a one-way sync using rclone sync.
-func (e *SyncEngine) runOneWay(ctx context.Context, fSrc, fDst fs.Fs) error {
-	return rclonesync.Sync(ctx, fDst, fSrc, true)
+// It applies SyncOptions including filters and noDelete.
+// Note: transfers setting is applied in RunTask before calling this method.
+//
+// Parameters:
+//   - fSrc: source filesystem (files to copy from)
+//   - fDst: destination filesystem (files to copy to)
+//   - opts: sync options including filters and noDelete flag
+func (e *SyncEngine) runOneWay(ctx context.Context, fSrc, fDst fs.Fs, opts SyncOptions) error {
+	// Apply filter rules if specified
+	var err error
+	if len(opts.Filters) > 0 {
+		ctx, err = applyFilterRules(ctx, opts.Filters)
+		if err != nil {
+			return i18n.NewI18nError(i18n.ErrSyncFailed).WithCause(err)
+		}
+	}
+
+	// Use CopyDir instead of Sync when noDelete is true
+	// CopyDir copies from src to dst without deleting existing files
+	if opts.NoDelete {
+		return rclonesync.CopyDir(ctx, fDst, fSrc, true) // dst = fDst, src = fSrc
+	}
+	// Sync makes dst identical to src, including deletions
+	return rclonesync.Sync(ctx, fDst, fSrc, true) // dst = fDst, src = fSrc
 }
 
 // pollStats monitors the rclone stats and persists logs to the database.

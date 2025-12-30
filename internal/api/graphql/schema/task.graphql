@@ -56,6 +56,22 @@ type TaskSyncOptions {
 	冲突解决策略（默认 NEWER，仅用于双向同步）
 	"""
 	conflictResolution: ConflictResolution
+	"""
+	文件过滤规则列表 - rclone filter 语法
+	每个元素为一条规则，格式: "- pattern" (排除) 或 "+ pattern" (包含)
+	规则按顺序匹配，第一个匹配的规则生效
+	"""
+	filters: [String!]
+	"""
+	保留删除文件 - 仅单向同步有效
+	启用后，同步不会删除目标端的多余文件
+	"""
+	noDelete: Boolean
+	"""
+	并行传输数量 - 范围 1-64
+	为 null 时使用全局配置默认值
+	"""
+	transfers: Int
 }
 
 """
@@ -146,6 +162,18 @@ input TaskSyncOptionsInput {
 	冲突解决策略（默认 NEWER，仅用于双向同步）
 	"""
 	conflictResolution: ConflictResolution
+	"""
+	文件过滤规则列表 - rclone filter 语法
+	"""
+	filters: [String!]
+	"""
+	保留删除文件 - 仅单向同步有效
+	"""
+	noDelete: Boolean
+	"""
+	并行传输数量 - 范围 1-64
+	"""
+	transfers: Int
 }
 
 """

@@ -14,6 +14,10 @@ A cloud sync management tool based on `rclone` development, designed to provide 
   - **One-way Upload**: Local -> Cloud (Suitable for backup)
   - **One-way Download**: Cloud -> Local (Suitable for fetching resources)
   - **Two-way Sync**: Keep data on both ends consistent (Suitable for multi-end collaboration)
+- **Advanced Task Options**:
+  - **File Filters**: Include/exclude files using powerful rclone filter patterns
+  - **Keep Deleted Files**: Prevent deletion of files in destination (one-way sync only)
+  - **Parallel Transfers**: Configure concurrent transfer count (1-64) per task
 - **Smart Trigger Mechanism**:
   - **Real-time Sync**: Listen for file system changes and trigger sync immediately.
   - **Scheduled Tasks**: Support custom schedules (Cron) for automatic execution.
@@ -140,6 +144,15 @@ port = 8080
 # "info" is recommended for production environments
 level = "info"
 
+# Hierarchical log levels by module name
+# Names are case-sensitive, separated by "."
+# Example: "core.db" matches "core.db", "core.db.query", etc.
+[log.levels]
+# "core.db" = "debug"        # core.db and sub-modules use debug level
+# "core.scheduler" = "warn"  # core.scheduler uses warn level
+# "rclone" = "error"         # rclone module uses error level
+
+[app.job]
 # Maximum number of logs retained per connection
 # 0 = unlimited (no cleanup)
 # Default: 1000
@@ -150,13 +163,11 @@ max_logs_per_connection = 1000
 # Default: "0 * * * *" (every hour)
 cleanup_schedule = "0 * * * *"
 
-# Hierarchical log levels by module name
-# Names are case-sensitive, separated by "."
-# Example: "core.db" matches "core.db", "core.db.query", etc.
-[log.levels]
-# "core.db" = "debug"        # core.db and sub-modules use debug level
-# "core.scheduler" = "warn"  # core.scheduler uses warn level
-# "rclone" = "error"         # rclone module uses error level
+[app.sync]
+# Global default parallel transfer count
+# Range: 1-64
+# Default: 4
+transfers = 4
 
 [database]
 # Database migration mode

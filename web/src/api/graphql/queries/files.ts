@@ -17,29 +17,30 @@ const FileEntryFragment = graphql(`
 export type FileEntryFragmentType = typeof FileEntryFragment;
 
 /**
- * Query to list local directory contents
+ * Query to list directory contents (unified interface for local and remote)
+ * @param connectionId - Optional connection ID. null = local filesystem
+ * @param path - The path to browse
+ * @param filters - Optional filter rules (rclone filter syntax)
+ * @param includeFiles - Whether to include files (default: false, only directories)
+ * @param basePath - Optional base path for filter matching
  */
-export const FilesLocalQuery = graphql(
+export const FilesListQuery = graphql(
   `
-    query FilesLocal($path: String!) {
+    query FilesList(
+      $connectionId: ID
+      $path: String!
+      $filters: [String!]
+      $includeFiles: Boolean
+      $basePath: String
+    ) {
       file {
-        local(path: $path) {
-          ...FileEntryFields
-        }
-      }
-    }
-  `,
-  [FileEntryFragment]
-);
-
-/**
- * Query to list remote directory contents
- */
-export const FilesRemoteQuery = graphql(
-  `
-    query FilesRemote($connectionId: ID!, $path: String!) {
-      file {
-        remote(connectionId: $connectionId, path: $path) {
+        list(
+          connectionId: $connectionId
+          path: $path
+          filters: $filters
+          includeFiles: $includeFiles
+          basePath: $basePath
+        ) {
           ...FileEntryFields
         }
       }

@@ -99,7 +99,7 @@ func (_c *TaskCreate) SetNillableRealtime(v *bool) *TaskCreate {
 }
 
 // SetOptions sets the "options" field.
-func (_c *TaskCreate) SetOptions(v map[string]interface{}) *TaskCreate {
+func (_c *TaskCreate) SetOptions(v *model.TaskSyncOptions) *TaskCreate {
 	_c.mutation.SetOptions(v)
 	return _c
 }

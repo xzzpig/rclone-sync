@@ -8,6 +8,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/xzzpig/rclone-sync/internal/core/errs"
 )
 
 // Config represents the application configuration structure.
@@ -39,6 +40,10 @@ type Config struct {
 	Security struct {
 		EncryptionKey string `mapstructure:"encryption_key"`
 	} `mapstructure:"security"`
+	Auth struct {
+		Username string `mapstructure:"username"`
+		Password string `mapstructure:"password"`
+	} `mapstructure:"auth"`
 }
 
 // Load loads the application configuration from file and environment variables.
@@ -97,6 +102,21 @@ func Load(cfgFile string) (*Config, error) {
 	return &cfg, nil
 }
 
+// IsAuthEnabled returns true if authentication is configured
+func (c *Config) IsAuthEnabled() bool {
+	return c.Auth.Username != "" && c.Auth.Password != ""
+}
+
+// ValidateAuth checks if auth configuration is valid
+func (c *Config) ValidateAuth() error {
+	hasUsername := c.Auth.Username != ""
+	hasPassword := c.Auth.Password != ""
+	if hasUsername != hasPassword {
+		return errs.ConstError("username and password must both be set or both be empty")
+	}
+	return nil
+}
+
 func setDefaults() {
 	viper.SetDefault("server.port", 8080)
 	viper.SetDefault("server.host", "0.0.0.0")
@@ -114,7 +134,6 @@ func setDefaults() {
 
 // BindFlags binds command-line flags to configuration values.
 func BindFlags(cmd *cobra.Command) {
-	cmd.PersistentFlags().String("config", "", "config file (default is ./config.toml)")
 	cmd.PersistentFlags().Int("port", 8080, "Port to run the server on")
 	_ = viper.BindPFlag("server.port", cmd.PersistentFlags().Lookup("port"))
 }

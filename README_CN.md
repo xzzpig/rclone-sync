@@ -183,7 +183,41 @@ path = "cloud-sync.db"
 # 数据库敏感数据加密密钥，如云存储凭据
 # 留空则不加密 (不建议在生产环境使用)
 encryption_key = ""
+
+[auth]
+# HTTP Basic Auth 认证凭据
+# 当同时设置用户名和密码时，所有 API 和 UI 访问（除 /health 外）都需要认证
+# 也可以通过环境变量设置：CLOUDSYNC_AUTH_USERNAME 和 CLOUDSYNC_AUTH_PASSWORD
+# 两者都留空则禁用认证（默认，适合个人本地使用）
+# username = "admin"
+# password = "your-secure-password"
 ```
+
+### HTTP Basic 认证
+
+要启用 HTTP Basic Auth，请在 `config.toml` 中添加以下配置：
+
+```toml
+[auth]
+username = "admin"
+password = "your-secure-password"
+```
+
+或使用环境变量：
+
+```bash
+export CLOUDSYNC_AUTH_USERNAME=admin
+export CLOUDSYNC_AUTH_PASSWORD=your-secure-password
+```
+
+启用后，访问任何页面（除 `/health` 外）都将提示输入 HTTP Basic Auth 凭据。
+
+**安全建议：**
+
+1. **使用 HTTPS**：HTTP Basic Auth 以 Base64 编码传输凭据。在生产环境中始终使用 HTTPS 保护传输安全。
+2. **使用反向代理**：在生产环境使用 Nginx/Caddy 等反向代理进行 TLS 终止。
+3. **保护配置文件**：配置文件中的密码为明文，请确保配置文件权限为 `600`。
+4. **强密码**：使用复杂密码，避免使用默认或简单密码。
 
 ### 环境变量
 

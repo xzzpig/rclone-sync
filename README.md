@@ -183,7 +183,41 @@ path = "cloud-sync.db"
 # Encryption key for sensitive data in database, such as cloud storage credentials
 # Leave empty to disable encryption (not recommended for production)
 encryption_key = ""
+
+[auth]
+# HTTP Basic Auth credentials
+# When both username and password are set, all API and UI access (except /health) will require authentication
+# Can also be set via environment variables: CLOUDSYNC_AUTH_USERNAME and CLOUDSYNC_AUTH_PASSWORD
+# Leave both empty to disable authentication (default, for personal local use)
+# username = "admin"
+# password = "your-secure-password"
 ```
+
+### HTTP Basic Authentication
+
+To enable HTTP Basic Auth, add the following configuration to your `config.toml`:
+
+```toml
+[auth]
+username = "admin"
+password = "your-secure-password"
+```
+
+Or use environment variables:
+
+```bash
+export CLOUDSYNC_AUTH_USERNAME=admin
+export CLOUDSYNC_AUTH_PASSWORD=your-secure-password
+```
+
+Once enabled, accessing any page (except `/health`) will prompt for HTTP Basic Auth credentials.
+
+**Security Recommendations:**
+
+1. **Use HTTPS**: HTTP Basic Auth transmits credentials in Base64 encoding. Always use HTTPS in production to protect transmission security.
+2. **Use a Reverse Proxy**: In production, use Nginx/Caddy or other reverse proxies for TLS termination.
+3. **Protect Configuration File**: The password in the config file is in plain text. Ensure the config file permissions are set to `600`.
+4. **Strong Password**: Use complex passwords and avoid default or simple passwords.
 
 ### Environment Variables
 

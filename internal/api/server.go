@@ -48,10 +48,14 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	// Health check
+	// Health check (must be registered before auth middleware)
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
+
+	// Apply authentication middleware after health check
+	// Config is passed by pointer; credentials are read on each request (stateless validation)
+	r.Use(context.OptionalAuthMiddleware(cfg))
 
 	// API Group
 	apiGroup := r.Group("/api")

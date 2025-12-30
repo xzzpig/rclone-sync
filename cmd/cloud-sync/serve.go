@@ -31,6 +31,8 @@ import (
 	"go.uber.org/zap"
 )
 
+var cfgFile string
+
 // serveCmd represents the serve command
 var serveCmd = &cobra.Command{
 	Use: "serve",
@@ -40,6 +42,12 @@ var serveCmd = &cobra.Command{
 		if err != nil {
 			// Use default logger since config is not loaded yet
 			logger.Get().Fatal("Failed to load config", zap.Error(err))
+		}
+
+		// Validate auth configuration
+		if err := cfg.ValidateAuth(); err != nil {
+			// Use default logger since config is not loaded yet
+			logger.Get().Fatal("Invalid auth configuration", zap.Error(err))
 		}
 
 		// 2. Initialize Logger with hierarchical level configuration
@@ -110,9 +118,9 @@ var serveCmd = &cobra.Command{
 		if cfg.App.Job.MaxLogsPerConnection > 0 && cfg.App.Job.CleanupSchedule != "" {
 			logCleanupSvc := services.NewLogCleanupService(dbClient, cfg.App.Job.MaxLogsPerConnection)
 			if err := logCleanupSvc.Start(cfg.App.Job.CleanupSchedule); err != nil {
-			} else {
-				defer logCleanupSvc.Stop()
+				log.Fatal("Failed to start log cleanup service", zap.Error(err))
 			}
+			defer logCleanupSvc.Stop()
 		}
 
 		// 11. Setup router with dependencies
@@ -171,6 +179,10 @@ var serveCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(serveCmd)
+
+	config.BindFlags(serveCmd)
+
+	serveCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./config.toml)")
 
 	// Here you will define your flags and configuration settings.
 

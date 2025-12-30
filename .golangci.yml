@@ -19,6 +19,22 @@ linters:
     - loggercheck
     - perfsprint
     - err113
+  exclusions:
+    rules:
+      - path: internal/api/graphql/resolver/
+        linters:
+          - revive
+        text: "unused-parameter"
+      - path: internal/api/graphql/resolver/
+        linters:
+          - dupl
+      - linters:
+          - revive
+        text: "var-naming: avoid package names that conflict with Go standard library package names"
+      - linters:
+          - revive
+        text: "var-naming: avoid meaningless package names"
+      
 
 formatters:
   enable:

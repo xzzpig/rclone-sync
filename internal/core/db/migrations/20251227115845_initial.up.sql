@@ -23,6 +23,8 @@ CREATE TABLE `jobs` (
   `end_time` datetime NULL,
   `files_transferred` integer NOT NULL DEFAULT 0,
   `bytes_transferred` integer NOT NULL DEFAULT 0,
+  `files_deleted` integer NOT NULL DEFAULT 0,
+  `error_count` integer NOT NULL DEFAULT 0,
   `errors` text NULL,
   `task_id` uuid NOT NULL,
   PRIMARY KEY (`id`),

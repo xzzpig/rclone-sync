@@ -14,6 +14,7 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
+	"github.com/xzzpig/rclone-sync/internal/core/db"
 	"github.com/xzzpig/rclone-sync/internal/core/services"
 	"github.com/xzzpig/rclone-sync/internal/rclone"
 
@@ -206,7 +207,7 @@ func TestDBStorage_ConcurrentAccess(t *testing.T) {
 // TestSyncEngine_WithDBStorage_Integration tests full sync flow using DBStorage
 func TestSyncEngine_WithDBStorage_Integration(t *testing.T) {
 	// Create test database client
-	client := enttest.Open(t, "sqlite3", "file:ent?mode=memory&cache=shared&_fk=1")
+	client := enttest.Open(t, "sqlite3", db.InMemoryDSN())
 	t.Cleanup(func() { client.Close() })
 
 	// Create encryptor
@@ -256,7 +257,7 @@ func TestSyncEngine_WithDBStorage_Integration(t *testing.T) {
 
 	// Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobSvc, nil, dataDir)
+	syncEngine := rclone.NewSyncEngine(jobSvc, nil, nil, dataDir, false)
 
 	// Run the task - this should use DBStorage to read the connection config
 	err = syncEngine.RunTask(ctx, testTask, model.JobTriggerManual)

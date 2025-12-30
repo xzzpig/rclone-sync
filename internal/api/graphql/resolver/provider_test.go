@@ -118,14 +118,14 @@ func (s *ProviderResolverTestSuite) TestProviderQuery_GetNotFound() {
 		}
 	`
 
-	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
-		"name": "nonexistent-provider-xyz",
+	testGetNotFound(s.Env, s.T(), GetNotFoundTestCase{
+		Name:        "non-existent-provider",
+		Entity:      "Provider",
+		Query:       query,
+		VariableKey: "name",
+		Variable:    func(t *testing.T) interface{} { return "nonexistent-provider-xyz" },
+		DataPath:    "provider.get",
 	})
-	require.Empty(s.T(), resp.Errors)
-
-	data := string(resp.Data)
-	result := gjson.Get(data, "provider.get")
-	assert.True(s.T(), !result.Exists() || result.Type == gjson.Null, "provider.get should be null for non-existent provider")
 }
 
 // TestProviderQuery_GetWithOptions tests that provider options are returned.

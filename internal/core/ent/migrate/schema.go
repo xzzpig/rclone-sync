@@ -44,6 +44,8 @@ var (
 		{Name: "end_time", Type: field.TypeTime, Nullable: true},
 		{Name: "files_transferred", Type: field.TypeInt, Default: 0},
 		{Name: "bytes_transferred", Type: field.TypeInt64, Default: 0},
+		{Name: "files_deleted", Type: field.TypeInt, Default: 0},
+		{Name: "error_count", Type: field.TypeInt, Default: 0},
 		{Name: "errors", Type: field.TypeString, Nullable: true, Size: 2147483647},
 		{Name: "task_id", Type: field.TypeUUID},
 	}
@@ -55,7 +57,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "jobs_tasks_jobs",
-				Columns:    []*schema.Column{JobsColumns[8]},
+				Columns:    []*schema.Column{JobsColumns[10]},
 				RefColumns: []*schema.Column{TasksColumns[0]},
 				OnDelete:   schema.Cascade,
 			},

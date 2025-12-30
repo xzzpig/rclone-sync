@@ -1,0 +1,275 @@
+# GraphQL Schema Changes for UI Detail Improvements
+# Feature: 008-ui-detail-improvements
+# Created: 2024-12-24
+#
+# This file contains the schema CHANGES only. 
+# For the complete schema, see internal/api/graphql/schema/*.graphql
+
+# =============================================================================
+# MODIFIED TYPES
+# =============================================================================
+
+"""
+作业执行记录 (MODIFIED - 新增 filesDeleted, errorCount)
+"""
+type Job {
+  """
+  UUID 主键
+  """
+  id: ID!
+  """
+  执行状态
+  """
+  status: JobStatus!
+  """
+  触发方式
+  """
+  trigger: JobTrigger!
+  """
+  开始时间
+  """
+  startTime: DateTime!
+  """
+  结束时间
+  """
+  endTime: DateTime
+  """
+  已传输文件数
+  """
+  filesTransferred: Int!
+  """
+  已传输字节数
+  """
+  bytesTransferred: BigInt!
+  """
+  删除的文件数 [NEW] - 同步过程中删除的文件数量
+  """
+  filesDeleted: Int!
+  """
+  错误数量 [NEW] - 同步过程中发生的错误数量
+  注意：与现有的 errors: String 字段区分，errorCount 是数量
+  """
+  errorCount: Int!
+  """
+  错误信息（保留现有字段）
+  """
+  errors: String
+  """
+  关联的任务（ent edge）
+  """
+  task: Task!
+  """
+  执行日志（分页查询）
+  """
+  logs(pagination: PaginationInput): JobLogConnection!
+}
+
+"""
+连接配额信息 (MODIFIED - 扩展字段)
+"""
+type ConnectionQuota {
+  """
+  总空间（字节），可能为 null 如果存储不支持
+  """
+  total: BigInt
+  """
+  已使用空间（字节），可能为 null 如果存储不支持
+  """
+  used: BigInt
+  """
+  可用空间（字节），可能为 null 如果存储不支持
+  """
+  free: BigInt
+  """
+  回收站占用空间（字节），可能为 null 如果存储不支持 [NEW]
+  """
+  trashed: BigInt
+  """
+  其他空间占用（字节），如版本控制、元数据等，可能为 null [NEW]
+  """
+  other: BigInt
+  """
+  对象/文件数量，可能为 null 如果存储不支持 [NEW]
+  """
+  objects: BigInt
+}
+
+"""
+作业进度事件 (MODIFIED - 新增 totalFiles, totalBytes, filesDeleted, errorCount)
+"""
+type JobProgressEvent {
+  """
+  作业 ID
+  """
+  jobId: ID!
+  """
+  关联的任务 ID
+  """
+  taskId: ID!
+  """
+  关联的连接 ID
+  """
+  connectionId: ID!
+  """
+  当前状态
+  """
+  status: JobStatus!
+  """
+  已传输文件数
+  """
+  filesTransferred: Int!
+  """
+  已传输字节数
+  """
+  bytesTransferred: BigInt!
+  """
+  总文件数（队列+已完成+进行中），会随扫描动态增加 [NEW]
+  """
+  filesTotal: Int!
+  """
+  总字节数（队列大小+已传输+正在传输的总大小） [NEW]
+  """
+  bytesTotal: BigInt!
+  """
+  删除的文件数 [NEW] - 通过 accounting.StatsInfo.GetDeletes() 获取
+  """
+  filesDeleted: Int!
+  """
+  错误数量 [NEW] - 通过 accounting.StatsInfo.GetErrors() 获取
+  """
+  errorCount: Int!
+  """
+  开始时间
+  """
+  startTime: DateTime!
+  """
+  结束时间
+  """
+  endTime: DateTime
+}
+
+"""
+传输进度事件 [NEW] - 当前正在传输的文件列表
+"""
+type TransferProgressEvent {
+  """
+  关联的作业 ID
+  """
+  jobId: ID!
+  """
+  关联的任务 ID
+  """
+  taskId: ID!
+  """
+  关联的连接 ID
+  """
+  connectionId: ID!
+  """
+  当前正在传输的文件列表
+  """
+  transfers: [TransferItem!]!
+}
+
+# =============================================================================
+# NEW TYPES
+# =============================================================================
+
+"""
+当前正在传输的文件项 [NEW]
+"""
+type TransferItem {
+  """
+  文件名称（含路径），如 "documents/report.pdf"
+  """
+  name: String!
+  """
+  文件总大小（字节）
+  """
+  size: BigInt!
+  """
+  已传输字节数
+  """
+  bytes: BigInt!
+}
+
+# =============================================================================
+# NEW SUBSCRIPTIONS
+# =============================================================================
+
+extend type Subscription {
+  """
+  订阅传输进度事件 [NEW]
+  
+  推送机制：
+  - 增量推送：仅推送有变化的传输项（新增、进度更新）
+  - 传输完成时推送：每个文件传输完成时推送一次（此时 bytes == size）
+  - 前端应根据 name 合并/更新传输列表，当 bytes == size 时可移除该项
+  
+  至少需要提供 connectionId, taskId, jobId 中的一个进行筛选
+  """
+  transferProgress(
+    """
+    按连接 ID 筛选
+    """
+    connectionId: ID
+    """
+    按任务 ID 筛选
+    """
+    taskId: ID
+    """
+    按作业 ID 筛选
+    """
+    jobId: ID
+  ): TransferProgressEvent!
+}
+
+# =============================================================================
+# QUERY EXAMPLES
+# =============================================================================
+
+# Example: Query connection with extended quota
+# 
+# query ConnectionWithQuota($id: ID!) {
+#   connection {
+#     get(id: $id) {
+#       id
+#       name
+#       quota {
+#         total
+#         used
+#         free
+#         trashed    # NEW
+#         other      # NEW
+#         objects    # NEW
+#       }
+#     }
+#   }
+# }
+
+# Example: Subscribe to job progress
+#
+# subscription JobProgress($connectionId: ID!) {
+#   jobProgress(connectionId: $connectionId) {
+#     jobId
+#     status
+#     filesTransferred
+#     bytesTransferred
+#     filesTotal          # NEW - 总文件数
+#     bytesTotal          # NEW - 总字节数
+#   }
+# }
+
+# Example: Subscribe to transfer progress [NEW]
+#
+# subscription TransferProgress($jobId: ID!) {
+#   transferProgress(jobId: $jobId) {
+#     jobId
+#     taskId
+#     connectionId
+#     transfers {
+#       name
+#       size
+#       bytes
+#     }
+#   }
+# }

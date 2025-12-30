@@ -22,14 +22,15 @@ import (
 
 // RouterDeps contains all dependencies required for setting up API routes.
 type RouterDeps struct {
-	Client         *ent.Client
-	Config         *config.Config
-	SyncEngine     *rclone.SyncEngine
-	Runner         ports.Runner
-	JobService     *services.JobService
-	Watcher        ports.Watcher
-	Scheduler      ports.Scheduler
-	JobProgressBus *subscription.JobProgressBus
+	Client              *ent.Client
+	Config              *config.Config
+	SyncEngine          *rclone.SyncEngine
+	Runner              ports.Runner
+	JobService          *services.JobService
+	Watcher             ports.Watcher
+	Scheduler           ports.Scheduler
+	JobProgressBus      *subscription.JobProgressBus
+	TransferProgressBus *subscription.TransferProgressBus
 }
 
 // routesLog returns a named logger for the api.routes package.
@@ -52,15 +53,16 @@ func RegisterAPIRoutes(router *gin.RouterGroup, deps RouterDeps) error {
 
 	// GraphQL endpoint
 	gqlDeps := &resolver.Dependencies{
-		SyncEngine:        deps.SyncEngine,
-		Runner:            deps.Runner,
-		JobService:        deps.JobService,
-		Watcher:           deps.Watcher,
-		Scheduler:         deps.Scheduler,
-		TaskService:       taskService,
-		ConnectionService: connService,
-		Encryptor:         encryptor,
-		JobProgressBus:    deps.JobProgressBus,
+		SyncEngine:          deps.SyncEngine,
+		Runner:              deps.Runner,
+		JobService:          deps.JobService,
+		Watcher:             deps.Watcher,
+		Scheduler:           deps.Scheduler,
+		TaskService:         taskService,
+		ConnectionService:   connService,
+		Encryptor:           encryptor,
+		JobProgressBus:      deps.JobProgressBus,
+		TransferProgressBus: deps.TransferProgressBus,
 	}
 	gqlHandler := graphql.NewHandler(gqlDeps)
 

@@ -82,6 +82,9 @@ other = "解析 rclone.conf 内容失败"
 [error_import_empty_list]
 other = "没有可导入的连接"
 
+[error_connection_has_dependent_tasks]
+other = "无法删除包含依赖任务的连接"
+
 # Status messages
 [status_syncing]
 other = "同步中"

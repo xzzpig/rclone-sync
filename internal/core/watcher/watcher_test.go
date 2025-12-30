@@ -66,7 +66,7 @@ func (m *MockTaskService) ListAllTasks(ctx context.Context) ([]*ent.Task, error)
 
 func setupTest(t *testing.T) {
 	t.Helper()
-	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug)
+	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug, nil)
 }
 
 func TestWatcher_Debounce(t *testing.T) {

@@ -53,6 +53,7 @@ export const ConnectionGetConfigQuery = graphql(`
 
 /**
  * Query to get connection with quota (for overview/storage display)
+ * Includes extended quota fields: trashed, other, objects
  */
 export const ConnectionGetQuotaQuery = graphql(`
   query ConnectionGetQuota($id: ID!) {
@@ -63,6 +64,9 @@ export const ConnectionGetQuotaQuery = graphql(`
         quota {
           total
           used
+          trashed
+          other
+          objects
         }
       }
     }

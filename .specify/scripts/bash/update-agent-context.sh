@@ -592,7 +592,7 @@ update_specific_agent() {
         copilot)
             update_agent_file "$COPILOT_FILE" "GitHub Copilot"
             ;;
-        cursor)
+        cursor-agent)
             update_agent_file "$CURSOR_FILE" "Cursor IDE"
             ;;
         qwen)
@@ -726,7 +726,7 @@ update_all_existing_agents() {
         update_agent_file "$CLINE_FILE" "Cline"
         found_agent=true
     fi
-
+    
     # If no agent files exist, create a default Claude file
     if [[ "$found_agent" == false ]]; then
         log_info "No existing agent files found, creating default Claude file..."

@@ -12,5 +12,6 @@
     },
     "files.exclude": {
         "web": true,
-    }
+    },
+    "go.lintTool": "golangci-lint-v2"
 }

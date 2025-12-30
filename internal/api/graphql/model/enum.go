@@ -1,3 +1,4 @@
+// Package model provides GraphQL model types and enum implementations.
 package model
 
 func toStrings[T ~string](arr []T) []string {
@@ -8,22 +9,27 @@ func toStrings[T ~string](arr []T) []string {
 	return strs
 }
 
-func (_ JobTrigger) Values() []string {
+// Values returns all valid values for JobTrigger enum.
+func (JobTrigger) Values() []string {
 	return toStrings(AllJobTrigger)
 }
 
-func (_ JobStatus) Values() []string {
+// Values returns all valid values for JobStatus enum.
+func (JobStatus) Values() []string {
 	return toStrings(AllJobStatus)
 }
 
-func (_ LogLevel) Values() []string {
+// Values returns all valid values for LogLevel enum.
+func (LogLevel) Values() []string {
 	return toStrings(AllLogLevel)
 }
 
-func (_ LogAction) Values() []string {
+// Values returns all valid values for LogAction enum.
+func (LogAction) Values() []string {
 	return toStrings(AllLogAction)
 }
 
-func (_ SyncDirection) Values() []string {
+// Values returns all valid values for SyncDirection enum.
+func (SyncDirection) Values() []string {
 	return toStrings(AllSyncDirection)
 }

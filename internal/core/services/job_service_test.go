@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
+	"github.com/xzzpig/rclone-sync/internal/core/db"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
 	"github.com/xzzpig/rclone-sync/internal/core/errs"
@@ -19,11 +20,11 @@ import (
 
 func init() {
 	// Initialize logger for tests
-	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug)
+	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug, nil)
 }
 
 func TestJobService(t *testing.T) {
-	client := enttest.Open(t, "sqlite3", "file:ent?mode=memory&cache=shared&_fk=1")
+	client := enttest.Open(t, "sqlite3", db.InMemoryDSN())
 	defer client.Close()
 
 	service := NewJobService(client)
@@ -101,13 +102,15 @@ func TestJobService(t *testing.T) {
 		taskID := createTask(t)
 		j, _ := service.CreateJob(ctx, taskID, model.JobTriggerManual)
 
-		updated, err := service.UpdateJobStats(ctx, j.ID, 10, 1024)
+		updated, err := service.UpdateJobStats(ctx, j.ID, 10, 1024, 2, 1)
 		assert.NoError(t, err)
 		assert.Equal(t, 10, updated.FilesTransferred)
 		assert.Equal(t, int64(1024), updated.BytesTransferred)
+		assert.Equal(t, 2, updated.FilesDeleted)
+		assert.Equal(t, 1, updated.ErrorCount)
 
 		t.Run("NotFound", func(t *testing.T) {
-			_, err := service.UpdateJobStats(ctx, uuid.New(), 10, 1024)
+			_, err := service.UpdateJobStats(ctx, uuid.New(), 10, 1024, 0, 0)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, errs.ErrNotFound)
 		})
@@ -451,7 +454,7 @@ func TestJobService(t *testing.T) {
 
 // Additional test for UpdateJobStatus with multiple status transitions
 func TestJobService_UpdateJobStatus_Transitions(t *testing.T) {
-	client := enttest.Open(t, "sqlite3", "file:ent?mode=memory&cache=shared&_fk=1")
+	client := enttest.Open(t, "sqlite3", db.InMemoryDSN())
 	defer client.Close()
 
 	service := NewJobService(client)
@@ -493,7 +496,7 @@ func TestJobService_UpdateJobStatus_Transitions(t *testing.T) {
 
 // Test for ListJobLogsByJobPaginated
 func TestJobService_ListJobLogsByJobPaginated(t *testing.T) {
-	client := enttest.Open(t, "sqlite3", "file:ent?mode=memory&cache=shared&_fk=1")
+	client := enttest.Open(t, "sqlite3", db.InMemoryDSN())
 	defer client.Close()
 
 	service := NewJobService(client)
@@ -583,9 +586,247 @@ func TestJobService_ListJobLogsByJobPaginated(t *testing.T) {
 	})
 }
 
+// Test for DeleteOldLogsForConnection
+func TestJobService_DeleteOldLogsForConnection(t *testing.T) {
+	client := enttest.Open(t, "sqlite3", db.InMemoryDSN())
+	defer client.Close()
+
+	service := NewJobService(client)
+	taskService := NewTaskService(client)
+	ctx := context.Background()
+
+	// Create test connection
+	encryptor, err := crypto.NewEncryptor("test-secret-key-32-bytes-long!!")
+	require.NoError(t, err)
+	connService := NewConnectionService(client, encryptor)
+	testConn, err := connService.CreateConnection(ctx, "test-cleanup-logs", "local", map[string]string{
+		"type": "local",
+	})
+	require.NoError(t, err)
+
+	// Create task
+	task, err := taskService.CreateTask(ctx, "Cleanup Logs Task", "/l", testConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
+	require.NoError(t, err)
+
+	// Create job
+	j, err := service.CreateJob(ctx, task.ID, model.JobTriggerManual)
+	require.NoError(t, err)
+
+	// Add logs with different timestamps
+	for i := 0; i < 10; i++ {
+		_, err := service.AddJobLog(ctx, j.ID, string(model.LogLevelInfo), string(model.LogActionUpload), "/file"+string(rune('0'+i)), int64(i*100))
+		require.NoError(t, err)
+		time.Sleep(time.Millisecond) // Ensure different timestamps
+	}
+
+	t.Run("KeepCount_LessThanTotal", func(t *testing.T) {
+		// Keep 5 logs, delete 5
+		deleted, err := service.DeleteOldLogsForConnection(ctx, testConn.ID, 5)
+		assert.NoError(t, err)
+		assert.Equal(t, 5, deleted)
+
+		// Verify only 5 logs remain
+		count, err := service.CountJobLogs(ctx, &testConn.ID, nil, nil, "")
+		assert.NoError(t, err)
+		assert.Equal(t, 5, count)
+	})
+
+	t.Run("KeepCount_GreaterThanTotal", func(t *testing.T) {
+		// Now we have 5 logs, keep 10 (should delete 0)
+		deleted, err := service.DeleteOldLogsForConnection(ctx, testConn.ID, 10)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, deleted)
+
+		// Verify 5 logs still remain
+		count, err := service.CountJobLogs(ctx, &testConn.ID, nil, nil, "")
+		assert.NoError(t, err)
+		assert.Equal(t, 5, count)
+	})
+
+	t.Run("KeepCount_Zero", func(t *testing.T) {
+		// Keep 0 logs (delete all)
+		deleted, err := service.DeleteOldLogsForConnection(ctx, testConn.ID, 0)
+		assert.NoError(t, err)
+		assert.Equal(t, 5, deleted)
+
+		// Verify no logs remain
+		count, err := service.CountJobLogs(ctx, &testConn.ID, nil, nil, "")
+		assert.NoError(t, err)
+		assert.Equal(t, 0, count)
+	})
+
+	t.Run("NoLogs", func(t *testing.T) {
+		// Create a new connection with no logs
+		emptyConn, err := connService.CreateConnection(ctx, "empty-conn-"+uuid.NewString(), "local", map[string]string{
+			"type": "local",
+		})
+		require.NoError(t, err)
+
+		deleted, err := service.DeleteOldLogsForConnection(ctx, emptyConn.ID, 10)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, deleted)
+	})
+
+	t.Run("MultipleJobs", func(t *testing.T) {
+		// Create a new connection for this test
+		multiJobConn, err := connService.CreateConnection(ctx, "multi-job-conn-"+uuid.NewString(), "local", map[string]string{
+			"type": "local",
+		})
+		require.NoError(t, err)
+
+		multiTask, err := taskService.CreateTask(ctx, "Multi Job Task "+uuid.NewString(), "/l", multiJobConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
+		require.NoError(t, err)
+
+		// Create two jobs with logs
+		job1, err := service.CreateJob(ctx, multiTask.ID, model.JobTriggerManual)
+		require.NoError(t, err)
+		job2, err := service.CreateJob(ctx, multiTask.ID, model.JobTriggerSchedule)
+		require.NoError(t, err)
+
+		// Add 5 logs to each job
+		for i := 0; i < 5; i++ {
+			_, err := service.AddJobLog(ctx, job1.ID, string(model.LogLevelInfo), string(model.LogActionUpload), "/file1-"+string(rune('0'+i)), int64(i*100))
+			require.NoError(t, err)
+			time.Sleep(time.Millisecond)
+		}
+		for i := 0; i < 5; i++ {
+			_, err := service.AddJobLog(ctx, job2.ID, string(model.LogLevelInfo), string(model.LogActionDownload), "/file2-"+string(rune('0'+i)), int64(i*200))
+			require.NoError(t, err)
+			time.Sleep(time.Millisecond)
+		}
+
+		// Total 10 logs, keep 3
+		deleted, err := service.DeleteOldLogsForConnection(ctx, multiJobConn.ID, 3)
+		assert.NoError(t, err)
+		assert.Equal(t, 7, deleted)
+
+		// Verify 3 logs remain
+		count, err := service.CountJobLogs(ctx, &multiJobConn.ID, nil, nil, "")
+		assert.NoError(t, err)
+		assert.Equal(t, 3, count)
+	})
+
+	t.Run("VerifyNewestLogsKept", func(t *testing.T) {
+		// Create a new connection for this test
+		verifyConn, err := connService.CreateConnection(ctx, "verify-newest-conn-"+uuid.NewString(), "local", map[string]string{
+			"type": "local",
+		})
+		require.NoError(t, err)
+
+		verifyTask, err := taskService.CreateTask(ctx, "Verify Newest Task "+uuid.NewString(), "/l", verifyConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
+		require.NoError(t, err)
+
+		verifyJob, err := service.CreateJob(ctx, verifyTask.ID, model.JobTriggerManual)
+		require.NoError(t, err)
+
+		// Create logs with identifiable paths: old-0 (oldest), old-1, ..., new-0 (newest)
+		// Add 5 "old" logs first
+		oldLogPaths := []string{}
+		for i := 0; i < 5; i++ {
+			path := "/old-" + string(rune('0'+i))
+			oldLogPaths = append(oldLogPaths, path)
+			_, err := service.AddJobLog(ctx, verifyJob.ID, string(model.LogLevelInfo), string(model.LogActionUpload), path, int64(i*100))
+			require.NoError(t, err)
+			time.Sleep(2 * time.Millisecond) // Ensure different timestamps
+		}
+
+		// Add 5 "new" logs (these should be kept)
+		newLogPaths := []string{}
+		for i := 0; i < 5; i++ {
+			path := "/new-" + string(rune('0'+i))
+			newLogPaths = append(newLogPaths, path)
+			_, err := service.AddJobLog(ctx, verifyJob.ID, string(model.LogLevelInfo), string(model.LogActionDownload), path, int64(i*200))
+			require.NoError(t, err)
+			time.Sleep(2 * time.Millisecond) // Ensure different timestamps
+		}
+
+		// Keep 5 logs (should keep all "new" logs, delete all "old" logs)
+		deleted, err := service.DeleteOldLogsForConnection(ctx, verifyConn.ID, 5)
+		assert.NoError(t, err)
+		assert.Equal(t, 5, deleted)
+
+		// Get remaining logs
+		remainingLogs, err := service.ListJobLogs(ctx, &verifyConn.ID, nil, nil, "", 10, 0)
+		require.NoError(t, err)
+		require.Len(t, remainingLogs, 5)
+
+		// Verify that all remaining logs are "new" logs (newest ones)
+		for _, log := range remainingLogs {
+			// Check that the path starts with "/new-" (not "/old-")
+			assert.Contains(t, log.Path, "/new-", "Remaining log should be a new log, but got: %s", log.Path)
+
+			// Verify path is NOT in old paths
+			for _, oldPath := range oldLogPaths {
+				assert.NotEqual(t, oldPath, log.Path, "Old log should have been deleted: %s", oldPath)
+			}
+		}
+
+		// Additional verification: check that all new log paths are present
+		remainingPaths := make(map[string]bool)
+		for _, log := range remainingLogs {
+			remainingPaths[log.Path] = true
+		}
+		for _, newPath := range newLogPaths {
+			assert.True(t, remainingPaths[newPath], "New log should be kept: %s", newPath)
+		}
+	})
+
+	t.Run("VerifyNewestLogsKept_PartialKeep", func(t *testing.T) {
+		// Create a new connection for this test
+		partialConn, err := connService.CreateConnection(ctx, "partial-keep-conn-"+uuid.NewString(), "local", map[string]string{
+			"type": "local",
+		})
+		require.NoError(t, err)
+
+		partialTask, err := taskService.CreateTask(ctx, "Partial Keep Task "+uuid.NewString(), "/l", partialConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
+		require.NoError(t, err)
+
+		partialJob, err := service.CreateJob(ctx, partialTask.ID, model.JobTriggerManual)
+		require.NoError(t, err)
+
+		// Create 10 logs with sequential numbers in path to identify order
+		var logTimes []time.Time
+		for i := 0; i < 10; i++ {
+			path := "/log-" + string(rune('0'+i)) // /log-0 is oldest, /log-9 is newest
+			log, err := service.AddJobLog(ctx, partialJob.ID, string(model.LogLevelInfo), string(model.LogActionUpload), path, int64(i*100))
+			require.NoError(t, err)
+			logTimes = append(logTimes, log.Time)
+			time.Sleep(2 * time.Millisecond) // Ensure different timestamps
+		}
+
+		// Keep 3 logs (should keep /log-7, /log-8, /log-9 - the 3 newest)
+		deleted, err := service.DeleteOldLogsForConnection(ctx, partialConn.ID, 3)
+		assert.NoError(t, err)
+		assert.Equal(t, 7, deleted)
+
+		// Get remaining logs ordered by time descending (newest first)
+		remainingLogs, err := service.ListJobLogs(ctx, &partialConn.ID, nil, nil, "", 10, 0)
+		require.NoError(t, err)
+		require.Len(t, remainingLogs, 3)
+
+		// Collect remaining paths
+		remainingPaths := make(map[string]bool)
+		for _, log := range remainingLogs {
+			remainingPaths[log.Path] = true
+		}
+
+		// Verify that logs 0-6 (old) are deleted
+		for i := 0; i < 7; i++ {
+			oldPath := "/log-" + string(rune('0'+i))
+			assert.False(t, remainingPaths[oldPath], "Old log should have been deleted: %s", oldPath)
+		}
+
+		// Verify that logs 7-9 (newest) are kept
+		for i := 7; i < 10; i++ {
+			newPath := "/log-" + string(rune('0'+i))
+			assert.True(t, remainingPaths[newPath], "New log should be kept: %s", newPath)
+		}
+	})
+}
+
 // Additional test for CountJobLogs with multiple filters
 func TestJobService_CountJobLogs_ComplexFilters(t *testing.T) {
-	client := enttest.Open(t, "sqlite3", "file:ent?mode=memory&cache=shared&_fk=1")
+	client := enttest.Open(t, "sqlite3", db.InMemoryDSN())
 	defer client.Close()
 
 	service := NewJobService(client)
@@ -635,5 +876,110 @@ func TestJobService_CountJobLogs_ComplexFilters(t *testing.T) {
 		count, err := service.CountJobLogs(ctx, nil, nil, &j.ID, "")
 		assert.NoError(t, err)
 		assert.Equal(t, 4, count)
+	})
+}
+
+func TestJobService_DeleteJob(t *testing.T) {
+	client := enttest.Open(t, "sqlite3", db.InMemoryDSN())
+	defer client.Close()
+
+	service := NewJobService(client)
+	taskService := NewTaskService(client)
+	ctx := context.Background()
+
+	// Create test connection
+	encryptor, err := crypto.NewEncryptor("test-secret-key-32-bytes-long!!")
+	require.NoError(t, err)
+	connService := NewConnectionService(client, encryptor)
+	testConn, err := connService.CreateConnection(ctx, "test-delete-job", "local", map[string]string{
+		"type": "local",
+	})
+	require.NoError(t, err)
+
+	// Create task
+	task, err := taskService.CreateTask(ctx, "Delete Job Task", "/l", testConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
+	require.NoError(t, err)
+
+	t.Run("DeleteJob_WithLogs_Cascade", func(t *testing.T) {
+		// Create job
+		job, err := service.CreateJob(ctx, task.ID, model.JobTriggerManual)
+		require.NoError(t, err)
+
+		// Add some logs to the job
+		_, err = service.AddJobLog(ctx, job.ID, string(model.LogLevelInfo), string(model.LogActionUpload), "/file1", 100)
+		require.NoError(t, err)
+		_, err = service.AddJobLog(ctx, job.ID, string(model.LogLevelInfo), string(model.LogActionDownload), "/file2", 200)
+		require.NoError(t, err)
+		_, err = service.AddJobLog(ctx, job.ID, string(model.LogLevelError), string(model.LogActionError), "sync failed", 0)
+		require.NoError(t, err)
+
+		// Verify logs exist before deletion
+		logsBefore, err := service.ListJobLogs(ctx, nil, nil, &job.ID, "", 10, 0)
+		require.NoError(t, err)
+		assert.Len(t, logsBefore, 3, "Should have 3 logs before deletion")
+
+		// Delete the job (should cascade delete logs)
+		err = service.DeleteJob(ctx, job.ID)
+		assert.NoError(t, err)
+
+		// Verify job is deleted
+		_, err = service.GetJob(ctx, job.ID)
+		assert.ErrorIs(t, err, errs.ErrNotFound, "Job should be deleted")
+
+		// Verify logs are also deleted (cascade)
+		logsAfter, err := service.ListJobLogs(ctx, nil, nil, &job.ID, "", 10, 0)
+		require.NoError(t, err)
+		assert.Len(t, logsAfter, 0, "All logs should be cascade deleted")
+	})
+
+	t.Run("DeleteJob_NoLogs", func(t *testing.T) {
+		// Create job without logs
+		job, err := service.CreateJob(ctx, task.ID, model.JobTriggerManual)
+		require.NoError(t, err)
+
+		// Delete the job
+		err = service.DeleteJob(ctx, job.ID)
+		assert.NoError(t, err)
+
+		// Verify job is deleted
+		_, err = service.GetJob(ctx, job.ID)
+		assert.ErrorIs(t, err, errs.ErrNotFound, "Job should be deleted")
+	})
+
+	t.Run("DeleteJob_NotFound", func(t *testing.T) {
+		// Try to delete a non-existent job
+		err := service.DeleteJob(ctx, uuid.New())
+		assert.ErrorIs(t, err, errs.ErrNotFound, "Should return ErrNotFound for non-existent job")
+	})
+
+	t.Run("DeleteJob_MultipleJobs", func(t *testing.T) {
+		// Create two jobs with logs
+		job1, err := service.CreateJob(ctx, task.ID, model.JobTriggerManual)
+		require.NoError(t, err)
+		job2, err := service.CreateJob(ctx, task.ID, model.JobTriggerManual)
+		require.NoError(t, err)
+
+		// Add logs to both jobs
+		_, err = service.AddJobLog(ctx, job1.ID, string(model.LogLevelInfo), string(model.LogActionUpload), "/file1", 100)
+		require.NoError(t, err)
+		_, err = service.AddJobLog(ctx, job2.ID, string(model.LogLevelInfo), string(model.LogActionUpload), "/file2", 200)
+		require.NoError(t, err)
+
+		// Delete job1
+		err = service.DeleteJob(ctx, job1.ID)
+		assert.NoError(t, err)
+
+		// Verify job1 is deleted but job2 still exists
+		_, err = service.GetJob(ctx, job1.ID)
+		assert.ErrorIs(t, err, errs.ErrNotFound, "Job1 should be deleted")
+
+		job2Exists, err := service.GetJob(ctx, job2.ID)
+		assert.NoError(t, err)
+		assert.NotNil(t, job2Exists, "Job2 should still exist")
+
+		// Verify job2's logs still exist
+		logs2, err := service.ListJobLogs(ctx, nil, nil, &job2.ID, "", 10, 0)
+		require.NoError(t, err)
+		assert.Len(t, logs2, 1, "Job2's logs should still exist")
 	})
 }

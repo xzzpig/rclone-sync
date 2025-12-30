@@ -80,12 +80,18 @@ type ConnectionQuery struct {
 
 // 连接配额信息
 type ConnectionQuota struct {
-	// 总空间（字节）
-	Total int64 `json:"total"`
-	// 已使用空间（字节）
-	Used int64 `json:"used"`
-	// 可用空间（字节）
-	Free int64 `json:"free"`
+	// 总空间（字节），可能为 null 如果存储不支持
+	Total *int64 `json:"total,omitempty"`
+	// 已使用空间（字节），可能为 null 如果存储不支持
+	Used *int64 `json:"used,omitempty"`
+	// 可用空间（字节），可能为 null 如果存储不支持
+	Free *int64 `json:"free,omitempty"`
+	// 回收站占用空间（字节），可能为 null 如果存储不支持
+	Trashed *int64 `json:"trashed,omitempty"`
+	// 其他空间占用（字节），如版本控制、元数据等，可能为 null
+	Other *int64 `json:"other,omitempty"`
+	// 对象/文件数量，可能为 null 如果存储不支持
+	Objects *int64 `json:"objects,omitempty"`
 }
 
 // 连接测试失败
@@ -224,13 +230,19 @@ type Job struct {
 	FilesTransferred int `json:"filesTransferred"`
 	// 已传输字节数
 	BytesTransferred int64 `json:"bytesTransferred"`
+	// 删除的文件数
+	FilesDeleted int `json:"filesDeleted"`
+	// 错误数量
+	ErrorCount int `json:"errorCount"`
 	// 错误信息
 	Errors *string `json:"errors,omitempty"`
 	// 关联的任务（ent edge）
 	Task *Task `json:"task"`
 	// 执行日志（分页查询）
-	Logs   *JobLogConnection `json:"logs"`
-	TaskID uuid.UUID         `json:"-"`
+	Logs *JobLogConnection `json:"logs"`
+	// 运行时进度（仅 RUNNING 状态的 job 有值，其他状态返回 null）
+	Progress *JobProgressEvent `json:"progress,omitempty"`
+	TaskID   uuid.UUID         `json:"-"`
 }
 
 // 作业分页连接
@@ -286,6 +298,14 @@ type JobProgressEvent struct {
 	FilesTransferred int `json:"filesTransferred"`
 	// 已传输字节数
 	BytesTransferred int64 `json:"bytesTransferred"`
+	// 总文件数（队列+已完成+进行中），会随扫描动态增加
+	FilesTotal int `json:"filesTotal"`
+	// 总字节数（队列大小+已传输+正在传输的总大小）
+	BytesTotal int64 `json:"bytesTotal"`
+	// 删除的文件数
+	FilesDeleted int `json:"filesDeleted"`
+	// 错误数量
+	ErrorCount int `json:"errorCount"`
 	// 开始时间
 	StartTime time.Time `json:"startTime"`
 	// 结束时间
@@ -478,6 +498,28 @@ type TestConnectionInput struct {
 	Type string `json:"type"`
 	// 配置参数
 	Config map[string]string `json:"config"`
+}
+
+// 当前正在传输的文件项
+type TransferItem struct {
+	// 文件名称（含路径），如 "documents/report.pdf"
+	Name string `json:"name"`
+	// 文件总大小（字节）
+	Size int64 `json:"size"`
+	// 已传输字节数
+	Bytes int64 `json:"bytes"`
+}
+
+// 传输进度事件 - 当前正在传输的文件列表
+type TransferProgressEvent struct {
+	// 关联的作业 ID
+	JobID uuid.UUID `json:"jobId"`
+	// 关联的任务 ID
+	TaskID uuid.UUID `json:"taskId"`
+	// 关联的连接 ID
+	ConnectionID uuid.UUID `json:"connectionId"`
+	// 当前正在传输的文件列表
+	Transfers []*TransferItem `json:"transfers"`
 }
 
 // 更新连接输入

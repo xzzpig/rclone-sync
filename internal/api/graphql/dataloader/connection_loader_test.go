@@ -22,10 +22,10 @@ import (
 func setupConnectionTestDB(t *testing.T) (*ent.Client, *services.ConnectionService) {
 	t.Helper()
 
-	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug)
+	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug, nil)
 
 	client, err := db.InitDB(db.InitDBOptions{
-		DSN:           "file:ent?mode=memory&cache=shared&_fk=1",
+		DSN:           db.InMemoryDSN(),
 		MigrationMode: db.MigrationModeAuto,
 	})
 	require.NoError(t, err)

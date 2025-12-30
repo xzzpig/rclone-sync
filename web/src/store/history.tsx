@@ -1,11 +1,24 @@
 import { client } from '@/api/graphql/client';
 import { JobsListQuery, LogsListQuery } from '@/api/graphql/queries/jobs';
-import { JOB_PROGRESS_SUBSCRIPTION } from '@/api/graphql/queries/subscriptions';
 import type { JobListItem, JobLogListItem, JobProgressEvent, LogLevel } from '@/lib/types';
 import * as m from '@/paraglide/messages.js';
-import { createSubscription } from '@urql/solid';
-import { createContext, createEffect, ParentComponent, useContext } from 'solid-js';
+import { createContext, createEffect, onCleanup, ParentComponent, useContext } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
+import { useJobProgress, type JobProgressFilter } from './jobProgress';
+
+/**
+ * Job progress data from query or subscription
+ * Using fields from JobProgressEvent type
+ */
+type JobProgress = Pick<
+  JobProgressEvent,
+  | 'filesTransferred'
+  | 'bytesTransferred'
+  | 'filesTotal'
+  | 'bytesTotal'
+  | 'filesDeleted'
+  | 'errorCount'
+>;
 
 interface HistoryState {
   jobs: JobListItem[];
@@ -23,6 +36,8 @@ interface HistoryState {
   // Tracking current filter parameters for subscription
   currentConnectionId: string | null;
   currentTaskId: string | null;
+  // Runtime progress cache for running jobs (jobId -> progress)
+  jobProgressCache: Record<string, JobProgress>;
 }
 
 const initialState: HistoryState = {
@@ -40,6 +55,7 @@ const initialState: HistoryState = {
   errorLogs: null,
   currentConnectionId: null,
   currentTaskId: null,
+  jobProgressCache: {},
 };
 
 interface HistoryActions {
@@ -52,36 +68,23 @@ interface HistoryActions {
     page?: number;
   }) => Promise<void>;
   clearLogs: () => void;
+  /**
+   * Get job progress from cache (filesTotal/bytesTotal for running jobs)
+   */
+  getJobProgress: (jobId: string) => JobProgress | undefined;
 }
 
 const HistoryContext = createContext<[HistoryState, HistoryActions]>();
 
 export const HistoryProvider: ParentComponent = (props) => {
   const [state, setState] = createStore<HistoryState>(initialState);
+  const jobProgress = useJobProgress();
 
-  // GraphQL subscription for job progress using @urql/solid
-  const [subscriptionResult] = createSubscription({
-    query: JOB_PROGRESS_SUBSCRIPTION,
-    variables: () => ({
-      connectionId: state.currentConnectionId ?? undefined,
-      taskId: state.currentTaskId ?? undefined,
-    }),
-    pause: () => !state.currentConnectionId,
-  });
+  // Track current subscription for cleanup
+  let currentSubscription: { unsubscribe: () => void } | null = null;
 
-  // Handle subscription data updates
-  createEffect(() => {
-    const data = subscriptionResult.data?.jobProgress as JobProgressEvent | undefined;
-    if (!data) return;
-
-    // Check if the subscription data matches our current filter
-    if (state.currentConnectionId && data.connectionId !== state.currentConnectionId) {
-      return;
-    }
-    if (state.currentTaskId && data.taskId !== state.currentTaskId) {
-      return;
-    }
-
+  // Handle job progress events from centralized subscription
+  const handleJobProgress = (data: JobProgressEvent) => {
     setState(
       produce((s) => {
         const jobIndex = s.jobs.findIndex((j) => j.id === data.jobId);
@@ -102,8 +105,49 @@ export const HistoryProvider: ParentComponent = (props) => {
           // Don't reload here directly to avoid infinite loops
           // The UI should handle this via polling or user refresh
         }
+
+        // Update or clear progress cache based on job status
+        if (data.status === 'RUNNING') {
+          // Job is running, update progress cache
+          s.jobProgressCache[data.jobId] = {
+            filesTransferred: data.filesTransferred,
+            bytesTransferred: data.bytesTransferred,
+            filesTotal: data.filesTotal,
+            bytesTotal: data.bytesTotal,
+            filesDeleted: data.filesDeleted,
+            errorCount: data.errorCount,
+          };
+        } else if (['SUCCESS', 'FAILED', 'CANCELLED'].includes(data.status)) {
+          // Job completed, clear progress cache
+          delete s.jobProgressCache[data.jobId];
+        }
       })
     );
+  };
+
+  // Update subscription when filter changes
+  createEffect(() => {
+    // Unsubscribe from previous subscription
+    if (currentSubscription) {
+      currentSubscription.unsubscribe();
+      currentSubscription = null;
+    }
+
+    // Only subscribe when we have a connection ID
+    if (state.currentConnectionId) {
+      const filter: JobProgressFilter = {
+        connectionId: state.currentConnectionId,
+        taskId: state.currentTaskId ?? undefined,
+      };
+      currentSubscription = jobProgress.subscribe(handleJobProgress, filter);
+    }
+  });
+
+  // Cleanup on unmount
+  onCleanup(() => {
+    if (currentSubscription) {
+      currentSubscription.unsubscribe();
+    }
   });
 
   const actions: HistoryActions = {
@@ -123,6 +167,7 @@ export const HistoryProvider: ParentComponent = (props) => {
             taskId: params.task_id,
             connectionId: params.connection_id,
             pagination: { limit: state.jobsPageSize, offset },
+            withProgress: true,
           },
           { requestPolicy: 'network-only' }
         );
@@ -132,10 +177,33 @@ export const HistoryProvider: ParentComponent = (props) => {
         }
 
         const listData = result.data?.job?.list;
-        setState('jobs', listData?.items ?? []);
+        const items = listData?.items ?? [];
+        setState('jobs', items);
         setState('jobsTotal', listData?.totalCount ?? 0);
         setState('jobsPage', page);
         setState('errorJobs', null);
+
+        // Initialize progress cache from query results
+        setState(
+          produce((s) => {
+            // Clear old cache entries
+            s.jobProgressCache = {};
+            // Add progress from query results for RUNNING jobs
+            for (const job of items) {
+              const progress = job.progress as JobProgress | null | undefined;
+              if (progress) {
+                s.jobProgressCache[job.id] = {
+                  filesTransferred: progress.filesTransferred,
+                  bytesTransferred: progress.bytesTransferred,
+                  filesTotal: progress.filesTotal,
+                  bytesTotal: progress.bytesTotal,
+                  filesDeleted: progress.filesDeleted,
+                  errorCount: progress.errorCount,
+                };
+              }
+            }
+          })
+        );
       } catch (err) {
         setState('errorJobs', err);
         console.error('Failed to fetch jobs:', err);
@@ -184,6 +252,10 @@ export const HistoryProvider: ParentComponent = (props) => {
       setState('logsTotal', 0);
       setState('logsPage', 1);
       setState('errorLogs', null);
+    },
+
+    getJobProgress: (jobId: string) => {
+      return state.jobProgressCache[jobId];
     },
   };
 

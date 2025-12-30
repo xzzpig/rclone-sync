@@ -7,12 +7,12 @@ package resolver
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/generated"
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
+	"github.com/xzzpig/rclone-sync/internal/i18n"
 	"github.com/xzzpig/rclone-sync/internal/rclone"
 	"go.uber.org/zap"
 )
@@ -87,7 +87,7 @@ func (r *connectionResolver) Tasks(ctx context.Context, obj *model.Connection, p
 func (r *connectionResolver) Quota(ctx context.Context, obj *model.Connection) (*model.ConnectionQuota, error) {
 	quota, err := rclone.GetRemoteQuota(ctx, obj.Name)
 	if err != nil {
-		logger.Named("api.graphql").Warn("Failed to get remote quota",
+		logger.Named("api.graphql.resolver.connection").Warn("Failed to get remote quota",
 			zap.String("connection", obj.Name),
 			zap.Error(err),
 		)
@@ -95,21 +95,13 @@ func (r *connectionResolver) Quota(ctx context.Context, obj *model.Connection) (
 		return nil, nil
 	}
 
-	var total, used, free int64
-	if quota.Total != nil {
-		total = *quota.Total
-	}
-	if quota.Used != nil {
-		used = *quota.Used
-	}
-	if quota.Free != nil {
-		free = *quota.Free
-	}
-
 	return &model.ConnectionQuota{
-		Total: total,
-		Used:  used,
-		Free:  free,
+		Total:   quota.Total,
+		Used:    quota.Used,
+		Free:    quota.Free,
+		Trashed: quota.Trashed,
+		Other:   quota.Other,
+		Objects: quota.Objects,
 	}, nil
 }
 
@@ -152,7 +144,7 @@ func (r *connectionMutationResolver) Delete(ctx context.Context, obj *model.Conn
 		return nil, err
 	}
 	if taskCount > 0 {
-		return nil, fmt.Errorf("cannot delete connection with %d dependent tasks", taskCount)
+		return nil, i18n.ErrBadRequestI18n(i18n.ErrConnectionHasDependentTasks)
 	}
 
 	err = r.deps.ConnectionService.DeleteConnectionByID(ctx, id)
@@ -178,6 +170,7 @@ func (r *connectionMutationResolver) Test(ctx context.Context, obj *model.Connec
 
 	// Test the remote configuration
 	if err := rclone.TestRemote(ctx, entConn.Type, config); err != nil {
+		//nolint:nilerr // Returning test failure as union result, not as error
 		return &model.ConnectionTestFailure{
 			Error: err.Error(),
 		}, nil
@@ -192,6 +185,7 @@ func (r *connectionMutationResolver) Test(ctx context.Context, obj *model.Connec
 func (r *connectionMutationResolver) TestUnsaved(ctx context.Context, obj *model.ConnectionMutation, input model.TestConnectionInput) (model.TestConnectionResult, error) {
 	// Test the remote configuration
 	if err := rclone.TestRemote(ctx, input.Type, input.Config); err != nil {
+		//nolint:nilerr // Returning test failure as union result, not as error
 		return &model.ConnectionTestFailure{
 			Error: err.Error(),
 		}, nil
@@ -248,7 +242,7 @@ func (r *connectionQueryResolver) List(ctx context.Context, obj *model.Connectio
 func (r *connectionQueryResolver) Get(ctx context.Context, obj *model.ConnectionQuery, id uuid.UUID) (*model.Connection, error) {
 	entConnection, err := r.deps.ConnectionService.GetConnectionByID(ctx, id)
 	if err != nil {
-		// Return nil for not found, this is valid for GraphQL
+		//nolint:nilerr // Return nil for not found, this is valid for GraphQL nullable queries
 		return nil, nil
 	}
 	return entConnectionToModel(entConnection), nil

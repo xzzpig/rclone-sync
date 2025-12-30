@@ -77,17 +77,29 @@ type Connection {
 """
 type ConnectionQuota {
 	"""
-	总空间（字节）
+	总空间（字节），可能为 null 如果存储不支持
 	"""
-	total: BigInt!
+	total: BigInt
 	"""
-	已使用空间（字节）
+	已使用空间（字节），可能为 null 如果存储不支持
 	"""
-	used: BigInt!
+	used: BigInt
 	"""
-	可用空间（字节）
+	可用空间（字节），可能为 null 如果存储不支持
 	"""
-	free: BigInt!
+	free: BigInt
+	"""
+	回收站占用空间（字节），可能为 null 如果存储不支持
+	"""
+	trashed: BigInt
+	"""
+	其他空间占用（字节），如版本控制、元数据等，可能为 null
+	"""
+	other: BigInt
+	"""
+	对象/文件数量，可能为 null 如果存储不支持
+	"""
+	objects: BigInt
 }
 
 """

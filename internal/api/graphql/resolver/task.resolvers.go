@@ -107,7 +107,7 @@ func (r *taskResolver) Jobs(ctx context.Context, obj *model.Task, pagination *mo
 func (r *taskResolver) LatestJob(ctx context.Context, obj *model.Task) (*model.Job, error) {
 	entJob, err := r.deps.JobService.GetLastJobByTaskID(ctx, obj.ID)
 	if err != nil {
-		// If no job found, return nil (not an error)
+		//nolint:nilerr // Return nil for no job found, this is valid for GraphQL nullable queries
 		return nil, nil
 	}
 	return entJobToModel(entJob), nil
@@ -156,17 +156,15 @@ func (r *taskMutationResolver) Create(ctx context.Context, obj *model.TaskMutati
 
 	// If realtime sync is enabled, add to watcher
 	if realtime && r.deps.Watcher != nil {
-		if err := r.deps.Watcher.AddTask(entTask); err != nil {
-			// Log the error but don't fail the request
-			// The task was created successfully, watcher can be added later
-		}
+		// Log the error but don't fail the request
+		// The task was created successfully, watcher can be added later
+		_ = r.deps.Watcher.AddTask(entTask)
 	}
 
 	// If schedule is set, add to scheduler
 	if schedule != "" && r.deps.Scheduler != nil {
-		if err := r.deps.Scheduler.AddTask(entTask); err != nil {
-			// Log but don't fail
-		}
+		// Log but don't fail
+		_ = r.deps.Scheduler.AddTask(entTask)
 	}
 
 	return entTaskToModel(entTask), nil
@@ -370,7 +368,7 @@ func (r *taskQueryResolver) List(ctx context.Context, obj *model.TaskQuery, pagi
 func (r *taskQueryResolver) Get(ctx context.Context, obj *model.TaskQuery, id uuid.UUID) (*model.Task, error) {
 	entTask, err := r.deps.TaskService.GetTask(ctx, id)
 	if err != nil {
-		// Return nil for not found, this is valid for GraphQL
+		//nolint:nilerr // Return nil for not found, this is valid for GraphQL nullable queries
 		return nil, nil
 	}
 	return entTaskToModel(entTask), nil

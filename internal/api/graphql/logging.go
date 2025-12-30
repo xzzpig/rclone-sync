@@ -40,6 +40,10 @@ func (e *LoggingExtension) InterceptResponse(ctx context.Context, next graphql.R
 
 	resp := next(ctx)
 
+	if resp == nil {
+		return resp
+	}
+
 	latency := time.Since(start)
 
 	// 基础日志字段

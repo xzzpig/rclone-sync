@@ -140,6 +140,24 @@ port = 8080
 # 生产环境建议使用 "info"
 level = "info"
 
+# 每个连接保留的最大日志条数
+# 0 = 无限制（不清理）
+# 默认值: 1000
+max_logs_per_connection = 1000
+
+# 日志清理任务的 cron 表达式
+# 格式: 分 时 日 月 周
+# 默认值: "0 * * * *" (每小时整点)
+cleanup_schedule = "0 * * * *"
+
+# 按模块名称设置层级日志级别
+# 名称区分大小写，以 "." 分隔
+# 示例: "core.db" 匹配 "core.db", "core.db.query" 等
+[log.levels]
+# "core.db" = "debug"        # core.db 及其子模块使用 debug 级别
+# "core.scheduler" = "warn"  # core.scheduler 使用 warn 级别
+# "rclone" = "error"         # rclone 模块使用 error 级别
+
 [database]
 # 数据库迁移模式
 # "auto": 自动迁移 (适合开发或简单升级)

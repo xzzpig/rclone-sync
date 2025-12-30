@@ -13,13 +13,14 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
+	"github.com/xzzpig/rclone-sync/internal/core/db"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/task"
 	"github.com/xzzpig/rclone-sync/internal/core/errs"
 )
 
 func TestTaskService(t *testing.T) {
-	client := enttest.Open(t, "sqlite3", "file:ent?mode=memory&cache=shared&_fk=1")
+	client := enttest.Open(t, "sqlite3", db.InMemoryDSN())
 	defer client.Close()
 
 	service := NewTaskService(client)
@@ -388,7 +389,7 @@ func TestTaskService(t *testing.T) {
 
 // Additional test for edge cases
 func TestTaskService_EdgeCases(t *testing.T) {
-	client := enttest.Open(t, "sqlite3", "file:ent?mode=memory&cache=shared&_fk=1")
+	client := enttest.Open(t, "sqlite3", db.InMemoryDSN())
 	defer client.Close()
 
 	service := NewTaskService(client)
@@ -479,7 +480,7 @@ func TestTaskService_EdgeCases(t *testing.T) {
 
 // Tests for ListTasksPaginated
 func TestTaskService_ListTasksPaginated(t *testing.T) {
-	client := enttest.Open(t, "sqlite3", "file:ent?mode=memory&cache=shared&_fk=1")
+	client := enttest.Open(t, "sqlite3", db.InMemoryDSN())
 	defer client.Close()
 
 	service := NewTaskService(client)
@@ -557,7 +558,7 @@ func TestTaskService_ListTasksPaginated(t *testing.T) {
 
 // Tests for ListTasksByConnectionPaginated
 func TestTaskService_ListTasksByConnectionPaginated(t *testing.T) {
-	client := enttest.Open(t, "sqlite3", "file:ent?mode=memory&cache=shared&_fk=1")
+	client := enttest.Open(t, "sqlite3", db.InMemoryDSN())
 	defer client.Close()
 
 	service := NewTaskService(client)
@@ -651,7 +652,7 @@ func TestTaskService_ListTasksByConnectionPaginated(t *testing.T) {
 
 // Tests for ListJobsByTaskPaginated
 func TestTaskService_ListJobsByTaskPaginated(t *testing.T) {
-	client := enttest.Open(t, "sqlite3", "file:ent?mode=memory&cache=shared&_fk=1")
+	client := enttest.Open(t, "sqlite3", db.InMemoryDSN())
 	defer client.Close()
 
 	service := NewTaskService(client)

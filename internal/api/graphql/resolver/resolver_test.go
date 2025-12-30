@@ -28,6 +28,7 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/ports"
 	"github.com/xzzpig/rclone-sync/internal/core/runner"
 	"github.com/xzzpig/rclone-sync/internal/core/services"
+	"github.com/xzzpig/rclone-sync/internal/i18n"
 	"github.com/xzzpig/rclone-sync/internal/rclone"
 )
 
@@ -49,7 +50,10 @@ func NewTestEnv(t *testing.T) *TestEnv {
 	t.Helper()
 
 	// Init logger
-	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug)
+	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug, nil)
+
+	// Init i18n (required for i18n error handling)
+	require.NoError(t, i18n.Init())
 
 	// Create temporary directories
 	appDataDir := t.TempDir()
@@ -75,27 +79,29 @@ func NewTestEnv(t *testing.T) *TestEnv {
 	storage := rclone.NewDBStorage(connectionService)
 	storage.Install()
 
-	syncEngine := rclone.NewSyncEngine(jobService, nil, appDataDir)
+	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, appDataDir, false)
 	runnerInstance := runner.NewRunner(syncEngine)
 
 	// Create mock watcher and scheduler for testing
 	mockWatcher := &mockWatcher{}
 	mockScheduler := &mockScheduler{}
 
-	// Create job progress bus
+	// Create job progress bus and transfer progress bus
 	jobProgressBus := subscription.NewJobProgressBus()
+	transferProgressBus := subscription.NewTransferProgressBus()
 
 	// Create dependencies
 	deps := &resolver.Dependencies{
-		SyncEngine:        syncEngine,
-		Runner:            runnerInstance,
-		JobService:        jobService,
-		Watcher:           mockWatcher,
-		Scheduler:         mockScheduler,
-		TaskService:       taskService,
-		ConnectionService: connectionService,
-		Encryptor:         encryptor,
-		JobProgressBus:    jobProgressBus,
+		SyncEngine:          syncEngine,
+		Runner:              runnerInstance,
+		JobService:          jobService,
+		Watcher:             mockWatcher,
+		Scheduler:           mockScheduler,
+		TaskService:         taskService,
+		ConnectionService:   connectionService,
+		Encryptor:           encryptor,
+		JobProgressBus:      jobProgressBus,
+		TransferProgressBus: transferProgressBus,
 	}
 
 	// Create GraphQL handler

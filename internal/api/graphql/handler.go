@@ -37,7 +37,7 @@ func NewHandler(deps *resolver.Dependencies) *handler.Server {
 	// WebSocket configuration for subscriptions
 	srv.AddTransport(&transport.Websocket{
 		Upgrader: websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool {
+			CheckOrigin: func(_ *http.Request) bool {
 				return true // TODO: restrict origin in production
 			},
 			ReadBufferSize:  1024,

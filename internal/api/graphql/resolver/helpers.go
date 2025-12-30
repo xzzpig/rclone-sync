@@ -63,6 +63,8 @@ func entJobToModel(j *ent.Job) *model.Job {
 		EndTime:          endTime,
 		FilesTransferred: j.FilesTransferred,
 		BytesTransferred: j.BytesTransferred,
+		FilesDeleted:     j.FilesDeleted,
+		ErrorCount:       j.ErrorCount,
 		Errors:           errStr,
 		TaskID:           j.TaskID, // FK for dataloader optimization
 	}

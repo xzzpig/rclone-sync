@@ -168,6 +168,8 @@ const History: Component = () => {
                 </TableHead>
                 <TableHead class="w-[100px] whitespace-nowrap">{m.common_duration()}</TableHead>
                 <TableHead class="w-[100px] whitespace-nowrap">{m.common_files()}</TableHead>
+                <TableHead class="w-[80px] whitespace-nowrap">{m.history_filesDeleted()}</TableHead>
+                <TableHead class="w-[80px] whitespace-nowrap">{m.history_errors()}</TableHead>
                 <TableHead class="w-[100px] whitespace-nowrap">{m.common_data()}</TableHead>
                 <TableHead class="w-[100px] whitespace-nowrap text-right">
                   {m.common_actions()}
@@ -177,7 +179,7 @@ const History: Component = () => {
             <TableBody>
               <Show
                 when={!historyState.isLoadingJobs}
-                fallback={<TableSkeleton columns={7} rows={historyState.jobsPageSize} />}
+                fallback={<TableSkeleton columns={9} rows={historyState.jobsPageSize} />}
               >
                 <For each={historyState.jobs}>
                   {(job) => {
@@ -212,9 +214,41 @@ const History: Component = () => {
                             }
                           </IntervalUpdated>
                         </TableCell>
-                        <TableCell class="py-2 align-top">{job.filesTransferred ?? 0}</TableCell>
+                        <TableCell class="py-2 align-top">
+                          {(() => {
+                            const progress = historyActions.getJobProgress(job.id);
+                            if (job.status === 'RUNNING' && progress?.filesTotal) {
+                              return `${progress.filesTransferred ?? 0}/${progress.filesTotal}`;
+                            }
+                            return job.filesTransferred ?? 0;
+                          })()}
+                        </TableCell>
+                        <TableCell class="py-2 align-top">
+                          {(() => {
+                            const progress = historyActions.getJobProgress(job.id);
+                            if (job.status === 'RUNNING' && progress?.filesDeleted != null) {
+                              return progress.filesDeleted;
+                            }
+                            return job.filesDeleted ?? 0;
+                          })()}
+                        </TableCell>
+                        <TableCell class="py-2 align-top">
+                          {(() => {
+                            const progress = historyActions.getJobProgress(job.id);
+                            if (job.status === 'RUNNING' && progress?.errorCount != null) {
+                              return progress.errorCount;
+                            }
+                            return job.errorCount ?? 0;
+                          })()}
+                        </TableCell>
                         <TableCell class="whitespace-nowrap py-2 align-top">
-                          {formatBytes(job.bytesTransferred)}
+                          {(() => {
+                            const progress = historyActions.getJobProgress(job.id);
+                            if (job.status === 'RUNNING' && progress?.bytesTotal) {
+                              return `${formatBytes(progress.bytesTransferred)}/${formatBytes(progress.bytesTotal)}`;
+                            }
+                            return formatBytes(job.bytesTransferred);
+                          })()}
                         </TableCell>
                         <TableCell class="py-2 text-right align-top">
                           <Button

@@ -27,9 +27,6 @@
               pkgs.air
               atlas
             ];
-            shellHook = ''
-              export CGO_CFLAGS="-Wno-error=cpp"
-            '';
           };
         };
     };

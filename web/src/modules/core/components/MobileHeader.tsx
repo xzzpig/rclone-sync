@@ -12,8 +12,8 @@ interface MobileHeaderProps {
 
 const MobileHeader: Component<MobileHeaderProps> = (props) => {
   return (
-    <div class="flex items-center justify-between border-b border-border bg-background p-4 text-foreground md:hidden">
-      <div class="flex items-center">
+    <div class="flex items-center justify-between gap-2 border-b border-border bg-background p-4 text-foreground md:hidden">
+      <div class="flex min-w-0 flex-1 items-center">
         <Show when={props.showBack}>
           <Button
             as={A}

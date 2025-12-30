@@ -14,7 +14,10 @@ import type { FilesLocalQuery } from '@/api/graphql/queries/files';
 import type { IMPORT_PARSE } from '@/api/graphql/queries/import';
 import type { JobProgressQuery, JobsListQuery, LogsListQuery } from '@/api/graphql/queries/jobs';
 import type { ProviderGetQuery, ProvidersListQuery } from '@/api/graphql/queries/providers';
-import type { JOB_PROGRESS_SUBSCRIPTION } from '@/api/graphql/queries/subscriptions';
+import type {
+  JOB_PROGRESS_SUBSCRIPTION,
+  TRANSFER_PROGRESS_SUBSCRIPTION,
+} from '@/api/graphql/queries/subscriptions';
 import type {
   TaskCreateMutation,
   TasksListQuery,
@@ -79,6 +82,7 @@ export type JobLogListItem = NonNullable<
 >['items'][number];
 
 export type LogLevel = JobLogListItem['level'];
+export type LogAction = JobLogListItem['what'];
 
 // Status type for UI components (JobStatus + IDLE for idle state)
 export type StatusType = JobStatus | 'IDLE';
@@ -114,6 +118,13 @@ export type JobProgress = NonNullable<
 export type JobProgressEvent = NonNullable<
   ResultOf<typeof JOB_PROGRESS_SUBSCRIPTION>['jobProgress']
 >;
+
+// Transfer Progress types (from TRANSFER_PROGRESS_SUBSCRIPTION)
+export type TransferProgressEvent = NonNullable<
+  ResultOf<typeof TRANSFER_PROGRESS_SUBSCRIPTION>['transferProgress']
+>;
+
+export type TransferItem = TransferProgressEvent['transfers'][number];
 
 // Quota types (from ConnectionGetQuotaQuery)
 export type ConnectionQuota = NonNullable<ConnectionWithQuota['quota']>;

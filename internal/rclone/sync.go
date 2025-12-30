@@ -26,42 +26,40 @@ import (
 	"go.uber.org/zap"
 )
 
-// JobProgress represents the current progress of a sync job.
-type JobProgress struct {
-	Transfers int64
-	Bytes     int64
-}
-
 // SyncEngine handles file synchronization operations using rclone.
 type SyncEngine struct {
-	jobService     ports.JobService
-	jobProgressBus *subscription.JobProgressBus
-	logger         *zap.Logger
-	workDir        string
-	statsMu        sync.RWMutex
-	activeJobs     map[uuid.UUID]JobProgress
-	lastEvents     map[uuid.UUID]*model.JobProgressEvent
+	jobService          ports.JobService
+	jobProgressBus      *subscription.JobProgressBus
+	transferProgressBus *subscription.TransferProgressBus
+	logger              *zap.Logger
+	workDir             string
+	autoDeleteEmptyJobs bool
+	statsMu             sync.RWMutex
+	lastEvents          map[uuid.UUID]*model.JobProgressEvent
+	lastTransferEvents  map[uuid.UUID]*model.TransferProgressEvent
 }
 
 // NewSyncEngine creates a new SyncEngine instance.
-func NewSyncEngine(jobService ports.JobService, jobProgressBus *subscription.JobProgressBus, dataDir string) *SyncEngine {
+func NewSyncEngine(jobService ports.JobService, jobProgressBus *subscription.JobProgressBus, transferProgressBus *subscription.TransferProgressBus, dataDir string, autoDeleteEmptyJobs bool) *SyncEngine {
 	workDir := filepath.Join(dataDir, "bisync_state")
 	return &SyncEngine{
-		jobService:     jobService,
-		jobProgressBus: jobProgressBus,
-		logger:         logger.Named("sync.engine"),
-		workDir:        workDir,
-		activeJobs:     make(map[uuid.UUID]JobProgress),
-		lastEvents:     make(map[uuid.UUID]*model.JobProgressEvent),
+		jobService:          jobService,
+		jobProgressBus:      jobProgressBus,
+		transferProgressBus: transferProgressBus,
+		logger:              logger.Named("sync.engine"),
+		workDir:             workDir,
+		autoDeleteEmptyJobs: autoDeleteEmptyJobs,
+		lastEvents:          make(map[uuid.UUID]*model.JobProgressEvent),
+		lastTransferEvents:  make(map[uuid.UUID]*model.TransferProgressEvent),
 	}
 }
 
 // GetJobProgress returns the current progress of a running job.
-func (e *SyncEngine) GetJobProgress(jobID uuid.UUID) (JobProgress, bool) {
+// Returns the latest cached JobProgressEvent if the job is running, nil otherwise.
+func (e *SyncEngine) GetJobProgress(jobID uuid.UUID) *model.JobProgressEvent {
 	e.statsMu.RLock()
 	defer e.statsMu.RUnlock()
-	p, ok := e.activeJobs[jobID]
-	return p, ok
+	return e.lastEvents[jobID]
 }
 
 // getConflictResolutionFromOptions extracts conflict resolution setting from task options.
@@ -120,16 +118,11 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger model.
 		return errors.Join(errs.ErrSystem, errs.ConstError("failed to create job"), err)
 	}
 
-	// Initialize in-memory progress
-	e.statsMu.Lock()
-	e.activeJobs[jobEntity.ID] = JobProgress{}
-	e.statsMu.Unlock()
-
-	// Ensure cleanup when done
+	// Ensure cleanup of cached events when done
 	defer func() {
 		e.statsMu.Lock()
-		delete(e.activeJobs, jobEntity.ID)
 		delete(e.lastEvents, jobEntity.ID)
+		delete(e.lastTransferEvents, jobEntity.ID)
 		e.statsMu.Unlock()
 	}()
 
@@ -250,10 +243,10 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger model.
 
 	// Update final stats
 	s := accounting.Stats(statsCtx)
-	var files, bytes int64
+	var files, bytes, filesDeleted, errorCount int64
 	if s != nil {
-		files, bytes = s.GetTransfers(), s.GetBytes()
-		if _, updateErr := e.jobService.UpdateJobStats(ctx, jobEntity.ID, files, bytes); updateErr != nil {
+		files, bytes, filesDeleted, errorCount = s.GetTransfers(), s.GetBytes(), s.GetDeletes(), s.GetErrors()
+		if _, updateErr := e.jobService.UpdateJobStats(ctx, jobEntity.ID, files, bytes, filesDeleted, errorCount); updateErr != nil {
 			e.logger.Error("Failed to update final job stats", zap.Error(updateErr))
 		}
 	}
@@ -276,12 +269,51 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger model.
 
 	e.logger.Info("Sync task completed successfully", zap.Stringer("job_id", jobEntity.ID))
 
+	// Auto-delete empty jobs if configured
+	if shouldDeleteEmptyJob(e.autoDeleteEmptyJobs, model.JobStatusSuccess, int(files), bytes, int(filesDeleted), int(errorCount)) {
+		e.logger.Debug("Auto-deleting empty job", zap.Stringer("job_id", jobEntity.ID))
+		if err := e.jobService.DeleteJob(ctx, jobEntity.ID); err != nil {
+			// Log warning but don't fail the task - the job has already succeeded
+			e.logger.Warn("Failed to auto-delete empty job", zap.Stringer("job_id", jobEntity.ID), zap.Error(err))
+		} else {
+			e.logger.Debug("Successfully auto-deleted empty job", zap.Stringer("job_id", jobEntity.ID))
+		}
+	}
+
 	return nil
 }
 
 func (e *SyncEngine) failJob(ctx context.Context, jobID uuid.UUID, err error) {
 	e.logger.Error("Job failed during setup", zap.Error(err))
 	_, _ = e.jobService.UpdateJobStatus(ctx, jobID, string(model.JobStatusFailed), err.Error())
+}
+
+// shouldDeleteEmptyJob determines if a job should be deleted based on its configuration and result.
+// A job is considered "empty" if:
+// - filesTransferred = 0 (no files were transferred)
+// - bytesTransferred = 0 (no bytes were transferred)
+// - filesDeleted = 0 (no files were deleted)
+// - errorCount = 0 (no errors occurred)
+// - status = SUCCESS (the job completed successfully)
+// Failed jobs are always kept for debugging purposes.
+func shouldDeleteEmptyJob(autoDeleteEmptyJobs bool, status model.JobStatus, filesTransferred int, bytesTransferred int64, filesDeleted int, errorCount int) bool {
+	// If auto-delete is disabled, never delete
+	if !autoDeleteEmptyJobs {
+		return false
+	}
+
+	// Only delete successful jobs
+	if status != model.JobStatusSuccess {
+		return false
+	}
+
+	// Check if job had any activity (transfers, bytes, deletes, or errors)
+	if filesTransferred > 0 || bytesTransferred > 0 || filesDeleted > 0 || errorCount > 0 {
+		return false
+	}
+
+	// Job is empty and successful, delete it
+	return true
 }
 
 // runBidirectional executes a bidirectional sync using bisync.
@@ -308,6 +340,7 @@ func (e *SyncEngine) runBidirectional(ctx context.Context, task *ent.Task, f1, f
 	// Prepare Bisync options
 	opt := &bisync.Options{
 		Resync:          resync,
+		Recover:         true,
 		Workdir:         e.workDir,
 		NoCleanup:       true, // Keep workdir for state
 		Force:           true, // TODO: Expose as task option
@@ -375,8 +408,11 @@ func (e *SyncEngine) processStats(ctx context.Context, jobID uuid.UUID, task *en
 
 	var transfersToRemove []*accounting.Transfer
 	var logsToSave []*ent.JobLog
+	var activeTransfers []*model.TransferItem
 
-	// Find completed transfers
+	e.logger.Debug("Processing stats", zap.Any("transfers", *transfers))
+
+	// Process all transfers: collect completed for logging/removal, active for progress broadcast
 	for _, tr := range *transfers {
 		if tr.IsDone() {
 			snapshot := tr.Snapshot()
@@ -430,6 +466,12 @@ func (e *SyncEngine) processStats(ctx context.Context, jobID uuid.UUID, task *en
 					Size:  snapshot.Size,
 					Time:  snapshot.CompletedAt,
 				})
+				// Include completed transfers in broadcast (bytes == size signals completion to frontend)
+				activeTransfers = append(activeTransfers, &model.TransferItem{
+					Name:  snapshot.Name,
+					Size:  snapshot.Size,
+					Bytes: snapshot.Size, // bytes == size indicates completion
+				})
 			default:
 				// Unknown operation type
 				logsToSave = append(logsToSave, &ent.JobLog{
@@ -439,6 +481,14 @@ func (e *SyncEngine) processStats(ctx context.Context, jobID uuid.UUID, task *en
 					Time:  time.Now(),
 				})
 			}
+		} else {
+			// Collect active transfers for progress broadcast
+			snapshot := tr.Snapshot()
+			activeTransfers = append(activeTransfers, &model.TransferItem{
+				Name:  snapshot.Name,
+				Size:  snapshot.Size,
+				Bytes: snapshot.Bytes,
+			})
 		}
 	}
 
@@ -460,13 +510,9 @@ func (e *SyncEngine) processStats(ctx context.Context, jobID uuid.UUID, task *en
 		s.RemoveTransfer(tr)
 	}
 
-	// Update in-memory job progress for realtime monitoring
-	e.statsMu.Lock()
-	e.activeJobs[jobID] = JobProgress{
-		Transfers: s.GetTransfers(),
-		Bytes:     s.GetBytes(),
-	}
-	e.statsMu.Unlock()
+	// Get total stats for progress display
+	totalTransfers, totalBytes := getTotalStats(s)
+	filesDeleted, errorCount := s.GetDeletes(), s.GetErrors()
 
 	// Broadcast progress update
 	if task.Edges.Connection != nil {
@@ -477,9 +523,66 @@ func (e *SyncEngine) processStats(ctx context.Context, jobID uuid.UUID, task *en
 			Status:           model.JobStatusRunning,
 			FilesTransferred: int(s.GetTransfers()),
 			BytesTransferred: s.GetBytes(),
+			FilesTotal:       int(totalTransfers),
+			BytesTotal:       totalBytes,
+			FilesDeleted:     int(filesDeleted),
+			ErrorCount:       int(errorCount),
 			StartTime:        startTime,
 		})
+
+		// Broadcast transfer progress update (using snapshots collected while holding the lock)
+		e.broadcastTransferProgress(jobID, task, activeTransfers)
 	}
+}
+
+// broadcastTransferProgress broadcasts the current transfer progress for active file transfers.
+func (e *SyncEngine) broadcastTransferProgress(jobID uuid.UUID, task *ent.Task, activeTransfers []*model.TransferItem) {
+	if e.transferProgressBus == nil || task.Edges.Connection == nil {
+		return
+	}
+
+	event := &model.TransferProgressEvent{
+		JobID:        jobID,
+		TaskID:       task.ID,
+		ConnectionID: task.Edges.Connection.ID,
+		Transfers:    activeTransfers,
+	}
+
+	e.broadcastTransferUpdate(event)
+}
+
+func (e *SyncEngine) broadcastTransferUpdate(event *model.TransferProgressEvent) {
+	if e.transferProgressBus == nil {
+		return
+	}
+
+	e.statsMu.Lock()
+	defer e.statsMu.Unlock()
+
+	last, ok := e.lastTransferEvents[event.JobID]
+	if ok && transferEventsEqual(last, event) {
+		return
+	}
+
+	e.lastTransferEvents[event.JobID] = event
+	e.transferProgressBus.Publish(event)
+}
+
+// transferEventsEqual compares two TransferProgressEvent for equality.
+func transferEventsEqual(a, b *model.TransferProgressEvent) bool {
+	if a.JobID != b.JobID || a.TaskID != b.TaskID || a.ConnectionID != b.ConnectionID {
+		return false
+	}
+	if len(a.Transfers) != len(b.Transfers) {
+		return false
+	}
+	for i, ta := range a.Transfers {
+		tb := b.Transfers[i]
+		if ta.Name != tb.Name || ta.Size != tb.Size || ta.Bytes != tb.Bytes {
+			return false
+		}
+	}
+	return true
 }
 
 func (e *SyncEngine) broadcastJobUpdate(event *model.JobProgressEvent) {
@@ -494,6 +597,8 @@ func (e *SyncEngine) broadcastJobUpdate(event *model.JobProgressEvent) {
 	if ok && last.Status == event.Status &&
 		last.FilesTransferred == event.FilesTransferred &&
 		last.BytesTransferred == event.BytesTransferred &&
+		last.FilesTotal == event.FilesTotal &&
+		last.BytesTotal == event.BytesTotal &&
 		last.TaskID == event.TaskID &&
 		last.ConnectionID == event.ConnectionID &&
 		last.StartTime.Equal(event.StartTime) &&
@@ -503,6 +608,46 @@ func (e *SyncEngine) broadcastJobUpdate(event *model.JobProgressEvent) {
 
 	e.lastEvents[event.JobID] = event
 	e.jobProgressBus.Publish(event)
+}
+
+// getTotalStats retrieves total transfers and total bytes from rclone stats using RemoteStats API.
+// Returns (totalTransfers, totalBytes). Returns (0, 0) if stats is nil or on error.
+func getTotalStats(s *accounting.StatsInfo) (int64, int64) {
+	if s == nil {
+		return 0, 0
+	}
+
+	rc, err := s.RemoteStats(false)
+	if err != nil {
+		return 0, 0
+	}
+
+	// Extract totalTransfers and totalBytes from rc.Params
+	var totalTransfers, totalBytes int64
+
+	if v, ok := rc["totalTransfers"]; ok {
+		switch val := v.(type) {
+		case int64:
+			totalTransfers = val
+		case int:
+			totalTransfers = int64(val)
+		case float64:
+			totalTransfers = int64(val)
+		}
+	}
+
+	if v, ok := rc["totalBytes"]; ok {
+		switch val := v.(type) {
+		case int64:
+			totalBytes = val
+		case int:
+			totalBytes = int64(val)
+		case float64:
+			totalBytes = int64(val)
+		}
+	}
+
+	return totalTransfers, totalBytes
 }
 
 // getStatsInternals uses unsafe reflection to access private fields of rclone's StatsInfo.

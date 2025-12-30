@@ -108,7 +108,9 @@ const Settings: Component = () => {
       console.error('Failed to delete connection:', error);
       showToast({
         title: m.common_error(),
-        description: m.connection_failedToDelete(),
+        description: m.connection_failedToDelete({
+          error: error instanceof Error ? error.message : m.error_unknownError(),
+        }),
         variant: 'error',
       });
     } finally {

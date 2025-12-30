@@ -124,6 +124,14 @@ type Job @goExtraField(name: "TaskID", type: "github.com/google/uuid.UUID") {
 	"""
 	bytesTransferred: BigInt!
 	"""
+	删除的文件数
+	"""
+	filesDeleted: Int!
+	"""
+	错误数量
+	"""
+	errorCount: Int!
+	"""
 	错误信息
 	"""
 	errors: String
@@ -135,6 +143,10 @@ type Job @goExtraField(name: "TaskID", type: "github.com/google/uuid.UUID") {
 	执行日志（分页查询）
 	"""
 	logs(pagination: PaginationInput): JobLogConnection! @goField(forceResolver: true)
+	"""
+	运行时进度（仅 RUNNING 状态的 job 有值，其他状态返回 null）
+	"""
+	progress: JobProgressEvent @goField(forceResolver: true)
 }
 
 """
@@ -240,6 +252,22 @@ type JobProgressEvent {
 	"""
 	bytesTransferred: BigInt!
 	"""
+	总文件数（队列+已完成+进行中），会随扫描动态增加
+	"""
+	filesTotal: Int!
+	"""
+	总字节数（队列大小+已传输+正在传输的总大小）
+	"""
+	bytesTotal: BigInt!
+	"""
+	删除的文件数
+	"""
+	filesDeleted: Int!
+	"""
+	错误数量
+	"""
+	errorCount: Int!
+	"""
 	开始时间
 	"""
 	startTime: DateTime!
@@ -247,6 +275,46 @@ type JobProgressEvent {
 	结束时间
 	"""
 	endTime: DateTime
+}
+
+"""
+当前正在传输的文件项
+"""
+type TransferItem {
+	"""
+	文件名称（含路径），如 "documents/report.pdf"
+	"""
+	name: String!
+	"""
+	文件总大小（字节）
+	"""
+	size: BigInt!
+	"""
+	已传输字节数
+	"""
+	bytes: BigInt!
+}
+
+"""
+传输进度事件 - 当前正在传输的文件列表
+"""
+type TransferProgressEvent {
+	"""
+	关联的作业 ID
+	"""
+	jobId: ID!
+	"""
+	关联的任务 ID
+	"""
+	taskId: ID!
+	"""
+	关联的连接 ID
+	"""
+	connectionId: ID!
+	"""
+	当前正在传输的文件列表
+	"""
+	transfers: [TransferItem!]!
 }
 
 # =============================================================================
@@ -348,4 +416,28 @@ extend type Subscription {
 		"""
 		connectionId: ID
 	): JobProgressEvent!
+
+	"""
+	订阅传输进度事件
+
+	推送机制：
+	- 增量推送：仅推送有变化的传输项（新增、进度更新）
+	- 传输完成时推送：每个文件传输完成时推送一次（此时 bytes == size）
+	- 前端应根据 name 合并/更新传输列表，当 bytes == size 时可移除该项
+
+	"""
+	transferProgress(
+		"""
+		按连接 ID 筛选
+		"""
+		connectionId: ID
+		"""
+		按任务 ID 筛选
+		"""
+		taskId: ID
+		"""
+		按作业 ID 筛选
+		"""
+		jobId: ID
+	): TransferProgressEvent!
 }

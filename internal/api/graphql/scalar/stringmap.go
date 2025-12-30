@@ -3,10 +3,20 @@ package scalar
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 
 	"github.com/99designs/gqlgen/graphql"
+	"github.com/xzzpig/rclone-sync/internal/core/errs"
+)
+
+// ConstError is an alias to errs.ConstError for defining sentinel errors in this package.
+type ConstError = errs.ConstError
+
+const (
+	// ErrStringMapInvalidType is returned when the input is not a JSON object.
+	ErrStringMapInvalidType ConstError = "StringMap must be a JSON object"
+	// ErrStringMapValueNotString is returned when a value in the map is not a string.
+	ErrStringMapValueNotString ConstError = "StringMap value must be string"
 )
 
 // StringMap is a type alias for map[string]string, used for gqlgen model binding.
@@ -29,14 +39,14 @@ func UnmarshalStringMap(v interface{}) (map[string]string, error) {
 
 	m, ok := v.(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("StringMap must be a JSON object, got %T", v)
+		return nil, ErrStringMapInvalidType
 	}
 
 	result := make(map[string]string, len(m))
 	for k, val := range m {
 		str, ok := val.(string)
 		if !ok {
-			return nil, fmt.Errorf("StringMap value for key %q must be string, got %T", k, val)
+			return nil, ErrStringMapValueNotString
 		}
 		result[k] = str
 	}

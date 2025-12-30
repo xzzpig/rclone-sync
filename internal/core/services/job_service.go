@@ -70,10 +70,12 @@ func (s *JobService) UpdateJobStatus(ctx context.Context, jobID uuid.UUID, statu
 }
 
 // UpdateJobStats updates the statistics of a job.
-func (s *JobService) UpdateJobStats(ctx context.Context, jobID uuid.UUID, files, bytes int64) (*ent.Job, error) {
+func (s *JobService) UpdateJobStats(ctx context.Context, jobID uuid.UUID, files, bytes, filesDeleted, errorCount int64) (*ent.Job, error) {
 	j, err := s.client.Job.UpdateOneID(jobID).
 		SetFilesTransferred(int(files)).
 		SetBytesTransferred(bytes).
+		SetFilesDeleted(int(filesDeleted)).
+		SetErrorCount(int(errorCount)).
 		Save(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -362,6 +364,66 @@ func (s *JobService) ListJobLogsByJobPaginated(ctx context.Context, jobID uuid.U
 	}
 
 	return logs, totalCount, nil
+}
+
+// DeleteOldLogsForConnection deletes old logs for a connection, keeping only the newest keepCount logs.
+// Returns the number of logs deleted.
+func (s *JobService) DeleteOldLogsForConnection(ctx context.Context, connectionID uuid.UUID, keepCount int) (int, error) {
+	s.logger.Info("Deleting old logs for connection",
+		zap.String("connection_id", connectionID.String()),
+		zap.Int("keep_count", keepCount))
+
+	// Query all log IDs for this connection, ordered by time descending (newest first)
+	// Skip the first keepCount (which we want to keep), and collect the rest for deletion
+	idsToDelete, err := s.client.JobLog.Query().
+		Where(joblog.HasJobWith(
+			job.HasTaskWith(
+				task.ConnectionIDEQ(connectionID),
+			),
+		)).
+		Order(ent.Desc(joblog.FieldTime)).
+		Offset(keepCount).
+		IDs(ctx)
+
+	if err != nil {
+		return 0, errors.Join(errs.ErrSystem, err)
+	}
+
+	if len(idsToDelete) == 0 {
+		return 0, nil
+	}
+
+	// Batch delete the old logs
+	deleted, err := s.client.JobLog.Delete().
+		Where(joblog.IDIn(idsToDelete...)).
+		Exec(ctx)
+
+	if err != nil {
+		return 0, errors.Join(errs.ErrSystem, err)
+	}
+
+	s.logger.Info("Deleted old logs for connection",
+		zap.String("connection_id", connectionID.String()),
+		zap.Int("deleted_count", deleted))
+
+	return deleted, nil
+}
+
+// DeleteJob deletes a job by ID.
+// This will cascade delete all associated job logs.
+func (s *JobService) DeleteJob(ctx context.Context, jobID uuid.UUID) error {
+	s.logger.Info("Deleting job", zap.String("job_id", jobID.String()))
+
+	err := s.client.Job.DeleteOneID(jobID).Exec(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return errors.Join(errs.ErrNotFound, err)
+		}
+		return errors.Join(errs.ErrSystem, err)
+	}
+
+	s.logger.Info("Deleted job successfully", zap.String("job_id", jobID.String()))
+	return nil
 }
 
 var _ ports.JobService = (*JobService)(nil)

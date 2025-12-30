@@ -42,7 +42,7 @@ func InitDB(opts InitDBOptions) (*ent.Client, error) {
 	// Create ent client with optional debug logging
 	options := []ent.Option{ent.Driver(drv)}
 	if opts.EnableDebug {
-		options = append(options, ent.Debug())
+		options = append(options, ent.Debug(), ent.Log(logger.Named("core.db.query").Sugar().Debug))
 	}
 	client := ent.NewClient(options...)
 
@@ -51,14 +51,18 @@ func InitDB(opts InitDBOptions) (*ent.Client, error) {
 	case MigrationModeAuto:
 		log().Info("Using auto migration mode (ent schema)")
 		if err := client.Schema.Create(context.Background()); err != nil {
-			client.Close()
+			if closeErr := client.Close(); closeErr != nil {
+				log().Warn("Failed to close client after migration error", zap.Error(closeErr))
+			}
 			return nil, fmt.Errorf("failed to run auto migration: %w", err)
 		}
 		log().Info("Auto migration completed successfully")
 	default:
 		log().Info("Using versioned migration mode", zap.String("mode", string(opts.MigrationMode)))
 		if err := Migrate(sqlDB, opts.Environment); err != nil {
-			client.Close()
+			if closeErr := client.Close(); closeErr != nil {
+				log().Warn("Failed to close client after migration error", zap.Error(closeErr))
+			}
 			return nil, fmt.Errorf("failed to run versioned migrations: %w", err)
 		}
 		// Log migration status
@@ -78,4 +82,18 @@ func CloseDB(client *ent.Client) {
 	if client != nil {
 		_ = client.Close()
 	}
+}
+
+// FileSDN constructs a SQLite DSN for a file-based database with common parameters.
+// Note: cache=shared is intentionally not used because it introduces table-level locking
+// which causes SQLITE_LOCKED errors that cannot be resolved with busy_timeout.
+// Without shared cache, each connection has its own page cache, using more memory
+// but providing better concurrency with WAL mode.
+func FileSDN(path string) string {
+	return fmt.Sprintf("file:%s?_fk=1&_journal_mode=WAL&_busy_timeout=5000&_synchronous=NORMAL", path)
+}
+
+// InMemoryDSN returns the DSN for an in-memory SQLite database.
+func InMemoryDSN() string {
+	return "file:ent?mode=memory&cache=shared&_fk=1&_busy_timeout=5000"
 }

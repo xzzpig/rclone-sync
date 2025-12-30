@@ -42,8 +42,8 @@ var serveCmd = &cobra.Command{
 			logger.Get().Fatal("Failed to load config", zap.Error(err))
 		}
 
-		// 2. Initialize Logger
-		logger.InitLogger(logger.Environment(cfg.App.Environment), logger.LogLevel(cfg.Log.Level))
+		// 2. Initialize Logger with hierarchical level configuration
+		logger.InitLogger(logger.Environment(cfg.App.Environment), logger.LogLevel(cfg.Log.Level), cfg.Log.Levels)
 		log := logger.Named("cmd.serve")
 		log.Info("Starting cloud-sync server...")
 		rclone.SetupLogLevel(cfg.Log.Level)
@@ -56,9 +56,9 @@ var serveCmd = &cobra.Command{
 
 		// 4. Initialize database with configured options
 		dbClient, err := db.InitDB(db.InitDBOptions{
-			DSN:           fmt.Sprintf("file:%s?cache=shared&_fk=1", cfg.Database.Path),
+			DSN:           db.FileSDN(cfg.Database.Path),
 			MigrationMode: db.ParseMigrationMode(cfg.Database.MigrationMode),
-			EnableDebug:   cfg.App.Environment == "development",
+			EnableDebug:   logger.GetLevelForName("core.db.query") == zap.DebugLevel,
 			Environment:   cfg.App.Environment,
 		})
 		if err != nil {
@@ -84,7 +84,8 @@ var serveCmd = &cobra.Command{
 		taskSvc := services.NewTaskService(dbClient)
 		jobSvc := services.NewJobService(dbClient)
 		jobProgressBus := subscription.NewJobProgressBus()
-		syncEngine := rclone.NewSyncEngine(jobSvc, jobProgressBus, cfg.App.DataDir)
+		transferProgressBus := subscription.NewTransferProgressBus()
+		syncEngine := rclone.NewSyncEngine(jobSvc, jobProgressBus, transferProgressBus, cfg.App.DataDir, cfg.Job.AutoDeleteEmptyJobs)
 		taskRunner := runner.NewRunner(syncEngine)
 
 		// Reset any stuck jobs from previous crash/shutdown
@@ -105,16 +106,27 @@ var serveCmd = &cobra.Command{
 		watch.Start()
 		defer watch.Stop()
 
-		// 10. Setup router with dependencies
+		// 10. Initialize and start log cleanup service
+		if cfg.Log.MaxLogsPerConnection > 0 && cfg.Log.CleanupSchedule != "" {
+			logCleanupSvc := services.NewLogCleanupService(dbClient, cfg.Log.MaxLogsPerConnection)
+			if err := logCleanupSvc.Start(cfg.Log.CleanupSchedule); err != nil {
+				log.Error("Failed to start log cleanup service", zap.Error(err))
+			} else {
+				defer logCleanupSvc.Stop()
+			}
+		}
+
+		// 11. Setup router with dependencies
 		routerDeps := api.RouterDeps{
-			Client:         dbClient,
-			Config:         cfg,
-			SyncEngine:     syncEngine,
-			Runner:         taskRunner,
-			JobService:     jobSvc,
-			Watcher:        watch,
-			Scheduler:      sched,
-			JobProgressBus: jobProgressBus,
+			Client:              dbClient,
+			Config:              cfg,
+			SyncEngine:          syncEngine,
+			Runner:              taskRunner,
+			JobService:          jobSvc,
+			Watcher:             watch,
+			Scheduler:           sched,
+			JobProgressBus:      jobProgressBus,
+			TransferProgressBus: transferProgressBus,
 		}
 		r := api.SetupRouter(routerDeps)
 

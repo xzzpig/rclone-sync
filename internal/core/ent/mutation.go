@@ -690,6 +690,10 @@ type JobMutation struct {
 	addfiles_transferred *int
 	bytes_transferred    *int64
 	addbytes_transferred *int64
+	files_deleted        *int
+	addfiles_deleted     *int
+	error_count          *int
+	adderror_count       *int
 	errors               *string
 	clearedFields        map[string]struct{}
 	task                 *uuid.UUID
@@ -1111,6 +1115,118 @@ func (m *JobMutation) ResetBytesTransferred() {
 	m.addbytes_transferred = nil
 }
 
+// SetFilesDeleted sets the "files_deleted" field.
+func (m *JobMutation) SetFilesDeleted(i int) {
+	m.files_deleted = &i
+	m.addfiles_deleted = nil
+}
+
+// FilesDeleted returns the value of the "files_deleted" field in the mutation.
+func (m *JobMutation) FilesDeleted() (r int, exists bool) {
+	v := m.files_deleted
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFilesDeleted returns the old "files_deleted" field's value of the Job entity.
+// If the Job object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *JobMutation) OldFilesDeleted(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFilesDeleted is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFilesDeleted requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFilesDeleted: %w", err)
+	}
+	return oldValue.FilesDeleted, nil
+}
+
+// AddFilesDeleted adds i to the "files_deleted" field.
+func (m *JobMutation) AddFilesDeleted(i int) {
+	if m.addfiles_deleted != nil {
+		*m.addfiles_deleted += i
+	} else {
+		m.addfiles_deleted = &i
+	}
+}
+
+// AddedFilesDeleted returns the value that was added to the "files_deleted" field in this mutation.
+func (m *JobMutation) AddedFilesDeleted() (r int, exists bool) {
+	v := m.addfiles_deleted
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetFilesDeleted resets all changes to the "files_deleted" field.
+func (m *JobMutation) ResetFilesDeleted() {
+	m.files_deleted = nil
+	m.addfiles_deleted = nil
+}
+
+// SetErrorCount sets the "error_count" field.
+func (m *JobMutation) SetErrorCount(i int) {
+	m.error_count = &i
+	m.adderror_count = nil
+}
+
+// ErrorCount returns the value of the "error_count" field in the mutation.
+func (m *JobMutation) ErrorCount() (r int, exists bool) {
+	v := m.error_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldErrorCount returns the old "error_count" field's value of the Job entity.
+// If the Job object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *JobMutation) OldErrorCount(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldErrorCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldErrorCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldErrorCount: %w", err)
+	}
+	return oldValue.ErrorCount, nil
+}
+
+// AddErrorCount adds i to the "error_count" field.
+func (m *JobMutation) AddErrorCount(i int) {
+	if m.adderror_count != nil {
+		*m.adderror_count += i
+	} else {
+		m.adderror_count = &i
+	}
+}
+
+// AddedErrorCount returns the value that was added to the "error_count" field in this mutation.
+func (m *JobMutation) AddedErrorCount() (r int, exists bool) {
+	v := m.adderror_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetErrorCount resets all changes to the "error_count" field.
+func (m *JobMutation) ResetErrorCount() {
+	m.error_count = nil
+	m.adderror_count = nil
+}
+
 // SetErrors sets the "errors" field.
 func (m *JobMutation) SetErrors(s string) {
 	m.errors = &s
@@ -1275,7 +1391,7 @@ func (m *JobMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *JobMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 10)
 	if m.task != nil {
 		fields = append(fields, job.FieldTaskID)
 	}
@@ -1296,6 +1412,12 @@ func (m *JobMutation) Fields() []string {
 	}
 	if m.bytes_transferred != nil {
 		fields = append(fields, job.FieldBytesTransferred)
+	}
+	if m.files_deleted != nil {
+		fields = append(fields, job.FieldFilesDeleted)
+	}
+	if m.error_count != nil {
+		fields = append(fields, job.FieldErrorCount)
 	}
 	if m.errors != nil {
 		fields = append(fields, job.FieldErrors)
@@ -1322,6 +1444,10 @@ func (m *JobMutation) Field(name string) (ent.Value, bool) {
 		return m.FilesTransferred()
 	case job.FieldBytesTransferred:
 		return m.BytesTransferred()
+	case job.FieldFilesDeleted:
+		return m.FilesDeleted()
+	case job.FieldErrorCount:
+		return m.ErrorCount()
 	case job.FieldErrors:
 		return m.Errors()
 	}
@@ -1347,6 +1473,10 @@ func (m *JobMutation) OldField(ctx context.Context, name string) (ent.Value, err
 		return m.OldFilesTransferred(ctx)
 	case job.FieldBytesTransferred:
 		return m.OldBytesTransferred(ctx)
+	case job.FieldFilesDeleted:
+		return m.OldFilesDeleted(ctx)
+	case job.FieldErrorCount:
+		return m.OldErrorCount(ctx)
 	case job.FieldErrors:
 		return m.OldErrors(ctx)
 	}
@@ -1407,6 +1537,20 @@ func (m *JobMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetBytesTransferred(v)
 		return nil
+	case job.FieldFilesDeleted:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFilesDeleted(v)
+		return nil
+	case job.FieldErrorCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetErrorCount(v)
+		return nil
 	case job.FieldErrors:
 		v, ok := value.(string)
 		if !ok {
@@ -1428,6 +1572,12 @@ func (m *JobMutation) AddedFields() []string {
 	if m.addbytes_transferred != nil {
 		fields = append(fields, job.FieldBytesTransferred)
 	}
+	if m.addfiles_deleted != nil {
+		fields = append(fields, job.FieldFilesDeleted)
+	}
+	if m.adderror_count != nil {
+		fields = append(fields, job.FieldErrorCount)
+	}
 	return fields
 }
 
@@ -1440,6 +1590,10 @@ func (m *JobMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedFilesTransferred()
 	case job.FieldBytesTransferred:
 		return m.AddedBytesTransferred()
+	case job.FieldFilesDeleted:
+		return m.AddedFilesDeleted()
+	case job.FieldErrorCount:
+		return m.AddedErrorCount()
 	}
 	return nil, false
 }
@@ -1462,6 +1616,20 @@ func (m *JobMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddBytesTransferred(v)
+		return nil
+	case job.FieldFilesDeleted:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddFilesDeleted(v)
+		return nil
+	case job.FieldErrorCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddErrorCount(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Job numeric field %s", name)
@@ -1525,6 +1693,12 @@ func (m *JobMutation) ResetField(name string) error {
 		return nil
 	case job.FieldBytesTransferred:
 		m.ResetBytesTransferred()
+		return nil
+	case job.FieldFilesDeleted:
+		m.ResetFilesDeleted()
+		return nil
+	case job.FieldErrorCount:
+		m.ResetErrorCount()
 		return nil
 	case job.FieldErrors:
 		m.ResetErrors()

@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
+	"entgo.io/ent/schema/index"
 	"github.com/google/uuid"
 )
 
@@ -31,6 +32,14 @@ func (JobLog) Fields() []ent.Field {
 			Default(string(model.LogActionUnknown)),
 		field.Int64("size").
 			Optional(),
+	}
+}
+
+// Indexes of the JobLog.
+func (JobLog) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("job_id"),
+		index.Fields("job_id", "time"),
 	}
 }
 

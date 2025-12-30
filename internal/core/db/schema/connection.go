@@ -45,6 +45,7 @@ func (Connection) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("name").Unique(),
 		index.Fields("type"),
+		index.Fields("created_at"),
 	}
 }
 

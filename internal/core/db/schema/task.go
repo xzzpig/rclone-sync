@@ -9,6 +9,7 @@ import (
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
+	"entgo.io/ent/schema/index"
 	"github.com/google/uuid"
 )
 
@@ -44,6 +45,14 @@ func (Task) Fields() []ent.Field {
 		field.Time("updated_at").
 			Default(time.Now).
 			UpdateDefault(time.Now),
+	}
+}
+
+// Indexes of the Task.
+func (Task) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("connection_id"),
+		index.Fields("created_at"),
 	}
 }
 

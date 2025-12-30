@@ -33,6 +33,11 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{ConnectionsColumns[2]},
 			},
+			{
+				Name:    "connection_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ConnectionsColumns[4]},
+			},
 		},
 	}
 	// JobsColumns holds the columns for the "jobs" table.
@@ -62,6 +67,23 @@ var (
 				OnDelete:   schema.Cascade,
 			},
 		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "job_task_id",
+				Unique:  false,
+				Columns: []*schema.Column{JobsColumns[10]},
+			},
+			{
+				Name:    "job_task_id_start_time",
+				Unique:  false,
+				Columns: []*schema.Column{JobsColumns[10], JobsColumns[3]},
+			},
+			{
+				Name:    "job_status",
+				Unique:  false,
+				Columns: []*schema.Column{JobsColumns[1]},
+			},
+		},
 	}
 	// JobLogsColumns holds the columns for the "job_logs" table.
 	JobLogsColumns = []*schema.Column{
@@ -84,6 +106,18 @@ var (
 				Columns:    []*schema.Column{JobLogsColumns[6]},
 				RefColumns: []*schema.Column{JobsColumns[0]},
 				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "joblog_job_id",
+				Unique:  false,
+				Columns: []*schema.Column{JobLogsColumns[6]},
+			},
+			{
+				Name:    "joblog_job_id_time",
+				Unique:  false,
+				Columns: []*schema.Column{JobLogsColumns[6], JobLogsColumns[2]},
 			},
 		},
 	}
@@ -112,6 +146,18 @@ var (
 				Columns:    []*schema.Column{TasksColumns[10]},
 				RefColumns: []*schema.Column{ConnectionsColumns[0]},
 				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "task_connection_id",
+				Unique:  false,
+				Columns: []*schema.Column{TasksColumns[10]},
+			},
+			{
+				Name:    "task_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{TasksColumns[8]},
 			},
 		},
 	}

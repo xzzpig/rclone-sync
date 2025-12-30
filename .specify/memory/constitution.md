@@ -1,8 +1,8 @@
 <!--
 SYNC IMPACT REPORT
-Version change: 1.4.0 -> 1.5.0
+Version change: 1.5.0 -> 1.6.0
 Modified principles: None
-Added sections: Frontend GraphQL entry in Technology Stack
+Added sections: Principle XI - Database Index Strategy
 Removed sections: None
 Templates requiring updates: ✅ None
 Follow-up TODOs: None
@@ -51,6 +51,16 @@ All user-visible text MUST be externalized into translation resource files—har
 ### X. Schema-First API Contract
 
 All API interactions MUST be defined via GraphQL Schema first. Code generation MUST be used to ensure type safety across Backend (Go) and Frontend (TypeScript). Ad-hoc API endpoints are prohibited. Resolvers MUST implement the generated interfaces strictly.
+
+### XI. Database Index Strategy
+
+All database CRUD operations MUST be reviewed for appropriate indexing needs. When adding new queries, mutations, or entity relationships, developers MUST evaluate whether database indexes are required to maintain query performance. Indexes MUST be added for:
+- Fields used in WHERE clauses for frequent queries
+- Foreign key columns used in JOIN operations
+- Fields used in ORDER BY for paginated results
+- Unique constraint columns
+
+Index additions MUST be implemented via migration files using golang-migrate. Over-indexing MUST be avoided—each index adds write overhead. Index decisions MUST be documented in the corresponding migration file comments.
 
 ## Technical Constraints
 
@@ -108,4 +118,4 @@ All API interactions MUST be defined via GraphQL Schema first. Code generation M
 
 This constitution supersedes all other development practices. Amendments REQUIRE documentation, team approval, and migration plan. Versioning follows Semantic Versioning (MAJOR.MINOR.PATCH). All code reviews MUST verify compliance with these principles. Complexity MUST be justified with clear business value.
 
-**Version**: 1.5.0 | **Ratified**: 2025-12-04 | **Last Amended**: 2025-12-28
+**Version**: 1.6.0 | **Ratified**: 2025-12-04 | **Last Amended**: 2025-12-30

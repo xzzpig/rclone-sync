@@ -9,6 +9,7 @@ import (
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
+	"entgo.io/ent/schema/index"
 	"github.com/google/uuid"
 )
 
@@ -42,6 +43,15 @@ func (Job) Fields() []ent.Field {
 			Default(0),
 		field.Text("errors").
 			Optional(),
+	}
+}
+
+// Indexes of the Job.
+func (Job) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("task_id"),
+		index.Fields("task_id", "start_time"),
+		index.Fields("status"),
 	}
 }
 

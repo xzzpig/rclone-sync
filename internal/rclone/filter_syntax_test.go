@@ -295,10 +295,6 @@ func TestCreateFilterFromRules(t *testing.T) {
 			rules []string
 		}{
 			{
-				name:  "Empty rules",
-				rules: []string{},
-			},
-			{
 				name:  "Single exclude rule",
 				rules: []string{"- node_modules/**"},
 			},

@@ -176,16 +176,16 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger model.
 	})
 
 	// 5. Create Fs objects
-	// Note: We assume remotes are already configured in rclone.conf
-	// For local paths, NewFs works directly. For remotes, it uses the config.
-	fSrc, err := fs.NewFs(statsCtx, task.SourcePath)
+	// For source (local paths), use GetFs with empty remote to skip caching (per FR-009).
+	// For destination (remote), use GetFs with remote name to leverage Fs cache.
+	fSrc, err := GetFs(statsCtx, "", task.SourcePath)
 	if err != nil {
 		e.failJob(ctx, jobEntity.ID, err)
 		return err
 	}
 
-	f2Path := fmt.Sprintf("%s:%s", connectionName, task.RemotePath)
-	fDst, err := fs.NewFs(statsCtx, f2Path)
+	// For remote destinations, use cached Fs to avoid repeated connection setup
+	fDst, err := GetFs(statsCtx, connectionName, task.RemotePath)
 	if err != nil {
 		e.failJob(ctx, jobEntity.ID, err)
 		return err

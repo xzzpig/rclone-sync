@@ -13,9 +13,9 @@ type AboutInfo = fs.Usage
 // GetRemoteQuota gets the quota information for a remote
 // It corresponds to the `rclone about` command
 func GetRemoteQuota(ctx context.Context, remoteName string) (*AboutInfo, error) {
-	// Create the Fs for the remote
-	// We use remoteName + ":" to ensure it's treated as a remote
-	f, err := fs.NewFs(ctx, remoteName+":")
+	// Create the Fs for the remote using cached Fs via GetFs
+	// GetFs with remote name and empty path returns cached "remote:" Fs
+	f, err := GetFs(ctx, remoteName, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create fs for remote %s: %w", remoteName, err)
 	}

@@ -85,6 +85,12 @@ other = "没有可导入的连接"
 [error_connection_has_dependent_tasks]
 other = "无法删除包含依赖任务的连接"
 
+[error_filter_rule_invalid]
+other = "过滤器规则 #{{.Index}} \"{{.Rule}}\" 无效: {{.Reason}}"
+
+[error_transfers_out_of_range]
+other = "并行传输数量必须在 1-64 之间，当前值为 {{.Value}}"
+
 # Status messages
 [status_syncing]
 other = "同步中"

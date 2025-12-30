@@ -25,6 +25,12 @@ export const TasksListQuery = graphql(`
             name
             type
           }
+          options {
+            conflictResolution
+            filters
+            noDelete
+            transfers
+          }
           latestJob {
             id
             status
@@ -62,6 +68,9 @@ export const TaskGetQuery = graphql(`
         }
         options {
           conflictResolution
+          filters
+          noDelete
+          transfers
         }
         latestJob {
           id

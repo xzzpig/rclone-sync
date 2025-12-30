@@ -27,4 +27,7 @@ const (
 
 	// ErrUnauthorized is returned when the user is not authorized to perform the action.
 	ErrUnauthorized = ConstError("unauthorized")
+
+	// ErrValidation is returned when validation of input data fails.
+	ErrValidation = ConstError("validation error")
 )

@@ -30,6 +30,8 @@ const (
 	ErrImportParseFailed           = "error_import_parse_failed"
 	ErrImportEmptyList             = "error_import_empty_list"
 	ErrConnectionHasDependentTasks = "error_connection_has_dependent_tasks"
+	ErrFilterRuleInvalid           = "error_filter_rule_invalid"
+	ErrTransfersOutOfRange         = "error_transfers_out_of_range"
 )
 
 // Status message keys

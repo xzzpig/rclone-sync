@@ -22,6 +22,7 @@ import {
   Switch,
 } from 'solid-js';
 import IconFolder from '~icons/lucide/folder';
+import IconFile from '~icons/lucide/file';
 import IconRefreshCw from '~icons/lucide/refresh-cw';
 
 export interface FileBrowserProps {
@@ -197,7 +198,12 @@ export const FileBrowser: Component<FileBrowserProps> = (props) => {
                       handleEntryClick(entry);
                     }}
                   >
-                    <IconFolder class="size-5 shrink-0 text-blue-500" />
+                    <Show
+                      when={entry.isDir}
+                      fallback={<IconFile class="size-5 shrink-0 text-muted-foreground" />}
+                    >
+                      <IconFolder class="size-5 shrink-0 text-blue-500" />
+                    </Show>
                     <span class="flex-1 truncate">{entry.name}</span>
                   </div>
                 )}

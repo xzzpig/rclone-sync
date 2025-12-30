@@ -130,7 +130,7 @@ func TestPollStatsLogic(t *testing.T) {
 	jobID := uuid.New()
 
 	// 2. Setup SyncEngine
-	engine := NewSyncEngine(mockJobService, nil, nil, t.TempDir(), false)
+	engine := NewSyncEngine(mockJobService, nil, nil, t.TempDir(), false, 0)
 	engine.logger = zap.NewNop() // Setup logger
 
 	// 3. Setup Context with Stats
@@ -159,7 +159,7 @@ func TestPollStatsLogic(t *testing.T) {
 func TestGetJobProgress(t *testing.T) {
 	// Setup
 	mockJobService := new(MockJobService)
-	engine := NewSyncEngine(mockJobService, nil, nil, t.TempDir(), false)
+	engine := NewSyncEngine(mockJobService, nil, nil, t.TempDir(), false, 0)
 
 	// Test case 1: Job ID exists in lastEvents
 	jobID1 := uuid.New()
@@ -189,7 +189,7 @@ func TestGetJobProgress(t *testing.T) {
 func TestGetConflictResolutionFromOptions(t *testing.T) {
 	tests := []struct {
 		name            string
-		options         map[string]any
+		options         *model.TaskSyncOptions
 		expectedResolve string
 		expectedLoser   string
 	}{
@@ -201,56 +201,40 @@ func TestGetConflictResolutionFromOptions(t *testing.T) {
 		},
 		{
 			name:            "empty options - default",
-			options:         map[string]any{},
+			options:         &model.TaskSyncOptions{},
 			expectedResolve: "newer",
 			expectedLoser:   "num",
 		},
 		{
 			name: "resolution: newer",
-			options: map[string]any{
-				"conflict_resolution": "newer",
+			options: &model.TaskSyncOptions{
+				ConflictResolution: func() *model.ConflictResolution { v := model.ConflictResolutionNewer; return &v }(),
 			},
 			expectedResolve: "newer",
 			expectedLoser:   "num",
 		},
 		{
 			name: "resolution: local",
-			options: map[string]any{
-				"conflict_resolution": "local",
+			options: &model.TaskSyncOptions{
+				ConflictResolution: func() *model.ConflictResolution { v := model.ConflictResolutionLocal; return &v }(),
 			},
 			expectedResolve: "path1",
 			expectedLoser:   "delete",
 		},
 		{
 			name: "resolution: remote",
-			options: map[string]any{
-				"conflict_resolution": "remote",
+			options: &model.TaskSyncOptions{
+				ConflictResolution: func() *model.ConflictResolution { v := model.ConflictResolutionRemote; return &v }(),
 			},
 			expectedResolve: "path2",
 			expectedLoser:   "delete",
 		},
 		{
 			name: "resolution: both",
-			options: map[string]any{
-				"conflict_resolution": "both",
+			options: &model.TaskSyncOptions{
+				ConflictResolution: func() *model.ConflictResolution { v := model.ConflictResolutionBoth; return &v }(),
 			},
 			expectedResolve: "none",
-			expectedLoser:   "num",
-		},
-		{
-			name: "resolution: unknown - default to newer",
-			options: map[string]any{
-				"conflict_resolution": "unknown",
-			},
-			expectedResolve: "newer",
-			expectedLoser:   "num",
-		},
-		{
-			name: "resolution: wrong type - default",
-			options: map[string]any{
-				"conflict_resolution": 123,
-			},
-			expectedResolve: "newer",
 			expectedLoser:   "num",
 		},
 	}
@@ -267,7 +251,7 @@ func TestGetConflictResolutionFromOptions(t *testing.T) {
 // TestFailJob tests the failJob method
 func TestFailJob(t *testing.T) {
 	mockJobService := new(MockJobService)
-	engine := NewSyncEngine(mockJobService, nil, nil, t.TempDir(), false)
+	engine := NewSyncEngine(mockJobService, nil, nil, t.TempDir(), false, 0)
 	engine.logger = zap.NewNop()
 
 	jobID := uuid.New()
@@ -338,6 +322,208 @@ func TestGetTotalStats_NilStats(t *testing.T) {
 	totalTransfers, totalBytes := getTotalStats(nil)
 	assert.Equal(t, int64(0), totalTransfers, "totalTransfers should be 0 for nil stats")
 	assert.Equal(t, int64(0), totalBytes, "totalBytes should be 0 for nil stats")
+}
+
+// TestApplyFilterRules tests the applyFilterRules helper function.
+func TestApplyFilterRules(t *testing.T) {
+	tests := []struct {
+		name        string
+		rules       []string
+		expectErr   bool
+		errContains string
+	}{
+		{
+			name:      "empty rules - returns original context",
+			rules:     nil,
+			expectErr: false,
+		},
+		{
+			name:      "empty slice - returns original context",
+			rules:     []string{},
+			expectErr: false,
+		},
+		{
+			name:      "valid exclude rule",
+			rules:     []string{"- *.tmp"},
+			expectErr: false,
+		},
+		{
+			name:      "valid include rule",
+			rules:     []string{"+ *.go"},
+			expectErr: false,
+		},
+		{
+			name:      "multiple valid rules",
+			rules:     []string{"- node_modules/**", "- .git/**", "+ **"},
+			expectErr: false,
+		},
+		{
+			name:        "invalid rule - missing prefix",
+			rules:       []string{"*.tmp"},
+			expectErr:   true,
+			errContains: "error_filter_rule_invalid",
+		},
+		{
+			name:        "invalid rule - wrong prefix",
+			rules:       []string{"* *.tmp"},
+			expectErr:   true,
+			errContains: "error_filter_rule_invalid",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			newCtx, err := applyFilterRules(ctx, tt.rules)
+
+			if tt.expectErr {
+				assert.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, newCtx)
+				// When no rules, context should be unchanged
+				if len(tt.rules) == 0 {
+					assert.Equal(t, ctx, newCtx)
+				}
+			}
+		})
+	}
+}
+
+// TestGetSyncOptionsFromTask tests the getSyncOptionsFromTask helper function.
+func TestGetSyncOptionsFromTask(t *testing.T) {
+	tests := []struct {
+		name     string
+		options  *model.TaskSyncOptions
+		expected SyncOptions
+	}{
+		{
+			name:     "nil options - returns empty SyncOptions",
+			options:  nil,
+			expected: SyncOptions{},
+		},
+		{
+			name:     "empty options - returns empty SyncOptions",
+			options:  &model.TaskSyncOptions{},
+			expected: SyncOptions{},
+		},
+		{
+			name: "filters only",
+			options: &model.TaskSyncOptions{
+				Filters: []string{"- *.tmp", "+ **"},
+			},
+			expected: SyncOptions{
+				Filters: []string{"- *.tmp", "+ **"},
+			},
+		},
+		{
+			name: "noDelete only",
+			options: &model.TaskSyncOptions{
+				NoDelete: func() *bool { v := true; return &v }(),
+			},
+			expected: SyncOptions{
+				NoDelete: true,
+			},
+		},
+		{
+			name: "transfers only",
+			options: &model.TaskSyncOptions{
+				Transfers: func() *int { v := 8; return &v }(),
+			},
+			expected: SyncOptions{
+				Transfers: 8,
+			},
+		},
+		{
+			name: "all options combined",
+			options: &model.TaskSyncOptions{
+				Filters:   []string{"- node_modules/**", "+ **"},
+				NoDelete:  func() *bool { v := true; return &v }(),
+				Transfers: func() *int { v := 32; return &v }(),
+			},
+			expected: SyncOptions{
+				Filters:   []string{"- node_modules/**", "+ **"},
+				NoDelete:  true,
+				Transfers: 32,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getSyncOptionsFromTask(tt.options)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestDetermineTransfers tests the determineTransfers helper function.
+func TestDetermineTransfers(t *testing.T) {
+	tests := []struct {
+		name             string
+		taskTransfers    int
+		defaultTransfers int
+		expected         int
+	}{
+		{
+			name:             "task-level value takes priority",
+			taskTransfers:    8,
+			defaultTransfers: 16,
+			expected:         8,
+		},
+		{
+			name:             "global config used when task is 0",
+			taskTransfers:    0,
+			defaultTransfers: 16,
+			expected:         16,
+		},
+		{
+			name:             "built-in default when both are 0",
+			taskTransfers:    0,
+			defaultTransfers: 0,
+			expected:         DefaultTransfers,
+		},
+		{
+			name:             "built-in default when both are negative",
+			taskTransfers:    -1,
+			defaultTransfers: -1,
+			expected:         DefaultTransfers,
+		},
+		{
+			name:             "task-level edge case: 1",
+			taskTransfers:    1,
+			defaultTransfers: 64,
+			expected:         1,
+		},
+		{
+			name:             "task-level edge case: 64",
+			taskTransfers:    64,
+			defaultTransfers: 4,
+			expected:         64,
+		},
+		{
+			name:             "global config edge case: 1",
+			taskTransfers:    0,
+			defaultTransfers: 1,
+			expected:         1,
+		},
+		{
+			name:             "global config edge case: 64",
+			taskTransfers:    0,
+			defaultTransfers: 64,
+			expected:         64,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := determineTransfers(tt.taskTransfers, tt.defaultTransfers)
+			assert.Equal(t, tt.expected, result, "determineTransfers result mismatch")
+		})
+	}
 }
 
 // TestShouldDeleteEmptyJob tests the shouldDeleteEmptyJob helper function.

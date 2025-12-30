@@ -82,3 +82,25 @@ func entJobLogToModel(l *ent.JobLog) *model.JobLog {
 		JobID: l.JobID, // FK for dataloader optimization
 	}
 }
+
+// buildOptions converts TaskSyncOptionsInput to TaskSyncOptions for database storage.
+// It only includes fields that are explicitly set (non-nil).
+func buildOptions(input *model.TaskSyncOptionsInput) *model.TaskSyncOptions {
+	if input == nil {
+		return nil
+	}
+
+	options := &model.TaskSyncOptions{
+		ConflictResolution: input.ConflictResolution,
+		Filters:            input.Filters,
+		NoDelete:           input.NoDelete,
+		Transfers:          input.Transfers,
+	}
+
+	// Return nil if all fields are empty
+	if options.ConflictResolution == nil && len(options.Filters) == 0 && options.NoDelete == nil && options.Transfers == nil {
+		return nil
+	}
+
+	return options
+}

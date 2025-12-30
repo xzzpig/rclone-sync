@@ -152,10 +152,10 @@ type FileEntry struct {
 
 // 文件查询命名空间
 type FileQuery struct {
-	// 列出本地目录内容
-	Local []*FileEntry `json:"local"`
-	// 列出远程目录内容
-	Remote []*FileEntry `json:"remote"`
+	// 列出目录内容（统一接口，支持本地和远程）
+	// 当 connectionId 为空时访问本地路径，否则访问远程连接
+	// 支持过滤器预览功能
+	List []*FileEntry `json:"list"`
 }
 
 // 导入连接输入
@@ -484,12 +484,28 @@ type TaskQuery struct {
 type TaskSyncOptions struct {
 	// 冲突解决策略（默认 NEWER，仅用于双向同步）
 	ConflictResolution *ConflictResolution `json:"conflictResolution,omitempty"`
+	// 文件过滤规则列表 - rclone filter 语法
+	// 每个元素为一条规则，格式: "- pattern" (排除) 或 "+ pattern" (包含)
+	// 规则按顺序匹配，第一个匹配的规则生效
+	Filters []string `json:"filters,omitempty"`
+	// 保留删除文件 - 仅单向同步有效
+	// 启用后，同步不会删除目标端的多余文件
+	NoDelete *bool `json:"noDelete,omitempty"`
+	// 并行传输数量 - 范围 1-64
+	// 为 null 时使用全局配置默认值
+	Transfers *int `json:"transfers,omitempty"`
 }
 
 // 任务同步选项输入
 type TaskSyncOptionsInput struct {
 	// 冲突解决策略（默认 NEWER，仅用于双向同步）
 	ConflictResolution *ConflictResolution `json:"conflictResolution,omitempty"`
+	// 文件过滤规则列表 - rclone filter 语法
+	Filters []string `json:"filters,omitempty"`
+	// 保留删除文件 - 仅单向同步有效
+	NoDelete *bool `json:"noDelete,omitempty"`
+	// 并行传输数量 - 范围 1-64
+	Transfers *int `json:"transfers,omitempty"`
 }
 
 // 测试连接输入（未保存的配置）

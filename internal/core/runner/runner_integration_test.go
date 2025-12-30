@@ -67,7 +67,7 @@ func setupIntegrationTest(t *testing.T) *testContext {
 	storage.Install()
 
 	// Create SyncEngine and Runner
-	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, dataDir, false)
+	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, dataDir, false, 0)
 	r := runner.NewRunner(syncEngine)
 
 	cleanup := func() {
@@ -165,7 +165,7 @@ func setupCancelTest(t *testing.T) *cancelTestContext {
 	_ = storage // DBStorage is installed, slowfs backend will be created via ConnectionService
 
 	// Create SyncEngine and Runner
-	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, dataDir, false)
+	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, dataDir, false, 0)
 	r := runner.NewRunner(syncEngine)
 
 	cleanup := func() {

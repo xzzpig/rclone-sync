@@ -36,7 +36,7 @@ type Task struct {
 	// Realtime holds the value of the "realtime" field.
 	Realtime bool `json:"realtime,omitempty"`
 	// Options holds the value of the "options" field.
-	Options map[string]interface{} `json:"options,omitempty"`
+	Options *model.TaskSyncOptions `json:"options,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.

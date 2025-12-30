@@ -21,17 +21,20 @@ type Config struct {
 		MigrationMode string `mapstructure:"migration_mode"`
 	} `mapstructure:"database"`
 	Log struct {
-		Level                string    `mapstructure:"level"`
-		Levels               LogLevels `mapstructure:"levels"`
-		MaxLogsPerConnection int       `mapstructure:"max_logs_per_connection"`
-		CleanupSchedule      string    `mapstructure:"cleanup_schedule"`
+		Level  string    `mapstructure:"level"`
+		Levels LogLevels `mapstructure:"levels"`
 	} `mapstructure:"log"`
-	Job struct {
-		AutoDeleteEmptyJobs bool `mapstructure:"auto_delete_empty_jobs"`
-	} `mapstructure:"job"`
 	App struct {
 		DataDir     string `mapstructure:"data_dir"`
 		Environment string `mapstructure:"environment"`
+		Job         struct {
+			AutoDeleteEmptyJobs  bool   `mapstructure:"auto_delete_empty_jobs"`
+			MaxLogsPerConnection int    `mapstructure:"max_logs_per_connection"`
+			CleanupSchedule      string `mapstructure:"cleanup_schedule"`
+		} `mapstructure:"job"`
+		Sync struct {
+			Transfers int `mapstructure:"transfers"` // Default parallel transfers (1-64), default: 4
+		} `mapstructure:"sync"`
 	} `mapstructure:"app"`
 	Security struct {
 		EncryptionKey string `mapstructure:"encryption_key"`
@@ -100,11 +103,12 @@ func setDefaults() {
 	viper.SetDefault("database.path", "cloud-sync.db")
 	viper.SetDefault("database.migration_mode", "versioned")
 	viper.SetDefault("log.level", "info")
-	viper.SetDefault("log.max_logs_per_connection", 1000)
-	viper.SetDefault("log.cleanup_schedule", "0 * * * *")
-	viper.SetDefault("job.auto_delete_empty_jobs", true)
 	viper.SetDefault("app.data_dir", "./app_data")
 	viper.SetDefault("app.environment", "production")
+	viper.SetDefault("app.job.auto_delete_empty_jobs", true)
+	viper.SetDefault("app.job.max_logs_per_connection", 1000)
+	viper.SetDefault("app.job.cleanup_schedule", "0 * * * *")
+	viper.SetDefault("app.sync.transfers", 4)
 	viper.SetDefault("security.encryption_key", "")
 }
 

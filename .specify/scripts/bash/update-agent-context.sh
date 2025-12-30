@@ -633,6 +633,7 @@ update_specific_agent() {
             ;;
         bob)
             update_agent_file "$BOB_FILE" "IBM Bob"
+            ;;
         cline)
             update_agent_file "$CLINE_FILE" "Cline"
             ;;

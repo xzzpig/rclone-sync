@@ -33,20 +33,7 @@ func (r *taskResolver) Options(ctx context.Context, obj *model.Task) (*model.Tas
 		return nil, err
 	}
 
-	if entTask.Options == nil {
-		return nil, nil
-	}
-
-	// Convert options map to TaskSyncOptions
-	options := &model.TaskSyncOptions{}
-	if cr, ok := entTask.Options["conflict_resolution"].(string); ok {
-		conflictRes := model.ConflictResolution(cr)
-		if conflictRes.IsValid() {
-			options.ConflictResolution = &conflictRes
-		}
-	}
-
-	return options, nil
+	return entTask.Options, nil
 }
 
 // Connection is the resolver for the connection field.
@@ -124,12 +111,10 @@ func (r *taskMutationResolver) Create(ctx context.Context, obj *model.TaskMutati
 		}
 	}
 
-	// Build options map
-	var options map[string]interface{}
-	if input.Options != nil && input.Options.ConflictResolution != nil {
-		options = map[string]interface{}{
-			"conflict_resolution": string(*input.Options.ConflictResolution),
-		}
+	// Build options from input
+	var options *model.TaskSyncOptions
+	if input.Options != nil {
+		options = buildOptions(input.Options)
 	}
 
 	// Default realtime to false if not provided
@@ -217,12 +202,8 @@ func (r *taskMutationResolver) Update(ctx context.Context, obj *model.TaskMutati
 		realtime = *input.Realtime
 	}
 
-	options := existingTask.Options
-	if input.Options != nil && input.Options.ConflictResolution != nil {
-		options = map[string]interface{}{
-			"conflict_resolution": string(*input.Options.ConflictResolution),
-		}
-	}
+	// Use complete options from input (not merge) - caller should pass full options
+	options := buildOptions(input.Options)
 
 	// Update task
 	updatedTask, err := r.deps.TaskService.UpdateTask(

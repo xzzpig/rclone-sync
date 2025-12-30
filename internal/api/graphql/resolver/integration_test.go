@@ -332,9 +332,9 @@ func (s *IntegrationTestSuite) TestUserJourney_CompleteFlow() {
 	require.Empty(s.T(), resp.Errors, "Should create connection")
 	connID := gjson.Get(string(resp.Data), "connection.create.id").String()
 
-	// Phase 2: Browse local files
+	// Phase 2: Browse local files (connectionId: null means local filesystem)
 	browseQuery := `
-        query($path: String!) { file { local(path: $path) { name isDir } } }
+        query($path: String!) { file { list(path: $path) { name isDir } } }
     `
 	resp = s.Env.ExecuteGraphQLWithVars(s.T(), browseQuery, map[string]interface{}{
 		"path": s.testDir,

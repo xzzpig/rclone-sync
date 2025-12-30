@@ -119,8 +119,7 @@ type ComplexityRoot struct {
 	}
 
 	FileQuery struct {
-		Local  func(childComplexity int, path string) int
-		Remote func(childComplexity int, connectionID uuid.UUID, path string) int
+		List func(childComplexity int, connectionID *uuid.UUID, path string, basePath *string, filters []string, includeFiles *bool) int
 	}
 
 	ImportExecuteResult struct {
@@ -304,6 +303,9 @@ type ComplexityRoot struct {
 
 	TaskSyncOptions struct {
 		ConflictResolution func(childComplexity int) int
+		Filters            func(childComplexity int) int
+		NoDelete           func(childComplexity int) int
+		Transfers          func(childComplexity int) int
 	}
 
 	TransferItem struct {
@@ -340,8 +342,7 @@ type ConnectionQueryResolver interface {
 	Get(ctx context.Context, obj *model.ConnectionQuery, id uuid.UUID) (*model.Connection, error)
 }
 type FileQueryResolver interface {
-	Local(ctx context.Context, obj *model.FileQuery, path string) ([]*model.FileEntry, error)
-	Remote(ctx context.Context, obj *model.FileQuery, connectionID uuid.UUID, path string) ([]*model.FileEntry, error)
+	List(ctx context.Context, obj *model.FileQuery, connectionID *uuid.UUID, path string, basePath *string, filters []string, includeFiles *bool) ([]*model.FileEntry, error)
 }
 type ImportMutationResolver interface {
 	Parse(ctx context.Context, obj *model.ImportMutation, input model.ImportParseInput) (model.ImportParseResult, error)
@@ -655,28 +656,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.FileEntry.Path(childComplexity), true
 
-	case "FileQuery.local":
-		if e.complexity.FileQuery.Local == nil {
+	case "FileQuery.list":
+		if e.complexity.FileQuery.List == nil {
 			break
 		}
 
-		args, err := ec.field_FileQuery_local_args(ctx, rawArgs)
+		args, err := ec.field_FileQuery_list_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.FileQuery.Local(childComplexity, args["path"].(string)), true
-	case "FileQuery.remote":
-		if e.complexity.FileQuery.Remote == nil {
-			break
-		}
-
-		args, err := ec.field_FileQuery_remote_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.FileQuery.Remote(childComplexity, args["connectionId"].(uuid.UUID), args["path"].(string)), true
+		return e.complexity.FileQuery.List(childComplexity, args["connectionId"].(*uuid.UUID), args["path"].(string), args["basePath"].(*string), args["filters"].([]string), args["includeFiles"].(*bool)), true
 
 	case "ImportExecuteResult.connections":
 		if e.complexity.ImportExecuteResult.Connections == nil {
@@ -1435,6 +1425,24 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.TaskSyncOptions.ConflictResolution(childComplexity), true
+	case "TaskSyncOptions.filters":
+		if e.complexity.TaskSyncOptions.Filters == nil {
+			break
+		}
+
+		return e.complexity.TaskSyncOptions.Filters(childComplexity), true
+	case "TaskSyncOptions.noDelete":
+		if e.complexity.TaskSyncOptions.NoDelete == nil {
+			break
+		}
+
+		return e.complexity.TaskSyncOptions.NoDelete(childComplexity), true
+	case "TaskSyncOptions.transfers":
+		if e.complexity.TaskSyncOptions.Transfers == nil {
+			break
+		}
+
+		return e.complexity.TaskSyncOptions.Transfers(childComplexity), true
 
 	case "TransferItem.bytes":
 		if e.complexity.TransferItem.Bytes == nil {
@@ -1908,26 +1916,36 @@ type FileEntry {
 """
 type FileQuery {
 	"""
-	列出本地目录内容
+	列出目录内容（统一接口，支持本地和远程）
+	当 connectionId 为空时访问本地路径，否则访问远程连接
+	支持过滤器预览功能
 	"""
-	local(
+	list(
 		"""
-		目录路径
+		连接 ID - 为空时表示访问本地文件系统
+		"""
+		connectionId: ID
+		"""
+		目录路径（当前浏览的路径）
 		"""
 		path: String!
-	): [FileEntry!]! @goField(forceResolver: true)
-	"""
-	列出远程目录内容
-	"""
-	remote(
 		"""
-		连接 ID
+		同步任务的根路径（用于过滤器匹配）
+		当使用过滤器预览时，过滤规则是相对于此路径进行匹配的
+		如果不提供，默认使用 path 的值
 		"""
-		connectionId: ID!
+		basePath: String
 		"""
-		目录路径
+		过滤规则列表 - rclone filter 语法
+		每个元素为一条规则，格式: "- pattern" (排除) 或 "+ pattern" (包含)
+		规则按顺序匹配，第一个匹配的规则生效
 		"""
-		path: String!
+		filters: [String!]
+		"""
+		是否包含文件 - 默认 false（仅返回目录）
+		当为 true 时，返回目录和文件（用于过滤器预览）
+		"""
+		includeFiles: Boolean
 	): [FileEntry!]! @goField(forceResolver: true)
 }
 
@@ -2818,6 +2836,22 @@ type TaskSyncOptions {
 	冲突解决策略（默认 NEWER，仅用于双向同步）
 	"""
 	conflictResolution: ConflictResolution
+	"""
+	文件过滤规则列表 - rclone filter 语法
+	每个元素为一条规则，格式: "- pattern" (排除) 或 "+ pattern" (包含)
+	规则按顺序匹配，第一个匹配的规则生效
+	"""
+	filters: [String!]
+	"""
+	保留删除文件 - 仅单向同步有效
+	启用后，同步不会删除目标端的多余文件
+	"""
+	noDelete: Boolean
+	"""
+	并行传输数量 - 范围 1-64
+	为 null 时使用全局配置默认值
+	"""
+	transfers: Int
 }
 
 """
@@ -2908,6 +2942,18 @@ input TaskSyncOptionsInput {
 	冲突解决策略（默认 NEWER，仅用于双向同步）
 	"""
 	conflictResolution: ConflictResolution
+	"""
+	文件过滤规则列表 - rclone filter 语法
+	"""
+	filters: [String!]
+	"""
+	保留删除文件 - 仅单向同步有效
+	"""
+	noDelete: Boolean
+	"""
+	并行传输数量 - 范围 1-64
+	"""
+	transfers: Int
 }
 
 """
@@ -3144,21 +3190,10 @@ func (ec *executionContext) field_Connection_tasks_args(ctx context.Context, raw
 	return args, nil
 }
 
-func (ec *executionContext) field_FileQuery_local_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+func (ec *executionContext) field_FileQuery_list_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "path", ec.unmarshalNString2string)
-	if err != nil {
-		return nil, err
-	}
-	args["path"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_FileQuery_remote_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "connectionId", ec.unmarshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "connectionId", ec.unmarshalOID2ᚖgithubᚗcomᚋgoogleᚋuuidᚐUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -3168,6 +3203,21 @@ func (ec *executionContext) field_FileQuery_remote_args(ctx context.Context, raw
 		return nil, err
 	}
 	args["path"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "basePath", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["basePath"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "filters", ec.unmarshalOString2ᚕstringᚄ)
+	if err != nil {
+		return nil, err
+	}
+	args["filters"] = arg3
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "includeFiles", ec.unmarshalOBoolean2ᚖbool)
+	if err != nil {
+		return nil, err
+	}
+	args["includeFiles"] = arg4
 	return args, nil
 }
 
@@ -4616,15 +4666,15 @@ func (ec *executionContext) fieldContext_FileEntry_isDir(_ context.Context, fiel
 	return fc, nil
 }
 
-func (ec *executionContext) _FileQuery_local(ctx context.Context, field graphql.CollectedField, obj *model.FileQuery) (ret graphql.Marshaler) {
+func (ec *executionContext) _FileQuery_list(ctx context.Context, field graphql.CollectedField, obj *model.FileQuery) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_FileQuery_local,
+		ec.fieldContext_FileQuery_list,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.FileQuery().Local(ctx, obj, fc.Args["path"].(string))
+			return ec.resolvers.FileQuery().List(ctx, obj, fc.Args["connectionId"].(*uuid.UUID), fc.Args["path"].(string), fc.Args["basePath"].(*string), fc.Args["filters"].([]string), fc.Args["includeFiles"].(*bool))
 		},
 		nil,
 		ec.marshalNFileEntry2ᚕᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐFileEntryᚄ,
@@ -4633,7 +4683,7 @@ func (ec *executionContext) _FileQuery_local(ctx context.Context, field graphql.
 	)
 }
 
-func (ec *executionContext) fieldContext_FileQuery_local(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_FileQuery_list(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "FileQuery",
 		Field:      field,
@@ -4658,56 +4708,7 @@ func (ec *executionContext) fieldContext_FileQuery_local(ctx context.Context, fi
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_FileQuery_local_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _FileQuery_remote(ctx context.Context, field graphql.CollectedField, obj *model.FileQuery) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_FileQuery_remote,
-		func(ctx context.Context) (any, error) {
-			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.FileQuery().Remote(ctx, obj, fc.Args["connectionId"].(uuid.UUID), fc.Args["path"].(string))
-		},
-		nil,
-		ec.marshalNFileEntry2ᚕᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐFileEntryᚄ,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_FileQuery_remote(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "FileQuery",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "name":
-				return ec.fieldContext_FileEntry_name(ctx, field)
-			case "path":
-				return ec.fieldContext_FileEntry_path(ctx, field)
-			case "isDir":
-				return ec.fieldContext_FileEntry_isDir(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type FileEntry", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_FileQuery_remote_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_FileQuery_list_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -7437,10 +7438,8 @@ func (ec *executionContext) fieldContext_Query_file(_ context.Context, field gra
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "local":
-				return ec.fieldContext_FileQuery_local(ctx, field)
-			case "remote":
-				return ec.fieldContext_FileQuery_remote(ctx, field)
+			case "list":
+				return ec.fieldContext_FileQuery_list(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FileQuery", field.Name)
 		},
@@ -8043,6 +8042,12 @@ func (ec *executionContext) fieldContext_Task_options(_ context.Context, field g
 			switch field.Name {
 			case "conflictResolution":
 				return ec.fieldContext_TaskSyncOptions_conflictResolution(ctx, field)
+			case "filters":
+				return ec.fieldContext_TaskSyncOptions_filters(ctx, field)
+			case "noDelete":
+				return ec.fieldContext_TaskSyncOptions_noDelete(ctx, field)
+			case "transfers":
+				return ec.fieldContext_TaskSyncOptions_transfers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type TaskSyncOptions", field.Name)
 		},
@@ -8808,6 +8813,93 @@ func (ec *executionContext) fieldContext_TaskSyncOptions_conflictResolution(_ co
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type ConflictResolution does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TaskSyncOptions_filters(ctx context.Context, field graphql.CollectedField, obj *model.TaskSyncOptions) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TaskSyncOptions_filters,
+		func(ctx context.Context) (any, error) {
+			return obj.Filters, nil
+		},
+		nil,
+		ec.marshalOString2ᚕstringᚄ,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_TaskSyncOptions_filters(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TaskSyncOptions",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TaskSyncOptions_noDelete(ctx context.Context, field graphql.CollectedField, obj *model.TaskSyncOptions) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TaskSyncOptions_noDelete,
+		func(ctx context.Context) (any, error) {
+			return obj.NoDelete, nil
+		},
+		nil,
+		ec.marshalOBoolean2ᚖbool,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_TaskSyncOptions_noDelete(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TaskSyncOptions",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TaskSyncOptions_transfers(ctx context.Context, field graphql.CollectedField, obj *model.TaskSyncOptions) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TaskSyncOptions_transfers,
+		func(ctx context.Context) (any, error) {
+			return obj.Transfers, nil
+		},
+		nil,
+		ec.marshalOInt2ᚖint,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_TaskSyncOptions_transfers(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TaskSyncOptions",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
 		},
 	}
 	return fc, nil
@@ -10734,7 +10826,7 @@ func (ec *executionContext) unmarshalInputTaskSyncOptionsInput(ctx context.Conte
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"conflictResolution"}
+	fieldsInOrder := [...]string{"conflictResolution", "filters", "noDelete", "transfers"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -10748,6 +10840,27 @@ func (ec *executionContext) unmarshalInputTaskSyncOptionsInput(ctx context.Conte
 				return it, err
 			}
 			it.ConflictResolution = data
+		case "filters":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("filters"))
+			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Filters = data
+		case "noDelete":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("noDelete"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.NoDelete = data
+		case "transfers":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("transfers"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Transfers = data
 		}
 	}
 
@@ -11743,7 +11856,7 @@ func (ec *executionContext) _FileQuery(ctx context.Context, sel ast.SelectionSet
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("FileQuery")
-		case "local":
+		case "list":
 			field := field
 
 			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
@@ -11752,43 +11865,7 @@ func (ec *executionContext) _FileQuery(ctx context.Context, sel ast.SelectionSet
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._FileQuery_local(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
-			}
-
-			if field.Deferrable != nil {
-				dfs, ok := deferred[field.Deferrable.Label]
-				di := 0
-				if ok {
-					dfs.AddField(field)
-					di = len(dfs.Values) - 1
-				} else {
-					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
-					deferred[field.Deferrable.Label] = dfs
-				}
-				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
-					return innerFunc(ctx, dfs)
-				})
-
-				// don't run the out.Concurrently() call below
-				out.Values[i] = graphql.Null
-				continue
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-		case "remote":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._FileQuery_remote(ctx, field, obj)
+				res = ec._FileQuery_list(ctx, field, obj)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -13915,6 +13992,12 @@ func (ec *executionContext) _TaskSyncOptions(ctx context.Context, sel ast.Select
 			out.Values[i] = graphql.MarshalString("TaskSyncOptions")
 		case "conflictResolution":
 			out.Values[i] = ec._TaskSyncOptions_conflictResolution(ctx, field, obj)
+		case "filters":
+			out.Values[i] = ec._TaskSyncOptions_filters(ctx, field, obj)
+		case "noDelete":
+			out.Values[i] = ec._TaskSyncOptions_noDelete(ctx, field, obj)
+		case "transfers":
+			out.Values[i] = ec._TaskSyncOptions_transfers(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

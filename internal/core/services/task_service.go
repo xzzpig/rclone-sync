@@ -45,7 +45,7 @@ func withLatestJobPredicate(q *ent.JobQuery) {
 }
 
 // CreateTask creates a new sync task with the given parameters.
-func (s *TaskService) CreateTask(ctx context.Context, name, sourcePath string, connectionID uuid.UUID, remotePath, direction, schedule string, realtime bool, options map[string]interface{}) (*ent.Task, error) {
+func (s *TaskService) CreateTask(ctx context.Context, name, sourcePath string, connectionID uuid.UUID, remotePath, direction, schedule string, realtime bool, options *model.TaskSyncOptions) (*ent.Task, error) {
 	t, err := s.client.Task.Create().
 		SetName(name).
 		SetSourcePath(sourcePath).
@@ -136,7 +136,7 @@ func (s *TaskService) GetTaskWithJobs(ctx context.Context, id uuid.UUID) (*ent.T
 }
 
 // UpdateTask updates an existing task with the given parameters.
-func (s *TaskService) UpdateTask(ctx context.Context, id uuid.UUID, name, sourcePath string, connectionID uuid.UUID, remotePath, direction, schedule string, realtime bool, options map[string]interface{}) (*ent.Task, error) {
+func (s *TaskService) UpdateTask(ctx context.Context, id uuid.UUID, name, sourcePath string, connectionID uuid.UUID, remotePath, direction, schedule string, realtime bool, options *model.TaskSyncOptions) (*ent.Task, error) {
 	t, err := s.client.Task.UpdateOneID(id).
 		SetName(name).
 		SetSourcePath(sourcePath).

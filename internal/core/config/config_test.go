@@ -234,3 +234,130 @@ encryption_key = "secret-key"
 	assert.Equal(t, 8, cfg.App.Sync.Transfers)
 	assert.Equal(t, "secret-key", cfg.Security.EncryptionKey)
 }
+
+func TestAuthConfig(t *testing.T) {
+	tests := []struct {
+		name              string
+		configContent     string
+		expectedUsername  string
+		expectedPassword  string
+		expectValidateErr bool
+		expectAuthEnabled bool
+	}{
+		{
+			name: "Both empty is valid (auth disabled)",
+			configContent: `
+[auth]
+username = ""
+password = ""
+`,
+			expectedUsername:  "",
+			expectedPassword:  "",
+			expectValidateErr: false,
+			expectAuthEnabled: false,
+		},
+		{
+			name: "Both set is valid (auth enabled)",
+			configContent: `
+[auth]
+username = "admin"
+password = "secret123"
+`,
+			expectedUsername:  "admin",
+			expectedPassword:  "secret123",
+			expectValidateErr: false,
+			expectAuthEnabled: true,
+		},
+		{
+			name: "Only username set returns error",
+			configContent: `
+[auth]
+username = "admin"
+password = ""
+`,
+			expectedUsername:  "admin",
+			expectedPassword:  "",
+			expectValidateErr: true,
+			expectAuthEnabled: false,
+		},
+		{
+			name: "Only password set returns error",
+			configContent: `
+[auth]
+username = ""
+password = "secret123"
+`,
+			expectedUsername:  "",
+			expectedPassword:  "secret123",
+			expectValidateErr: true,
+			expectAuthEnabled: false,
+		},
+		{
+			name: "No auth section is valid (defaults to empty, auth disabled)",
+			configContent: `
+[server]
+port = 8080
+`,
+			expectedUsername:  "",
+			expectedPassword:  "",
+			expectValidateErr: false,
+			expectAuthEnabled: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			viper.Reset()
+
+			tmpDir := t.TempDir()
+			configPath := filepath.Join(tmpDir, "config.toml")
+
+			err := os.WriteFile(configPath, []byte(tt.configContent), 0644)
+			require.NoError(t, err)
+
+			cfg, err := Load(configPath)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.expectedUsername, cfg.Auth.Username)
+			assert.Equal(t, tt.expectedPassword, cfg.Auth.Password)
+
+			if tt.expectValidateErr {
+				assert.Error(t, cfg.ValidateAuth())
+				assert.Contains(t, cfg.ValidateAuth().Error(), "username and password must both be set or both be empty")
+			} else {
+				assert.NoError(t, cfg.ValidateAuth())
+			}
+
+			assert.Equal(t, tt.expectAuthEnabled, cfg.IsAuthEnabled())
+		})
+	}
+}
+
+func TestAuthConfig_EnvironmentVariablesOverride(t *testing.T) {
+	viper.Reset()
+
+	// Set environment variables
+	t.Setenv("CLOUDSYNC_AUTH_USERNAME", "envuser")
+	t.Setenv("CLOUDSYNC_AUTH_PASSWORD", "envpass")
+
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.toml")
+
+	// Config file has different values
+	configContent := `
+[auth]
+username = "configuser"
+password = "configpass"
+`
+	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	require.NoError(t, err)
+
+	cfg, err := Load(configPath)
+	require.NoError(t, err)
+
+	// Environment variables should override config file
+	assert.Equal(t, "envuser", cfg.Auth.Username)
+	assert.Equal(t, "envpass", cfg.Auth.Password)
+	assert.NoError(t, cfg.ValidateAuth())
+	assert.True(t, cfg.IsAuthEnabled())
+}

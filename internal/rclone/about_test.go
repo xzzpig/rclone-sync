@@ -73,4 +73,42 @@ func TestGetRemoteQuota(t *testing.T) {
 		// For local filesystem, some fields might be populated
 		// We just verify the function returns without panic and has correct structure
 	})
+
+	t.Run("uses cached Fs instance", func(t *testing.T) {
+		// Create a local remote for testing cache behavior
+		remoteName := "test-quota-cache"
+		err := createRemote(remoteName, map[string]string{
+			"type": "local",
+		})
+		require.NoError(t, err)
+		defer func() {
+			rclone.ClearFsCache(remoteName)
+			deleteRemote(remoteName)
+		}()
+
+		// Clear any existing cache first
+		rclone.ClearFsCache(remoteName)
+
+		// Verify that the Fs is not yet loaded in cache
+		assert.False(t, rclone.IsConnectionLoaded(remoteName, ""),
+			"Fs should not be cached before GetRemoteQuota call")
+
+		// Call GetRemoteQuota which should cache the Fs
+		quota, err := rclone.GetRemoteQuota(ctx, remoteName)
+		require.NoError(t, err)
+		assert.NotNil(t, quota)
+
+		// After GetRemoteQuota call, the Fs should be cached
+		assert.True(t, rclone.IsConnectionLoaded(remoteName, ""),
+			"Fs should be cached after GetRemoteQuota call")
+
+		// Call GetRemoteQuota again - should reuse cached Fs
+		quota2, err := rclone.GetRemoteQuota(ctx, remoteName)
+		require.NoError(t, err)
+		assert.NotNil(t, quota2)
+
+		// Fs should still be cached
+		assert.True(t, rclone.IsConnectionLoaded(remoteName, ""),
+			"Fs should remain cached after second GetRemoteQuota call")
+	})
 }

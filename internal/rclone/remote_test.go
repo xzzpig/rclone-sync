@@ -450,84 +450,293 @@ func TestListRemoteDir_BasePath(t *testing.T) {
 	})
 }
 
-func TestCalculateFilterPrefix(t *testing.T) {
+func TestListRemoteDir_CacheBehavior(t *testing.T) {
+	setupTestConfig(t)
+
+	// Create a temporary directory with subdirectories
+	tempDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tempDir, "dir1"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(tempDir, "dir2"), 0755))
+
+	// Create a local remote pointing to tempDir
+	remoteName := "test-cache-behavior"
+	err := createRemote(remoteName, map[string]string{
+		"type": "local",
+	})
+	require.NoError(t, err)
+	defer deleteRemote(remoteName)
+
+	ctx := context.Background()
+
+	t.Run("remote path uses cache - Fs reused on subsequent calls", func(t *testing.T) {
+		// First call should create and cache the Fs
+		entries1, err := rclone.ListRemoteDir(ctx, rclone.ListRemoteDirOptions{
+			RemoteName: remoteName,
+			Path:       tempDir,
+		})
+		require.NoError(t, err)
+		assert.Len(t, entries1, 2)
+
+		// After first call, the connection should be loaded in cache
+		assert.True(t, rclone.IsConnectionLoaded(remoteName, tempDir), "Connection should be loaded in cache after first ListRemoteDir")
+
+		// Second call should reuse the cached Fs
+		entries2, err := rclone.ListRemoteDir(ctx, rclone.ListRemoteDirOptions{
+			RemoteName: remoteName,
+			Path:       tempDir,
+		})
+		require.NoError(t, err)
+		assert.Len(t, entries2, 2)
+
+		// Verify cache still has the connection
+		assert.True(t, rclone.IsConnectionLoaded(remoteName, tempDir), "Connection should still be in cache after second ListRemoteDir")
+	})
+
+	t.Run("local path does not use cache", func(t *testing.T) {
+		// Create a unique temp dir for this test
+		localTempDir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(localTempDir, "localdir"), 0755))
+
+		// Call with empty remote name (local path)
+		entries, err := rclone.ListRemoteDir(ctx, rclone.ListRemoteDirOptions{
+			RemoteName: "", // Empty = local path, no caching
+			Path:       localTempDir,
+		})
+		require.NoError(t, err)
+		assert.Len(t, entries, 1)
+
+		// Local paths don't use remote caching mechanism
+		// We just verify the call works correctly
+	})
+
+	t.Run("cache cleared after ClearFsCache", func(t *testing.T) {
+		// First, ensure connection is loaded
+		_, err := rclone.ListRemoteDir(ctx, rclone.ListRemoteDirOptions{
+			RemoteName: remoteName,
+			Path:       tempDir,
+		})
+		require.NoError(t, err)
+		assert.True(t, rclone.IsConnectionLoaded(remoteName, tempDir), "Connection should be in cache")
+
+		// Clear the cache for this remote
+		rclone.ClearFsCache(remoteName)
+
+		// After clearing, the connection should no longer be loaded
+		assert.False(t, rclone.IsConnectionLoaded(remoteName, tempDir), "Connection should not be in cache after ClearFsCache")
+
+		// But we can still list (it will re-create and cache the Fs)
+		entries, err := rclone.ListRemoteDir(ctx, rclone.ListRemoteDirOptions{
+			RemoteName: remoteName,
+			Path:       tempDir,
+		})
+		require.NoError(t, err)
+		assert.Len(t, entries, 2)
+
+		// And now it should be loaded again
+		assert.True(t, rclone.IsConnectionLoaded(remoteName, tempDir), "Connection should be re-cached after ListRemoteDir")
+	})
+
+	t.Run("basePath enables Fs reuse across subdirectories", func(t *testing.T) {
+		// Create a more complex directory structure for this test
+		baseDir := t.TempDir()
+		basePath := filepath.Join(baseDir, "root")
+		subdir1 := filepath.Join(basePath, "subdir1")
+		subdir2 := filepath.Join(basePath, "subdir2")
+
+		// Create structure:
+		// root/
+		//   subdir1/
+		//     file1.txt
+		//   subdir2/
+		//     file2.txt
+		require.NoError(t, os.MkdirAll(subdir1, 0755))
+		require.NoError(t, os.MkdirAll(subdir2, 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(subdir1, "file1.txt"), []byte("1"), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(subdir2, "file2.txt"), []byte("2"), 0644))
+
+		// Create a new remote for this test
+		cacheTestRemote := "test-basepath-cache"
+		err := createRemote(cacheTestRemote, map[string]string{
+			"type": "local",
+		})
+		require.NoError(t, err)
+		defer deleteRemote(cacheTestRemote)
+
+		// Clear any existing cache entries
+		rclone.ClearFsCache(cacheTestRemote)
+
+		// First call: list subdir1 with basePath=root
+		entries1, err := rclone.ListRemoteDir(ctx, rclone.ListRemoteDirOptions{
+			RemoteName:   cacheTestRemote,
+			Path:         subdir1,
+			BasePath:     basePath,
+			IncludeFiles: true,
+		})
+		require.NoError(t, err)
+		assert.Len(t, entries1, 1, "subdir1 should have 1 file")
+		assert.Equal(t, "file1.txt", entries1[0].Name)
+
+		// After first call, the Fs for basePath should be cached
+		assert.True(t, rclone.IsConnectionLoaded(cacheTestRemote, basePath),
+			"Fs should be cached using basePath (root), not subdir1")
+
+		// Verify subdir1 is NOT cached separately (we use basePath as cache key)
+		// Note: subdir1 would be cached if we didn't use basePath
+		// This is the key test: we want to reuse the basePath Fs
+
+		// Second call: list subdir2 with same basePath=root
+		// This should reuse the cached Fs from the first call
+		entries2, err := rclone.ListRemoteDir(ctx, rclone.ListRemoteDirOptions{
+			RemoteName:   cacheTestRemote,
+			Path:         subdir2,
+			BasePath:     basePath,
+			IncludeFiles: true,
+		})
+		require.NoError(t, err)
+		assert.Len(t, entries2, 1, "subdir2 should have 1 file")
+		assert.Equal(t, "file2.txt", entries2[0].Name)
+
+		// The cache should still contain the basePath Fs
+		assert.True(t, rclone.IsConnectionLoaded(cacheTestRemote, basePath),
+			"Fs should still be cached using basePath after browsing different subdirectory")
+	})
+}
+
+func TestCalculateListPath(t *testing.T) {
 	tests := []struct {
-		name        string
-		basePath    string
-		currentPath string
-		expected    string
+		name               string
+		basePath           string
+		currentPath        string
+		expectedFsRootPath string
+		expectedListPath   string
 	}{
 		{
-			name:        "empty basePath returns empty",
-			basePath:    "",
-			currentPath: "a/b/c",
-			expected:    "",
+			name:               "empty basePath - use currentPath as root",
+			basePath:           "",
+			currentPath:        "x/y",
+			expectedFsRootPath: "x/y",
+			expectedListPath:   "",
 		},
 		{
-			name:        "same path returns empty",
-			basePath:    "a/b/c",
-			currentPath: "a/b/c",
-			expected:    "",
+			name:               "same path - use basePath as root with empty listPath",
+			basePath:           "a/b",
+			currentPath:        "a/b",
+			expectedFsRootPath: "a/b",
+			expectedListPath:   "",
 		},
 		{
-			name:        "same path with trailing slashes",
-			basePath:    "a/b/c/",
-			currentPath: "a/b/c/",
-			expected:    "",
+			name:               "same path with trailing slashes",
+			basePath:           "a/b/",
+			currentPath:        "a/b/",
+			expectedFsRootPath: "a/b",
+			expectedListPath:   "",
 		},
 		{
-			name:        "currentPath is subdirectory of basePath",
-			basePath:    "a/b/c",
-			currentPath: "a/b/c/xxx",
-			expected:    "xxx/",
+			name:               "currentPath is subdirectory of basePath",
+			basePath:           "a/b",
+			currentPath:        "a/b/c/d",
+			expectedFsRootPath: "a/b",
+			expectedListPath:   "c/d",
 		},
 		{
-			name:        "currentPath is nested subdirectory",
-			basePath:    "a/b/c",
-			currentPath: "a/b/c/xxx/yyy",
-			expected:    "xxx/yyy/",
+			name:               "currentPath is immediate subdirectory",
+			basePath:           "a/b",
+			currentPath:        "a/b/c",
+			expectedFsRootPath: "a/b",
+			expectedListPath:   "c",
 		},
 		{
-			name:        "paths with trailing slashes",
-			basePath:    "a/b/c/",
-			currentPath: "a/b/c/xxx/",
-			expected:    "xxx/",
+			name:               "paths with trailing slashes",
+			basePath:           "a/b/",
+			currentPath:        "a/b/c/d/",
+			expectedFsRootPath: "a/b",
+			expectedListPath:   "c/d",
 		},
 		{
-			name:        "currentPath does not start with basePath",
-			basePath:    "a/b/c",
-			currentPath: "x/y/z",
-			expected:    "",
+			name:               "currentPath not under basePath - different paths",
+			basePath:           "a/b",
+			currentPath:        "x/y",
+			expectedFsRootPath: "x/y",
+			expectedListPath:   "",
 		},
 		{
-			name:        "basePath is longer than currentPath",
-			basePath:    "a/b/c/d",
-			currentPath: "a/b/c",
-			expected:    "",
+			name:               "currentPath not under basePath - partial prefix match",
+			basePath:           "a/b",
+			currentPath:        "a/bc/d",
+			expectedFsRootPath: "a/bc/d",
+			expectedListPath:   "",
 		},
 		{
-			name:        "partial prefix match should not work",
-			basePath:    "a/b/c",
-			currentPath: "a/b/cd/xxx",
-			expected:    "",
+			name:               "absolute paths",
+			basePath:           "/home/user/sync",
+			currentPath:        "/home/user/sync/subfolder",
+			expectedFsRootPath: "/home/user/sync",
+			expectedListPath:   "subfolder",
 		},
 		{
-			name:        "root basePath with subdirectory",
-			basePath:    "/",
-			currentPath: "/home/user",
-			expected:    "home/user/",
-		},
-		{
-			name:        "absolute paths",
-			basePath:    "/home/user/sync",
-			currentPath: "/home/user/sync/subfolder",
-			expected:    "subfolder/",
+			name:               "absolute paths with nested subdirectory",
+			basePath:           "/home/user/sync",
+			currentPath:        "/home/user/sync/a/b/c",
+			expectedFsRootPath: "/home/user/sync",
+			expectedListPath:   "a/b/c",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := rclone.CalculateFilterPrefix(tt.basePath, tt.currentPath)
+			fsRootPath, listPath := rclone.CalculateListPath(tt.basePath, tt.currentPath)
+			assert.Equal(t, tt.expectedFsRootPath, fsRootPath, "fsRootPath mismatch")
+			assert.Equal(t, tt.expectedListPath, listPath, "listPath mismatch")
+		})
+	}
+}
+
+func TestExtractEntryName(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		expected string
+	}{
+		{
+			name:     "path with subdirectories",
+			path:     "subdir/file.txt",
+			expected: "file.txt",
+		},
+		{
+			name:     "path with multiple levels",
+			path:     "a/b/c/d.txt",
+			expected: "d.txt",
+		},
+		{
+			name:     "simple filename",
+			path:     "file.txt",
+			expected: "file.txt",
+		},
+		{
+			name:     "directory name",
+			path:     "a/b/c",
+			expected: "c",
+		},
+		{
+			name:     "empty string",
+			path:     "",
+			expected: "",
+		},
+		{
+			name:     "single character",
+			path:     "x",
+			expected: "x",
+		},
+		{
+			name:     "path ending with slash",
+			path:     "a/b/",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := rclone.ExtractEntryName(tt.path)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

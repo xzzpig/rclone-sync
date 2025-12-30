@@ -48,39 +48,63 @@ func TestRemote(ctx context.Context, providerName string, params map[string]stri
 	return nil
 }
 
-// CalculateFilterPrefix calculates the path prefix for filter matching.
-// When BasePath is set and differs from currentPath, we need to calculate the relative prefix.
-// This ensures filter rules written relative to BasePath match correctly.
+// CalculateListPath calculates the Fs root path and the relative list path for directory listing.
+// When basePath is set and currentPath is under basePath, it returns:
+//   - fsRootPath: basePath (for Fs caching)
+//   - listPath: the relative path from basePath to currentPath
 //
-// Example:
-//   - BasePath="a/b/c", currentPath="a/b/c/xxx" → prefix="xxx/"
-//   - BasePath="a/b/c", currentPath="a/b/c" → prefix=""
-//   - BasePath="", currentPath="a/b/c" → prefix=""
-//   - BasePath="a/b/c/", currentPath="a/b/c/xxx/" → prefix="xxx/"
-func CalculateFilterPrefix(basePath, currentPath string) string {
+// When currentPath is not under basePath, it returns:
+//   - fsRootPath: currentPath
+//   - listPath: ""
+//
+// Examples:
+//   - basePath="a/b", currentPath="a/b/c/d" → fsRootPath="a/b", listPath="c/d"
+//   - basePath="a/b", currentPath="a/b" → fsRootPath="a/b", listPath=""
+//   - basePath="", currentPath="x/y" → fsRootPath="x/y", listPath=""
+//   - basePath="a/b", currentPath="x/y" → fsRootPath="x/y", listPath=""
+func CalculateListPath(basePath, currentPath string) (fsRootPath, listPath string) {
+	// Default: use currentPath as Fs root
+	fsRootPath = currentPath
+	listPath = ""
+
+	// If basePath is empty, just use currentPath
 	if basePath == "" {
-		return ""
+		return fsRootPath, listPath
 	}
 
+	// Normalize paths by removing trailing slashes
 	basePath = strings.TrimSuffix(basePath, "/")
 	currentPath = strings.TrimSuffix(currentPath, "/")
 
+	// If paths are equal, use basePath as root with empty listPath
 	if currentPath == basePath {
-		return ""
+		return basePath, ""
 	}
 
-	// Ensure we match complete path segments by checking for basePath + "/"
-	// This prevents "a/b/c" from matching "a/b/cd/xxx"
-	basePathWithSlash := basePath + "/"
-	if !strings.HasPrefix(currentPath, basePathWithSlash) {
-		return ""
+	// Check if currentPath is under basePath
+	if strings.HasPrefix(currentPath, basePath+"/") {
+		fsRootPath = basePath
+		listPath = strings.TrimPrefix(currentPath, basePath+"/")
+		return fsRootPath, listPath
 	}
 
-	prefix := strings.TrimPrefix(currentPath, basePathWithSlash)
-	if prefix != "" {
-		prefix += "/"
+	// currentPath is not under basePath, use currentPath as root
+	return currentPath, ""
+}
+
+// ExtractEntryName extracts the last path segment from a path.
+// This is used to get the display name for directory entries.
+//
+// Examples:
+//   - "subdir/file.txt" → "file.txt"
+//   - "file.txt" → "file.txt"
+//   - "a/b/c" → "c"
+//   - "" → ""
+func ExtractEntryName(path string) string {
+	if lastSlash := strings.LastIndex(path, "/"); lastSlash >= 0 {
+		return path[lastSlash+1:]
 	}
-	return prefix
+	return path
 }
 
 // ListRemoteDirOptions contains options for listing remote directory entries.
@@ -108,6 +132,10 @@ type ListRemoteDirOptions struct {
 // When RemoteName is empty, it treats Path as a local filesystem path.
 // Otherwise, it uses RemoteName as the rclone remote name.
 //
+// Caching strategy: When BasePath is set, the Fs is cached using remote:BasePath as the key.
+// This allows browsing different subdirectories within the same task to reuse the cached Fs.
+// When BasePath is empty, opts.Path is used as the Fs root (no caching benefit for subdirs).
+//
 // Note: rclone's fs.List() does not automatically apply filters from context.
 // Filters are applied at a higher level (e.g., in fs/operations or fs/walk packages).
 // For directory listing, we manually apply the filter to each entry.
@@ -122,58 +150,56 @@ func ListRemoteDir(ctx context.Context, opts ListRemoteDirOptions) ([]DirEntry, 
 		}
 	}
 
-	// Create the filesystem
-	// When RemoteName is empty, use Path directly (local filesystem)
-	// Otherwise, format as "RemoteName:Path" for remote access
-	var fsPath string
-	if opts.RemoteName == "" {
-		fsPath = opts.Path
-	} else {
-		fsPath = fmt.Sprintf("%s:%s", opts.RemoteName, opts.Path)
-	}
-	f, err := fs.NewFs(ctx, fsPath)
+	// Calculate the Fs root path and relative list path
+	// When BasePath is set, use it as the Fs root to enable cache reuse across subdirectories
+	fsRootPath, listPath := CalculateListPath(opts.BasePath, opts.Path)
+
+	// Create the filesystem using GetFs for cache support
+	// When RemoteName is empty, path is treated as local filesystem (no caching)
+	// When RemoteName is non-empty, cache.Get is used to reuse existing Fs instances
+	f, err := GetFs(ctx, opts.RemoteName, fsRootPath)
 	if err != nil {
 		return nil, i18n.NewI18nError(i18n.ErrPathNotExist).WithCause(err)
 	}
 
-	// List entries
-	entries, err := f.List(ctx, "")
+	// List entries at the relative path
+	entries, err := f.List(ctx, listPath)
 	if err != nil {
 		return nil, i18n.NewI18nError(i18n.ErrFailedToListRemotes).WithCause(err)
-	}
-
-	// Calculate path prefix for filter matching
-	filterPrefix := ""
-	if fi != nil {
-		filterPrefix = CalculateFilterPrefix(opts.BasePath, opts.Path)
 	}
 
 	// Build result based on options, manually applying filter
 	var result []DirEntry
 	for _, entry := range entries {
+		// entry.Remote() returns the path relative to Fs root (BasePath)
+		// e.g., when listing "subdir" in Fs rooted at BasePath, entry.Remote() returns "subdir/file.txt"
+		entryRemote := entry.Remote()
+
+		// Get the entry name (last path segment) for display
+		entryName := ExtractEntryName(entryRemote)
+
 		// Manually apply filter if present
 		// rclone's fs.List() doesn't auto-apply context filters
-		// Calculate the filter path relative to BasePath for accurate matching
+		// entry.Remote() is already relative to BasePath (Fs root), so use it directly for filter matching
 		if fi != nil {
-			filterPath := filterPrefix + entry.Remote()
-			if !fi.IncludeRemote(filterPath) {
+			if !fi.IncludeRemote(entryRemote) {
 				continue
 			}
 		}
 
-		switch e := entry.(type) {
+		switch entry.(type) {
 		case fs.Directory:
 			result = append(result, DirEntry{
-				Name:  e.Remote(),
-				Path:  fmt.Sprintf("%s/%s", opts.Path, e.Remote()),
+				Name:  entryName,
+				Path:  fmt.Sprintf("%s/%s", opts.Path, entryName),
 				IsDir: true,
 			})
 		case fs.Object:
 			// Only include files if requested
 			if opts.IncludeFiles {
 				result = append(result, DirEntry{
-					Name:  e.Remote(),
-					Path:  fmt.Sprintf("%s/%s", opts.Path, e.Remote()),
+					Name:  entryName,
+					Path:  fmt.Sprintf("%s/%s", opts.Path, entryName),
 					IsDir: false,
 				})
 			}

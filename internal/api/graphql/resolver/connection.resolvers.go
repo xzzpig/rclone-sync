@@ -24,7 +24,8 @@ func (r *connectionResolver) Config(ctx context.Context, obj *model.Connection) 
 
 // LoadStatus is the resolver for the loadStatus field.
 func (r *connectionResolver) LoadStatus(ctx context.Context, obj *model.Connection) (model.ConnectionLoadStatus, error) {
-	if rclone.IsConnectionLoaded(obj.Name) {
+	// Check if connection root is loaded in cache (using empty path for root)
+	if rclone.IsConnectionLoaded(obj.Name, "") {
 		return model.ConnectionLoadStatusLoaded, nil
 	}
 	// If not loaded, we consider it as "loading" status initially
@@ -116,9 +117,26 @@ func (r *connectionMutationResolver) Create(ctx context.Context, obj *model.Conn
 
 // Update is the resolver for the update field.
 func (r *connectionMutationResolver) Update(ctx context.Context, obj *model.ConnectionMutation, id uuid.UUID, input model.UpdateConnectionInput) (*model.Connection, error) {
-	err := r.deps.ConnectionService.UpdateConnection(ctx, id, input.Name, nil, input.Config)
+	// Get old connection name before update for cache invalidation
+	oldConn, err := r.deps.ConnectionService.GetConnectionByID(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+	oldName := oldConn.Name
+
+	err = r.deps.ConnectionService.UpdateConnection(ctx, id, input.Name, nil, input.Config)
+	if err != nil {
+		return nil, err
+	}
+
+	// Clear Fs cache for the old connection name to ensure stale cached Fs is removed.
+	// This is necessary because UpdateConnection may not go through storage.go's SetValue/DeleteSection
+	// which already calls cache.ClearConfig internally.
+	rclone.ClearFsCache(oldName)
+
+	// If name changed, also clear new name cache (defensive, though it shouldn't exist yet)
+	if input.Name != nil && *input.Name != oldName {
+		rclone.ClearFsCache(*input.Name)
 	}
 
 	// Fetch updated connection
@@ -131,12 +149,13 @@ func (r *connectionMutationResolver) Update(ctx context.Context, obj *model.Conn
 
 // Delete is the resolver for the delete field.
 func (r *connectionMutationResolver) Delete(ctx context.Context, obj *model.ConnectionMutation, id uuid.UUID) (*model.Connection, error) {
-	// Get connection before delete to return it
+	// Get connection before delete to return it and for cache invalidation
 	entConn, err := r.deps.ConnectionService.GetConnectionByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	conn := entConnectionToModel(entConn)
+	connName := entConn.Name
 
 	// Check if connection has dependent tasks
 	taskCount, err := r.deps.ConnectionService.CountAssociatedTasks(ctx, id)
@@ -151,6 +170,12 @@ func (r *connectionMutationResolver) Delete(ctx context.Context, obj *model.Conn
 	if err != nil {
 		return nil, err
 	}
+
+	// Clear Fs cache for the deleted connection.
+	// This is necessary because DeleteConnectionByID uses Ent client directly,
+	// not going through storage.go's DeleteSection which already calls cache.ClearConfig.
+	rclone.ClearFsCache(connName)
+
 	return conn, nil
 }
 

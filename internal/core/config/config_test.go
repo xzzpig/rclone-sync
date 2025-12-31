@@ -120,7 +120,7 @@ func TestLoad_Defaults(t *testing.T) {
 	// Verify defaults are applied
 	assert.Equal(t, 8080, cfg.Server.Port)
 	assert.Equal(t, "0.0.0.0", cfg.Server.Host)
-	assert.Equal(t, "cloud-sync.db", cfg.Database.Path)
+	assert.Equal(t, "rclone-sync.db", cfg.Database.Path)
 	assert.Equal(t, "versioned", cfg.Database.MigrationMode)
 	assert.Equal(t, "info", cfg.Log.Level)
 	assert.Equal(t, "./app_data", cfg.App.DataDir)
@@ -337,8 +337,8 @@ func TestAuthConfig_EnvironmentVariablesOverride(t *testing.T) {
 	viper.Reset()
 
 	// Set environment variables
-	t.Setenv("CLOUDSYNC_AUTH_USERNAME", "envuser")
-	t.Setenv("CLOUDSYNC_AUTH_PASSWORD", "envpass")
+	t.Setenv("RCLONESYNC_AUTH_USERNAME", "envuser")
+	t.Setenv("RCLONESYNC_AUTH_PASSWORD", "envpass")
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.toml")

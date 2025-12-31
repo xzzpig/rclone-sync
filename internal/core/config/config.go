@@ -57,7 +57,7 @@ func Load(cfgFile string) (*Config, error) {
 		viper.SetConfigType("toml")
 	}
 
-	viper.SetEnvPrefix("CLOUDSYNC")
+	viper.SetEnvPrefix("RCLONESYNC")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 
@@ -120,7 +120,7 @@ func (c *Config) ValidateAuth() error {
 func setDefaults() {
 	viper.SetDefault("server.port", 8080)
 	viper.SetDefault("server.host", "0.0.0.0")
-	viper.SetDefault("database.path", "cloud-sync.db")
+	viper.SetDefault("database.path", "rclone-sync.db")
 	viper.SetDefault("database.migration_mode", "versioned")
 	viper.SetDefault("log.level", "info")
 	viper.SetDefault("app.data_dir", "./app_data")

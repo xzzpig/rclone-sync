@@ -53,7 +53,7 @@ var serveCmd = &cobra.Command{
 		// 2. Initialize Logger with hierarchical level configuration
 		logger.InitLogger(logger.Environment(cfg.App.Environment), logger.LogLevel(cfg.Log.Level), cfg.Log.Levels)
 		log := logger.Named("cmd.serve")
-		log.Info("Starting cloud-sync server...")
+		log.Info("Starting rclone-sync server...")
 		rclone.SetupLogLevel(cfg.Log.Level)
 
 		// 3. Initialize i18n

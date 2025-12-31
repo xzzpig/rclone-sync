@@ -1,6 +1,6 @@
 {
   "$schema": "https://inlang.com/schema/inlang-message-format",
-  "app_title": "云同步",
+  "app_title": "Rclone Cloud Sync",
   "common_actions": "操作",
   "common_add": "添加",
   "common_apply": "应用",
@@ -355,7 +355,7 @@
   "welcome_running": "运行中 {count}",
   "welcome_runningAndFailed": "运行中 {running} / 失败 {failed}",
   "welcome_subtitle": "管理您的云存储同步任务",
-  "welcome_title": "欢迎使用云同步",
+  "welcome_title": "欢迎使用 Rclone Cloud Sync",
   "wizard_addNewConnection": "添加新连接",
   "wizard_configureSettings": "配置同步设置和调度",
   "wizard_createTask": "创建同步任务",

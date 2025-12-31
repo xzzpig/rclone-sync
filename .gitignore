@@ -53,9 +53,9 @@ bin/
 build/
 internal/ui/dist/*
 !internal/ui/dist/.gitkeep
-/cloud-sync
-/cloud-sync.db*
-/cloud-sync.*.db*
+/rclone-sync
+/rclone-sync.db*
+/rclone-sync.*.db*
 tmp/
 /config.toml
 # Air

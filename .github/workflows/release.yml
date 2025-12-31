@@ -90,24 +90,24 @@ jobs:
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 1
         run: |
-          go build -ldflags="-s -w" -o cloud-sync${{ matrix.ext }} ./cmd/cloud-sync
+          go build -ldflags="-s -w" -o rclone-sync${{ matrix.ext }} ./cmd/rclone-sync
 
       - name: Create archive (Unix)
         if: matrix.os != 'windows'
         run: |
-          tar -czvf cloud-sync-${{ matrix.os }}-${{ matrix.arch }}.tar.gz cloud-sync
+          tar -czvf rclone-sync-${{ matrix.os }}-${{ matrix.arch }}.tar.gz rclone-sync
 
       - name: Create archive (Windows)
         if: matrix.os == 'windows'
         shell: pwsh
         run: |
-          Compress-Archive -Path cloud-sync.exe -DestinationPath cloud-sync-${{ matrix.os }}-${{ matrix.arch }}.zip
+          Compress-Archive -Path rclone-sync.exe -DestinationPath rclone-sync-${{ matrix.os }}-${{ matrix.arch }}.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cloud-sync-${{ matrix.os }}-${{ matrix.arch }}
-          path: cloud-sync-${{ matrix.os }}-${{ matrix.arch }}.*
+          name: rclone-sync-${{ matrix.os }}-${{ matrix.arch }}
+          path: rclone-sync-${{ matrix.os }}-${{ matrix.arch }}.*
           retention-days: 1
 
   release:

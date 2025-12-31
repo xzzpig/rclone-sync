@@ -52,7 +52,7 @@ COPY --from=frontend /app/internal/ui/dist ./internal/ui/dist/
 
 # Enable CGO and build
 ENV CGO_ENABLED=1
-RUN go build -o cloud-sync ./cmd/cloud-sync
+RUN go build -o rclone-sync ./cmd/rclone-sync
 
 # Stage 3: Runtime
 FROM alpine:${ALPINE_VERSION}
@@ -63,7 +63,7 @@ WORKDIR /app
 RUN apk add --no-cache ca-certificates tzdata
 
 # Copy binary from builder
-COPY --from=builder /app/cloud-sync .
+COPY --from=builder /app/rclone-sync .
 
 # Create data directory
 RUN mkdir -p /app/app_data
@@ -75,4 +75,4 @@ EXPOSE 8080
 VOLUME ["/app/app_data"]
 
 # Run the application
-CMD ["./cloud-sync", "serve"]
+CMD ["./rclone-sync", "serve"]

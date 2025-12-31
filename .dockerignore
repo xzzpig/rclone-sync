@@ -9,7 +9,7 @@
 *.dll
 *.so
 *.dylib
-cloud-sync
+rclone-sync
 main
 
 # Test files

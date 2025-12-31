@@ -1,6 +1,6 @@
 {
   "$schema": "https://inlang.com/schema/inlang-message-format",
-  "app_title": "Cloud Sync",
+  "app_title": "Rclone Cloud Sync",
   "common_actions": "Actions",
   "common_add": "Add",
   "common_apply": "Apply",
@@ -355,7 +355,7 @@
   "welcome_running": "Running {count}",
   "welcome_runningAndFailed": "Running {running} / Failed {failed}",
   "welcome_subtitle": "Manage your cloud storage sync tasks",
-  "welcome_title": "Welcome to Cloud Sync",
+  "welcome_title": "Welcome to Rclone Cloud Sync",
   "wizard_addNewConnection": "Add New Connection",
   "wizard_configureSettings": "Configure sync settings and schedule",
   "wizard_createTask": "Create Sync Task",

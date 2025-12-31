@@ -50,10 +50,10 @@ Please go to the [Releases](https://github.com/xzzpig/rclone-sync/releases) page
 2.  Run in terminal or command line:
     ```bash
     # Linux / macOS
-    ./cloud-sync serve
+    ./rclone-sync serve
 
     # Windows
-    .\cloud-sync.exe serve
+    .\rclone-sync.exe serve
     ```
 3.  Open your browser and visit `http://localhost:8080` to start using it.
 
@@ -63,8 +63,23 @@ The easiest way to deploy is using Docker:
 
 ```bash
 docker run -d \
-  --name cloud-sync \
+  --name rclone-sync \
   -p 8080:8080 \
+  -v $(pwd)/rclone-sync.db:/app/rclone-sync.db \
+  -v $(pwd)/app_data:/app/app_data \
+  ghcr.io/xzzpig/rclone-sync
+```
+
+> **Important**: You must mount both `rclone-sync.db` (database file) and `app_data` (sync state directory), otherwise data will be lost when the container restarts.
+
+If you need to customize configuration (e.g., enable authentication, encryption key, etc.), mount the config file:
+
+```bash
+docker run -d \
+  --name rclone-sync \
+  -p 8080:8080 \
+  -v $(pwd)/config.toml:/app/config.toml \
+  -v $(pwd)/rclone-sync.db:/app/rclone-sync.db \
   -v $(pwd)/app_data:/app/app_data \
   ghcr.io/xzzpig/rclone-sync
 ```
@@ -73,8 +88,10 @@ If you need to sync local files, make sure to mount them into the container:
 
 ```bash
 docker run -d \
-  --name cloud-sync \
+  --name rclone-sync \
   -p 8080:8080 \
+  -v $(pwd)/config.toml:/app/config.toml \
+  -v $(pwd)/rclone-sync.db:/app/rclone-sync.db \
   -v $(pwd)/app_data:/app/app_data \
   -v /your/local/sync/path:/data \
   ghcr.io/xzzpig/rclone-sync
@@ -95,9 +112,9 @@ If you are a developer or want to experience the latest features:
     # Compile frontend
     cd web && pnpm install && pnpm build && cd ..
     # Compile backend
-    go build -o cloud-sync ./cmd/cloud-sync
+    go build -o rclone-sync ./cmd/rclone-sync
     # Run
-    ./cloud-sync serve
+    ./rclone-sync serve
     ```
 
 ## 📖 User Guide
@@ -233,8 +250,8 @@ transfers = 4
 migration_mode = "versioned"
 
 # Database file path (Relative to data_dir)
-# Default value: "cloud-sync.db"
-path = "cloud-sync.db"
+# Default value: "rclone-sync.db"
+path = "rclone-sync.db"
 
 [security]
 # Encryption key for sensitive data in database, such as cloud storage credentials
@@ -244,7 +261,7 @@ encryption_key = ""
 [auth]
 # HTTP Basic Auth credentials
 # When both username and password are set, all API and UI access (except /health) will require authentication
-# Can also be set via environment variables: CLOUDSYNC_AUTH_USERNAME and CLOUDSYNC_AUTH_PASSWORD
+# Can also be set via environment variables: RCLONESYNC_AUTH_USERNAME and RCLONESYNC_AUTH_PASSWORD
 # Leave both empty to disable authentication (default, for personal local use)
 # username = "admin"
 # password = "your-secure-password"
@@ -263,8 +280,8 @@ password = "your-secure-password"
 Or use environment variables:
 
 ```bash
-export CLOUDSYNC_AUTH_USERNAME=admin
-export CLOUDSYNC_AUTH_PASSWORD=your-secure-password
+export RCLONESYNC_AUTH_USERNAME=admin
+export RCLONESYNC_AUTH_PASSWORD=your-secure-password
 ```
 
 Once enabled, accessing any page (except `/health`) will prompt for HTTP Basic Auth credentials.
@@ -278,19 +295,19 @@ Once enabled, accessing any page (except `/health`) will prompt for HTTP Basic A
 
 ### Environment Variables
 
-Configuration can also be set via environment variables with the prefix `CLOUDSYNC_`. Nested fields use `_` as a separator.
+Configuration can also be set via environment variables with the prefix `RCLONESYNC_`. Nested fields use `_` as a separator.
 
 Examples:
-- `CLOUDSYNC_SERVER_PORT=9090`
-- `CLOUDSYNC_SERVER_HOST=0.0.0.0`
-- `CLOUDSYNC_APP_DATA_DIR=/data`
-- `CLOUDSYNC_APP_ENVIRONMENT=production`
-- `CLOUDSYNC_LOG_LEVEL=debug`
-- `CLOUDSYNC_DATABASE_PATH=/data/sync.db`
-- `CLOUDSYNC_SECURITY_ENCRYPTION_KEY=your-encryption-key`
-- `CLOUDSYNC_AUTH_USERNAME=admin`
-- `CLOUDSYNC_AUTH_PASSWORD=your-secure-password`
-- `CLOUDSYNC_APP_SYNC_TRANSFERS=8`
+- `RCLONESYNC_SERVER_PORT=9090`
+- `RCLONESYNC_SERVER_HOST=0.0.0.0`
+- `RCLONESYNC_APP_DATA_DIR=/data`
+- `RCLONESYNC_APP_ENVIRONMENT=production`
+- `RCLONESYNC_LOG_LEVEL=debug`
+- `RCLONESYNC_DATABASE_PATH=/data/sync.db`
+- `RCLONESYNC_SECURITY_ENCRYPTION_KEY=your-encryption-key`
+- `RCLONESYNC_AUTH_USERNAME=admin`
+- `RCLONESYNC_AUTH_PASSWORD=your-secure-password`
+- `RCLONESYNC_APP_SYNC_TRANSFERS=8`
 
 ### Command Line Parameters
 

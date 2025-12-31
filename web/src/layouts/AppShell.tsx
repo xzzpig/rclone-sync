@@ -57,7 +57,7 @@ const AppShell: ParentComponent = (props) => {
       // Return connection name if available, otherwise fallback to ID
       return connectionResult.data?.connection?.get?.name ?? decodeURIComponent(parts[1]);
     }
-    return 'Cloud Sync';
+    return 'Rclone Cloud Sync';
   };
 
   return (

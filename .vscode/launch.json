@@ -9,7 +9,7 @@
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${workspaceFolder}/cmd/cloud-sync",
+            "program": "${workspaceFolder}/cmd/rclone-sync",
             "args": [
                 "serve"
             ],

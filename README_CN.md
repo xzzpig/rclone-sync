@@ -53,10 +53,10 @@
 2.  在终端或命令行中运行：
     ```bash
     # Linux / macOS
-    ./cloud-sync serve
+    ./rclone-sync serve
 
     # Windows
-    .\cloud-sync.exe serve
+    .\rclone-sync.exe serve
     ```
 3.  打开浏览器访问 `http://localhost:8080` 即可开始使用。
 
@@ -66,8 +66,23 @@
 
 ```bash
 docker run -d \
-  --name cloud-sync \
+  --name rclone-sync \
   -p 8080:8080 \
+  -v $(pwd)/rclone-sync.db:/app/rclone-sync.db \
+  -v $(pwd)/app_data:/app/app_data \
+  ghcr.io/xzzpig/rclone-sync
+```
+
+> **重要**: 必须映射 `rclone-sync.db`（数据库文件）和 `app_data`（同步状态目录），否则容器重启后数据会丢失。
+
+如果您需要自定义配置（如启用认证、加密密钥等），请映射配置文件：
+
+```bash
+docker run -d \
+  --name rclone-sync \
+  -p 8080:8080 \
+  -v $(pwd)/config.toml:/app/config.toml \
+  -v $(pwd)/rclone-sync.db:/app/rclone-sync.db \
   -v $(pwd)/app_data:/app/app_data \
   ghcr.io/xzzpig/rclone-sync
 ```
@@ -76,8 +91,10 @@ docker run -d \
 
 ```bash
 docker run -d \
-  --name cloud-sync \
+  --name rclone-sync \
   -p 8080:8080 \
+  -v $(pwd)/config.toml:/app/config.toml \
+  -v $(pwd)/rclone-sync.db:/app/rclone-sync.db \
   -v $(pwd)/app_data:/app/app_data \
   -v /您的本地同步路径:/data \
   ghcr.io/xzzpig/rclone-sync
@@ -98,9 +115,9 @@ docker run -d \
     # 编译前端
     cd web && pnpm install && pnpm build && cd ..
     # 编译后端
-    go build -o cloud-sync ./cmd/cloud-sync
+    go build -o rclone-sync ./cmd/rclone-sync
     # 运行
-    ./cloud-sync serve
+    ./rclone-sync serve
     ```
 
 ## 📖 使用指南
@@ -236,8 +253,8 @@ transfers = 4
 migration_mode = "versioned"
 
 # 数据库文件路径 (相对于 data_dir)
-# 默认值: "cloud-sync.db"
-path = "cloud-sync.db"
+# 默认值: "rclone-sync.db"
+path = "rclone-sync.db"
 
 [security]
 # 数据库敏感数据加密密钥，如云存储凭据
@@ -247,7 +264,7 @@ encryption_key = ""
 [auth]
 # HTTP Basic Auth 认证凭据
 # 当同时设置用户名和密码时，所有 API 和 UI 访问（除 /health 外）都需要认证
-# 也可以通过环境变量设置：CLOUDSYNC_AUTH_USERNAME 和 CLOUDSYNC_AUTH_PASSWORD
+# 也可以通过环境变量设置：RCLONESYNC_AUTH_USERNAME 和 RCLONESYNC_AUTH_PASSWORD
 # 两者都留空则禁用认证（默认，适合个人本地使用）
 # username = "admin"
 # password = "your-secure-password"
@@ -266,8 +283,8 @@ password = "your-secure-password"
 或使用环境变量：
 
 ```bash
-export CLOUDSYNC_AUTH_USERNAME=admin
-export CLOUDSYNC_AUTH_PASSWORD=your-secure-password
+export RCLONESYNC_AUTH_USERNAME=admin
+export RCLONESYNC_AUTH_PASSWORD=your-secure-password
 ```
 
 启用后，访问任何页面（除 `/health` 外）都将提示输入 HTTP Basic Auth 凭据。
@@ -281,19 +298,19 @@ export CLOUDSYNC_AUTH_PASSWORD=your-secure-password
 
 ### 环境变量
 
-配置也可以通过环境变量设置，前缀为 `CLOUDSYNC_`。嵌套字段使用 `_` 分隔。
+配置也可以通过环境变量设置，前缀为 `RCLONESYNC_`。嵌套字段使用 `_` 分隔。
 
 示例:
-- `CLOUDSYNC_SERVER_PORT=9090`
-- `CLOUDSYNC_SERVER_HOST=0.0.0.0`
-- `CLOUDSYNC_APP_DATA_DIR=/data`
-- `CLOUDSYNC_APP_ENVIRONMENT=production`
-- `CLOUDSYNC_LOG_LEVEL=debug`
-- `CLOUDSYNC_DATABASE_PATH=/data/sync.db`
-- `CLOUDSYNC_SECURITY_ENCRYPTION_KEY=your-encryption-key`
-- `CLOUDSYNC_AUTH_USERNAME=admin`
-- `CLOUDSYNC_AUTH_PASSWORD=your-secure-password`
-- `CLOUDSYNC_APP_SYNC_TRANSFERS=8`
+- `RCLONESYNC_SERVER_PORT=9090`
+- `RCLONESYNC_SERVER_HOST=0.0.0.0`
+- `RCLONESYNC_APP_DATA_DIR=/data`
+- `RCLONESYNC_APP_ENVIRONMENT=production`
+- `RCLONESYNC_LOG_LEVEL=debug`
+- `RCLONESYNC_DATABASE_PATH=/data/sync.db`
+- `RCLONESYNC_SECURITY_ENCRYPTION_KEY=your-encryption-key`
+- `RCLONESYNC_AUTH_USERNAME=admin`
+- `RCLONESYNC_AUTH_PASSWORD=your-secure-password`
+- `RCLONESYNC_APP_SYNC_TRANSFERS=8`
 
 ### 命令行参数
 

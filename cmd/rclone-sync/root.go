@@ -11,7 +11,7 @@ import (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "cloud-sync",
+	Use:   "rclone-sync",
 	Short: "Rclone Cloud Sync Manager",
 	Long:  `A web-based manager for Rclone to handle cloud connections and sync tasks.`,
 }

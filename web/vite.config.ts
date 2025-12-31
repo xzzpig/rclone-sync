@@ -3,12 +3,14 @@ import { defineConfig } from 'vite';
 import solid from 'vite-plugin-solid';
 import solidSvg from 'vite-plugin-solid-svg';
 import Icons from 'unplugin-icons/vite';
+import checker from 'vite-plugin-checker';
 import path from 'path';
 
 export default defineConfig({
   publicDir: 'src/public',
   plugins: [
     paraglide({ project: './project.inlang', outdir: './src/paraglide' }),
+    checker({ typescript: true }),
     solid(),
     solidSvg(),
     Icons({

@@ -51,7 +51,8 @@ app_data/
 bisync_state/
 bin/
 build/
-dist/
+internal/ui/dist/*
+!internal/ui/dist/.gitkeep
 /cloud-sync
 /cloud-sync.db*
 /cloud-sync.*.db*

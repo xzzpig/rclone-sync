@@ -1,0 +1,81 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+cloud-sync
+main
+
+# Test files
+*.test
+*.out
+coverage.txt
+
+# Dependency directories
+node_modules/
+web/node_modules/
+
+# Build outputs
+dist/
+web/dist/
+internal/ui/dist/
+
+# Data directories
+app_data/
+tmp/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Log files
+*.log
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation files (not needed for build)
+*.md
+LICENSE
+specs/
+scripts/analyze_duplicates.js
+scripts/merge-schema.js
+scripts/sort-i18n-keys.js
+
+# Config files not needed for build
+*.code-workspace
+*.config.json
+ui.config.json
+
+# Cache directories
+.cache/
+web/.cache/
+web/project.inlang/cache/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Docker files
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Nix files
+flake.nix
+nix/

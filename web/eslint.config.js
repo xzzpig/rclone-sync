@@ -18,6 +18,7 @@ export default [
       'tsconfig.tsbuildinfo',
       'tsconfig.node.tsbuildinfo',
       'src/components/ui',
+      'src/paraglide/**',
     ],
   },
   // JavaScript 基础配置

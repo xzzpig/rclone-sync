@@ -15,21 +15,22 @@ A cloud sync management tool based on `rclone` development, designed to provide 
   - **One-way Download**: Cloud -> Local (Suitable for fetching resources)
   - **Two-way Sync**: Keep data on both ends consistent (Suitable for multi-end collaboration)
 - **Advanced Task Options**:
-  - **File Filters**: Include/exclude files using powerful rclone filter patterns
-  - **Keep Deleted Files**: Prevent deletion of files in destination (one-way sync only)
-  - **Parallel Transfers**: Configure concurrent transfer count (1-64) per task
+  - **File Filters**: Include/exclude files using powerful rclone filter patterns with **Real-time Preview**.
+  - **Conflict Resolution**: Choose how to handle conflicts in bidirectional sync (Newer/Local/Remote/Both).
+  - **Keep Deleted Files**: Prevent deletion of files in destination (one-way sync only).
+  - **Parallel Transfers**: Configure concurrent transfer count (1-64) per task.
 - **Smart Trigger Mechanism**:
-  - **Real-time Sync**: Listen for file system changes and trigger sync immediately.
+  - **Real-time Sync**: Listen for file system changes and trigger sync immediately with debounce protection.
   - **Scheduled Tasks**: Support custom schedules (Cron) for automatic execution.
 - **Visual Monitoring**:
-  - **Real-time Progress**: View current transfer files, speed, and remaining time.
+  - **Real-time Progress**: View current transfer files, speed, and progress for each file with live updates.
+  - **Quota Monitoring**: View cloud storage usage, remaining space, trashed space, and object count.
   - **Task History**: Detailed execution logs and result records for easy review.
+  - **Detailed Logs**: File-level event logs with filtering by task, job, and log level.
 - **Secure and Reliable**:
+  - **Access Control**: Built-in HTTP Basic Authentication for web access.
   - **Encrypted Storage**: Sensitive configuration information is encrypted and stored in the local database.
-  - **Data Security**: Strict sync logic prevents accidental data loss.
-- **Internationalization Support**: Natively supports **Simplified Chinese** and **English** interfaces.
-- **Cross-Platform**: Supports Linux, Windows, macOS.
-
+  - **Import Configuration**: Bulk import connections from existing rclone.conf files.
 ## ☁️ Supported Cloud Storage
 
 Thanks to the powerful ecosystem of Rclone, this tool supports over 40 cloud storage services, including but not limited to:
@@ -56,7 +57,30 @@ Please go to the [Releases](https://github.com/xzzpig/rclone-sync/releases) page
     ```
 3.  Open your browser and visit `http://localhost:8080` to start using it.
 
-### Method Two: Build from Source
+### Method Two: Run with Docker
+
+The easiest way to deploy is using Docker:
+
+```bash
+docker run -d \
+  --name cloud-sync \
+  -p 8080:8080 \
+  -v $(pwd)/app_data:/app/app_data \
+  ghcr.io/xzzpig/rclone-sync
+```
+
+If you need to sync local files, make sure to mount them into the container:
+
+```bash
+docker run -d \
+  --name cloud-sync \
+  -p 8080:8080 \
+  -v $(pwd)/app_data:/app/app_data \
+  -v /your/local/sync/path:/data \
+  ghcr.io/xzzpig/rclone-sync
+```
+
+### Method Three: Build from Source
 
 If you are a developer or want to experience the latest features:
 
@@ -83,6 +107,8 @@ When entering the system for the first time, please click the **"+"** icon in th
 - Select your cloud storage provider (e.g., Google Drive).
 - Complete the authorization process according to the wizard prompts.
 - After successful authorization, you will see the connection in the sidebar and can browse the files inside.
+- **Import Configuration**: You can also bulk import connections from an existing rclone.conf file using the import wizard.
+- **File Browser**: Browse both local and remote file systems to select paths for sync tasks.
 
 ### 2. Create Sync Task (Tasks)
 On the connection details page, click the **"New Task"** button.
@@ -92,6 +118,19 @@ On the connection details page, click the **"New Task"** button.
     - **Upload**: Only push local changes to the cloud.
     - **Download**: Only pull cloud changes to the local.
     - **Bidirectional**: Keep both ends consistent; modifications on either end will sync to the other.
+- **Conflict Resolution** (for bidirectional sync):
+    - **Newer**: Keep the newer file, rename the older one.
+    - **Local**: Keep the local file, delete the remote one.
+    - **Remote**: Keep the remote file, delete the local one.
+    - **Both**: Keep both files, add conflict suffix to the older one.
+- **Filters**: Add Include/Exclude rules to filter files using rclone filter syntax. Rules are matched in order, first match wins. Examples:
+  ```
+  - node_modules/**     # Exclude node_modules directory
+  - .git/**             # Exclude .git directory
+  - *.tmp               # Exclude all .tmp files
+  + **                  # Include everything else
+  ```
+  Click **"Preview"** to see which files will be affected before saving.
 - **Trigger Method**:
     - **Manual**: Sync only when you click "Run".
     - **Schedule**: Set scheduled tasks (e.g., "2 AM every day").
@@ -100,7 +139,10 @@ On the connection details page, click the **"New Task"** button.
 ### 3. Monitoring and Logs
 - **Dashboard**: In the task list, you can intuitively see the current status of each task (Idle, Syncing, Error).
 - **Task Details**: Click the task card to view detailed transfer speed, remaining file count, and historical run logs.
+- **Active Transfers**: View currently transferring files with real-time progress updates.
+- **Storage Quota**: Monitor cloud storage usage including used space, free space, trashed files, and object count.
 - **History**: The system retains recent sync logs for easy troubleshooting of file transfer issues.
+- **Detailed Logs**: View file-level event logs (UPLOAD/DOWNLOAD/DELETE/MOVE/ERROR) with filtering by task, job, and log level (INFO/WARNING/ERROR).
 
 ## ❓ Frequently Asked Questions (FAQ)
 
@@ -112,6 +154,15 @@ A: By default, data is stored in the `app_data` folder in the program's running 
 
 **Q: How do I reset the administrator password?**
 A: The current version defaults to no login authentication (suitable for personal local use). If you need to deploy on the public network, please use Nginx or other reverse proxies for authentication protection.
+
+**Q: Can I import existing rclone configurations?**
+A: Yes! You can use the import wizard to bulk import connections from your existing rclone.conf file. The wizard will parse the configuration, let you preview and edit connections, and then import them into the database.
+
+**Q: How does the log cleanup work?**
+A: The system automatically cleans up old log records based on the `max_logs_per_connection` setting. The cleanup task runs according to the `cleanup_schedule` cron expression (default: every hour). Oldest logs are deleted first (FIFO). Set to 0 to disable cleanup.
+
+**Q: What is the "auto_delete_empty_jobs" option?**
+A: When enabled, jobs with no activity (no files transferred, no deletions, no errors, and successful status) are automatically deleted. Failed jobs are always retained for debugging.
 
 ## ⚙️ Configuration Instructions
 
@@ -162,6 +213,12 @@ max_logs_per_connection = 1000
 # Format: minute hour day month weekday
 # Default: "0 * * * *" (every hour)
 cleanup_schedule = "0 * * * *"
+
+# Automatically delete empty jobs (no activity)
+# Empty job criteria: filesTransferred=0, bytesTransferred=0, filesDeleted=0, errorCount=0, status=SUCCESS
+# Failed jobs are retained even if empty
+# Default: true
+# auto_delete_empty_jobs = false
 
 [app.sync]
 # Global default parallel transfer count
@@ -225,17 +282,60 @@ Configuration can also be set via environment variables with the prefix `CLOUDSY
 
 Examples:
 - `CLOUDSYNC_SERVER_PORT=9090`
+- `CLOUDSYNC_SERVER_HOST=0.0.0.0`
 - `CLOUDSYNC_APP_DATA_DIR=/data`
+- `CLOUDSYNC_APP_ENVIRONMENT=production`
 - `CLOUDSYNC_LOG_LEVEL=debug`
+- `CLOUDSYNC_DATABASE_PATH=/data/sync.db`
+- `CLOUDSYNC_SECURITY_ENCRYPTION_KEY=your-encryption-key`
+- `CLOUDSYNC_AUTH_USERNAME=admin`
+- `CLOUDSYNC_AUTH_PASSWORD=your-secure-password`
+- `CLOUDSYNC_APP_SYNC_TRANSFERS=8`
 
 ### Command Line Parameters
 
 In addition to the configuration file, you can also override some settings via command line parameters:
 
 - `--config`: Specify configuration file path (Default: `config.toml`)
-- `--data-dir`: Specify data storage directory (Overrides setting in config file)
-- `--port`: Specify listening port (Overrides setting in config file)
+- `--data-dir`: Specify data storage directory (Overrides `app.data_dir` in config file)
+- `--port`: Specify listening port (Overrides `server.port` in config file)
+- `--host`: Specify listening host address (Overrides `server.host` in config file)
+- `--log-level`: Set log level (Overrides `log.level` in config file)
 - `--help`: View all available parameters
+
+### Hierarchical Log Levels
+
+You can set different log levels for specific modules to fine-tune logging output:
+
+```toml
+[log.levels]
+# Set debug level for database operations
+"core.db" = "debug"
+
+# Set warning level for scheduler
+"core.scheduler" = "warn"
+
+# Set error level for rclone operations
+"rclone" = "error"
+
+# Set debug level for GraphQL resolver
+"api.graphql" = "debug"
+```
+
+**Matching Rules:**
+- Module names are case-sensitive
+- A pattern matches itself and all sub-modules
+- Example: `"core.db"` matches `core.db`, `core.db.query`, `core.db.migrate`, etc.
+- The first matching pattern wins (top-down order in config file)
+
+**Common Module Names:**
+- `core.db` - Database operations
+- `core.scheduler` - Task scheduling
+- `core.runner` - Task execution
+- `core.watcher` - File system watching
+- `rclone` - Rclone operations
+- `api` - HTTP API
+- `api.graphql` - GraphQL resolver
 
 ## 📄 License
 

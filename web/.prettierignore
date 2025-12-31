@@ -9,6 +9,12 @@ dist
 # 配置文件
 vite.config.d.ts
 src/components/ui
+src/components/ui.css
+
+# 自动生成文件
+src/api/graphql/graphql-env.d.ts
+src/api/graphql/schema.graphql
+src/paraglide/**
 
 # 公共资源
 public

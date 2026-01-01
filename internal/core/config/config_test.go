@@ -333,31 +333,50 @@ port = 8080
 	}
 }
 
-func TestAuthConfig_EnvironmentVariablesOverride(t *testing.T) {
-	viper.Reset()
-
-	// Set environment variables
-	t.Setenv("RCLONESYNC_AUTH_USERNAME", "envuser")
-	t.Setenv("RCLONESYNC_AUTH_PASSWORD", "envpass")
-
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.toml")
-
-	// Config file has different values
-	configContent := `
+func TestAuthConfig_EnvironmentVariables(t *testing.T) {
+	tests := []struct {
+		name          string
+		configContent string
+		description   string
+	}{
+		{
+			name:          "EmptyConfig",
+			configContent: ``,
+			description:   "Environment variables are used when config file is empty",
+		},
+		{
+			name: "OverrideConfig",
+			configContent: `
 [auth]
 username = "configuser"
 password = "configpass"
-`
-	err := os.WriteFile(configPath, []byte(configContent), 0644)
-	require.NoError(t, err)
+`,
+			description: "Environment variables override config file values",
+		},
+	}
 
-	cfg, err := Load(configPath)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			viper.Reset()
 
-	// Environment variables should override config file
-	assert.Equal(t, "envuser", cfg.Auth.Username)
-	assert.Equal(t, "envpass", cfg.Auth.Password)
-	assert.NoError(t, cfg.ValidateAuth())
-	assert.True(t, cfg.IsAuthEnabled())
+			// Set environment variables
+			t.Setenv("RCLONESYNC_AUTH_USERNAME", "envuser")
+			t.Setenv("RCLONESYNC_AUTH_PASSWORD", "envpass")
+
+			tmpDir := t.TempDir()
+			configPath := filepath.Join(tmpDir, "config.toml")
+
+			err := os.WriteFile(configPath, []byte(tt.configContent), 0644)
+			require.NoError(t, err)
+
+			cfg, err := Load(configPath)
+			require.NoError(t, err)
+
+			// Environment variables should be used in both cases
+			assert.Equal(t, "envuser", cfg.Auth.Username)
+			assert.Equal(t, "envpass", cfg.Auth.Password)
+			assert.NoError(t, cfg.ValidateAuth())
+			assert.True(t, cfg.IsAuthEnabled())
+		})
+	}
 }

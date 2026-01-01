@@ -3,6 +3,7 @@ package config
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -118,6 +119,10 @@ func (c *Config) ValidateAuth() error {
 }
 
 func setDefaults() {
+	// 通过反射自动注册所有配置键，使 AutomaticEnv() 能正确识别环境变量
+	registerConfigKeys(reflect.TypeOf(Config{}), "")
+
+	// 设置非零默认值
 	viper.SetDefault("server.port", 8080)
 	viper.SetDefault("server.host", "0.0.0.0")
 	viper.SetDefault("database.path", "rclone-sync.db")
@@ -129,7 +134,37 @@ func setDefaults() {
 	viper.SetDefault("app.job.max_logs_per_connection", 1000)
 	viper.SetDefault("app.job.cleanup_schedule", "0 * * * *")
 	viper.SetDefault("app.sync.transfers", 4)
-	viper.SetDefault("security.encryption_key", "")
+}
+
+// registerConfigKeys 通过反射遍历结构体，为每个字段注册零值默认值
+// 这样 viper.AutomaticEnv() 就能识别所有配置键对应的环境变量
+func registerConfigKeys(t reflect.Type, prefix string) {
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		tag := field.Tag.Get("mapstructure")
+		if tag == "" || tag == "-" {
+			continue
+		}
+
+		key := tag
+		if prefix != "" {
+			key = prefix + "." + tag
+		}
+
+		kind := field.Type.Kind()
+
+		switch kind {
+		case reflect.Struct:
+			// 如果是结构体，递归处理
+			registerConfigKeys(field.Type, key)
+		case reflect.Map:
+			// 跳过 map 类型，因为它们需要特殊处理（如 LogLevels）
+			continue
+		default:
+			// 注册零值默认值，使 viper 知道这个键存在
+			viper.SetDefault(key, reflect.Zero(field.Type).Interface())
+		}
+	}
 }
 
 // BindFlags binds command-line flags to configuration values.

@@ -100,6 +100,7 @@ export const ConnectionUpdateMutation = graphql(`
         id
         name
         type
+        config
         createdAt
         updatedAt
       }

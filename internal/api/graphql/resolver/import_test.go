@@ -156,7 +156,8 @@ func (s *ImportResolverTestSuite) TestImportMutation_Execute() {
 						name
 						type
 					}
-					skippedCount
+					createdCount
+					updatedCount
 				}
 			}
 		}
@@ -179,12 +180,14 @@ func (s *ImportResolverTestSuite) TestImportMutation_Execute() {
 
 	data := string(resp.Data)
 	connections := gjson.Get(data, "import.execute.connections")
-	skippedCount := gjson.Get(data, "import.execute.skippedCount")
+	createdCount := gjson.Get(data, "import.execute.createdCount")
+	updatedCount := gjson.Get(data, "import.execute.updatedCount")
 
 	assert.True(s.T(), connections.Exists())
 	assert.True(s.T(), connections.IsArray())
 	assert.Equal(s.T(), 1, len(connections.Array()))
-	assert.Equal(s.T(), int64(0), skippedCount.Int())
+	assert.Equal(s.T(), int64(1), createdCount.Int())
+	assert.Equal(s.T(), int64(0), updatedCount.Int())
 
 	// Verify first connection
 	first := connections.Array()[0]
@@ -203,7 +206,8 @@ func (s *ImportResolverTestSuite) TestImportMutation_ExecuteMultiple() {
 						name
 						type
 					}
-					skippedCount
+					createdCount
+					updatedCount
 				}
 			}
 		}
@@ -236,7 +240,8 @@ func (s *ImportResolverTestSuite) TestImportMutation_ExecuteMultiple() {
 	assert.True(s.T(), connections.Exists())
 	assert.True(s.T(), connections.IsArray())
 	assert.Equal(s.T(), 2, len(connections.Array()))
-	assert.Equal(s.T(), int64(0), gjson.Get(data, "import.execute.skippedCount").Int())
+	assert.Equal(s.T(), int64(2), gjson.Get(data, "import.execute.createdCount").Int())
+	assert.Equal(s.T(), int64(0), gjson.Get(data, "import.execute.updatedCount").Int())
 }
 
 // TestImportMutation_ExecuteEmpty tests executing import with no connections.
@@ -249,7 +254,8 @@ func (s *ImportResolverTestSuite) TestImportMutation_ExecuteEmpty() {
 						id
 						name
 					}
-					skippedCount
+					createdCount
+					updatedCount
 				}
 			}
 		}
@@ -267,7 +273,8 @@ func (s *ImportResolverTestSuite) TestImportMutation_ExecuteEmpty() {
 	assert.True(s.T(), connections.Exists())
 	assert.True(s.T(), connections.IsArray())
 	assert.Equal(s.T(), 0, len(connections.Array()))
-	assert.Equal(s.T(), int64(0), gjson.Get(data, "import.execute.skippedCount").Int())
+	assert.Equal(s.T(), int64(0), gjson.Get(data, "import.execute.createdCount").Int())
+	assert.Equal(s.T(), int64(0), gjson.Get(data, "import.execute.updatedCount").Int())
 }
 
 // TestImportMutation_ExecuteDuplicateName tests executing import with duplicate names.
@@ -283,7 +290,8 @@ func (s *ImportResolverTestSuite) TestImportMutation_ExecuteDuplicateName() {
 						id
 						name
 					}
-					skippedCount
+					createdCount
+					updatedCount
 				}
 			}
 		}
@@ -306,11 +314,13 @@ func (s *ImportResolverTestSuite) TestImportMutation_ExecuteDuplicateName() {
 
 	data := string(resp.Data)
 	connections := gjson.Get(data, "import.execute.connections")
-	skippedCount := gjson.Get(data, "import.execute.skippedCount")
+	createdCount := gjson.Get(data, "import.execute.createdCount")
+	updatedCount := gjson.Get(data, "import.execute.updatedCount")
 
-	// Connection with duplicate name should be skipped
-	assert.Equal(s.T(), 0, len(connections.Array()))
-	assert.Equal(s.T(), int64(1), skippedCount.Int())
+	// Connection with duplicate name should be updated (overwrite=true by default)
+	assert.Equal(s.T(), 1, len(connections.Array()))
+	assert.Equal(s.T(), int64(0), createdCount.Int())
+	assert.Equal(s.T(), int64(1), updatedCount.Int())
 }
 
 // TestImportMutation_ParseWithSpecialCharacters tests parsing config with special characters.

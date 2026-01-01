@@ -11,7 +11,7 @@ import type {
   ConnectionsListQuery,
 } from '@/api/graphql/queries/connections';
 import type { FilesListQuery } from '@/api/graphql/queries/files';
-import type { IMPORT_PARSE } from '@/api/graphql/queries/import';
+import type { IMPORT_PARSE, IMPORT_EXECUTE } from '@/api/graphql/queries/import';
 import type { JobProgressQuery, JobsListQuery, LogsListQuery } from '@/api/graphql/queries/jobs';
 import type { ProviderGetQuery, ProvidersListQuery } from '@/api/graphql/queries/providers';
 import type {
@@ -129,6 +129,11 @@ export type TransferItem = TransferProgressEvent['transfers'][number];
 // Quota types (from ConnectionGetQuotaQuery)
 export type ConnectionQuota = NonNullable<ConnectionWithQuota['quota']>;
 
+// Import execute result type (from IMPORT_EXECUTE mutation)
+export type ImportResult = NonNullable<
+  NonNullable<ResultOf<typeof IMPORT_EXECUTE>>['import']['execute']
+>;
+
 // ============================================================================
 // Type Aliases for Backward Compatibility
 // ============================================================================
@@ -163,16 +168,6 @@ export interface ImportPreviewItem {
   isDuplicate: boolean;
   editedName?: string;
   editedConfig?: Record<string, string>;
-}
-
-/**
- * Import execution result
- */
-export interface ImportResult {
-  imported: number;
-  skipped: number;
-  failed: number;
-  errors?: string[];
 }
 
 /**

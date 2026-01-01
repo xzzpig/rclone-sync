@@ -42,7 +42,8 @@ export const IMPORT_EXECUTE = graphql(`
           type
           createdAt
         }
-        skippedCount
+        createdCount
+        updatedCount
       }
     }
   }

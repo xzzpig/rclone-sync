@@ -72,11 +72,10 @@ export const AddConnectionDialog = (props: { isOpen: boolean; onClose: () => voi
     }
 
     // Invalidate connections cache by reexecuting query
-    await client.query(
-      ConnectionsListQuery,
-      { pagination: { limit: 100, offset: 0 } },
-      { requestPolicy: 'network-only' }
-    );
+    await client.query(ConnectionsListQuery, {}, { requestPolicy: 'network-only' });
+
+    // Close the dialog after successful save
+    handleClose();
   };
 
   const handleClose = () => {

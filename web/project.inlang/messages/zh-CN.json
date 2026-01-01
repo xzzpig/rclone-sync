@@ -185,7 +185,7 @@
   "import_parseFailed": "解析配置失败",
   "import_parsing": "解析中...",
   "import_partialSuccess": "部分导入成功",
-  "import_partialSuccessDesc": "成功 {imported} 个，跳过 {skipped} 个，失败 {failed} 个",
+  "import_partialSuccessDesc": "成功 {created} 个，更新 {updated} 个，合计 {total} 个",
   "import_removeFromList": "从列表移除",
   "import_selectedCount": "已选择 {count} 个连接",
   "import_skipped": "已跳过",

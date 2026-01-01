@@ -23,7 +23,7 @@ const Sidebar: Component = () => {
   // Use GraphQL query for connections
   const [connectionsResult] = createQuery({
     query: ConnectionsListQuery,
-    variables: { pagination: { limit: 100, offset: 0 } },
+    variables: {},
   });
 
   const connections = () => connectionsResult.data?.connection?.list?.items ?? [];

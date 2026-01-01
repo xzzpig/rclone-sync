@@ -26,14 +26,14 @@ export const ImportWizard: Component<ImportWizardProps> = (props) => {
   const [step, setStep] = createSignal<Step>(1);
   const [loading, setLoading] = createSignal(false);
   const [previewItems, setPreviewItems] = createSignal<ImportPreviewItem[]>([]);
-  const [result, setResult] = createSignal<ImportResult | null>(null);
+  const [result, setResult] = createSignal<ImportResult | undefined>(undefined);
   const [error, setError] = createSignal<string | null>(null);
 
   const resetState = () => {
     setStep(1);
     setLoading(false);
     setPreviewItems([]);
-    setResult(null);
+    setResult(undefined);
     setError(null);
   };
 
@@ -143,20 +143,8 @@ export const ImportWizard: Component<ImportWizardProps> = (props) => {
       }
 
       const data = importResult.data?.import?.execute;
-      const importedCount = data?.connections?.length ?? 0;
-      const skippedCount = data?.skippedCount ?? 0;
-
-      // Convert to ImportResult format expected by Step3Confirm
-      setResult({
-        imported: importedCount,
-        skipped: skippedCount,
-        failed: 0, // GraphQL API doesn't have failed concept in current schema
-        errors: [],
-      });
+      setResult(data);
       setStep(3);
-
-      // 刷新连接列表 - invalidate GraphQL cache
-      client.query(ConnectionsListQuery, {}, { requestPolicy: 'network-only' });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : m.import_failed());
     } finally {

@@ -124,7 +124,8 @@ type ComplexityRoot struct {
 
 	ImportExecuteResult struct {
 		Connections  func(childComplexity int) int
-		SkippedCount func(childComplexity int) int
+		CreatedCount func(childComplexity int) int
+		UpdatedCount func(childComplexity int) int
 	}
 
 	ImportMutation struct {
@@ -674,12 +675,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.ImportExecuteResult.Connections(childComplexity), true
-	case "ImportExecuteResult.skippedCount":
-		if e.complexity.ImportExecuteResult.SkippedCount == nil {
+	case "ImportExecuteResult.createdCount":
+		if e.complexity.ImportExecuteResult.CreatedCount == nil {
 			break
 		}
 
-		return e.complexity.ImportExecuteResult.SkippedCount(childComplexity), true
+		return e.complexity.ImportExecuteResult.CreatedCount(childComplexity), true
+	case "ImportExecuteResult.updatedCount":
+		if e.complexity.ImportExecuteResult.UpdatedCount == nil {
+			break
+		}
+
+		return e.complexity.ImportExecuteResult.UpdatedCount(childComplexity), true
 
 	case "ImportMutation.execute":
 		if e.complexity.ImportMutation.Execute == nil {
@@ -1984,6 +1991,10 @@ input ImportExecuteInput {
 	要导入的连接列表
 	"""
 	connections: [ImportConnectionInput!]!
+	"""
+	是否覆盖已存在的连接（默认为 true）
+	"""
+	overwrite: Boolean! = true
 }
 
 """
@@ -2060,13 +2071,17 @@ union ImportParseResult = ImportParseSuccess | ImportParseError
 """
 type ImportExecuteResult {
 	"""
-	成功导入的连接列表
+成功导入的连接列表（包含新创建和更新的连接）
 	"""
 	connections: [Connection!]!
 	"""
-	跳过的连接数（名称冲突）
+	新创建的连接数
 	"""
-	skippedCount: Int!
+	createdCount: Int!
+	"""
+	更新的连接数
+	"""
+	updatedCount: Int!
 }
 
 # =============================================================================
@@ -4766,14 +4781,14 @@ func (ec *executionContext) fieldContext_ImportExecuteResult_connections(_ conte
 	return fc, nil
 }
 
-func (ec *executionContext) _ImportExecuteResult_skippedCount(ctx context.Context, field graphql.CollectedField, obj *model.ImportExecuteResult) (ret graphql.Marshaler) {
+func (ec *executionContext) _ImportExecuteResult_createdCount(ctx context.Context, field graphql.CollectedField, obj *model.ImportExecuteResult) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_ImportExecuteResult_skippedCount,
+		ec.fieldContext_ImportExecuteResult_createdCount,
 		func(ctx context.Context) (any, error) {
-			return obj.SkippedCount, nil
+			return obj.CreatedCount, nil
 		},
 		nil,
 		ec.marshalNInt2int,
@@ -4782,7 +4797,36 @@ func (ec *executionContext) _ImportExecuteResult_skippedCount(ctx context.Contex
 	)
 }
 
-func (ec *executionContext) fieldContext_ImportExecuteResult_skippedCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_ImportExecuteResult_createdCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ImportExecuteResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ImportExecuteResult_updatedCount(ctx context.Context, field graphql.CollectedField, obj *model.ImportExecuteResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ImportExecuteResult_updatedCount,
+		func(ctx context.Context) (any, error) {
+			return obj.UpdatedCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ImportExecuteResult_updatedCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ImportExecuteResult",
 		Field:      field,
@@ -4863,8 +4907,10 @@ func (ec *executionContext) fieldContext_ImportMutation_execute(ctx context.Cont
 			switch field.Name {
 			case "connections":
 				return ec.fieldContext_ImportExecuteResult_connections(ctx, field)
-			case "skippedCount":
-				return ec.fieldContext_ImportExecuteResult_skippedCount(ctx, field)
+			case "createdCount":
+				return ec.fieldContext_ImportExecuteResult_createdCount(ctx, field)
+			case "updatedCount":
+				return ec.fieldContext_ImportExecuteResult_updatedCount(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type ImportExecuteResult", field.Name)
 		},
@@ -10731,7 +10777,11 @@ func (ec *executionContext) unmarshalInputImportExecuteInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"connections"}
+	if _, present := asMap["overwrite"]; !present {
+		asMap["overwrite"] = true
+	}
+
+	fieldsInOrder := [...]string{"connections", "overwrite"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -10745,6 +10795,13 @@ func (ec *executionContext) unmarshalInputImportExecuteInput(ctx context.Context
 				return it, err
 			}
 			it.Connections = data
+		case "overwrite":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("overwrite"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Overwrite = data
 		}
 	}
 
@@ -11931,8 +11988,13 @@ func (ec *executionContext) _ImportExecuteResult(ctx context.Context, sel ast.Se
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "skippedCount":
-			out.Values[i] = ec._ImportExecuteResult_skippedCount(ctx, field, obj)
+		case "createdCount":
+			out.Values[i] = ec._ImportExecuteResult_createdCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updatedCount":
+			out.Values[i] = ec._ImportExecuteResult_updatedCount(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}

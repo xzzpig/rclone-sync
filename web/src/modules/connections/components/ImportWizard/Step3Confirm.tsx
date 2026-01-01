@@ -1,10 +1,9 @@
 import { Button } from '@/components/ui/button';
 import type { ImportResult } from '@/lib/types';
 import * as m from '@/paraglide/messages';
-import { Component, For, Show } from 'solid-js';
+import { Component, Show } from 'solid-js';
 import IconCheck from '~icons/lucide/check';
 import IconAlertTriangle from '~icons/lucide/alert-triangle';
-import IconX from '~icons/lucide/x';
 
 interface Step3ConfirmProps {
   result: ImportResult;
@@ -13,14 +12,17 @@ interface Step3ConfirmProps {
 }
 
 export const Step3Confirm: Component<Step3ConfirmProps> = (props) => {
-  const isFullSuccess = () => props.result.failed === 0 && props.result.skipped === 0;
-  const isPartialSuccess = () =>
-    props.result.imported > 0 && (props.result.failed > 0 || props.result.skipped > 0);
-  const isFullFailure = () => props.result.imported === 0 && props.result.failed > 0;
+  const createdCount = () => (props.result.createdCount ?? 0) as number;
+  const updatedCount = () => (props.result.updatedCount ?? 0) as number;
+  const totalCount = () => createdCount() + updatedCount();
+
+  const isFullSuccess = () => createdCount() > 0 && updatedCount() === 0;
+  const isPartialSuccess = () => createdCount() > 0 && updatedCount() > 0;
+  const isUpdateOnly = () => createdCount() === 0 && updatedCount() > 0;
 
   return (
     <div class="flex flex-col gap-4">
-      {/* 成功状态 */}
+      {/* 成功状态 - 只创建新连接 */}
       <Show when={isFullSuccess()}>
         <div class="flex flex-col items-center gap-3 py-6">
           <div class="flex size-16 items-center justify-center rounded-full bg-success/10">
@@ -29,83 +31,63 @@ export const Step3Confirm: Component<Step3ConfirmProps> = (props) => {
           <div class="text-center">
             <h3 class="text-lg font-medium">{m.import_success()}</h3>
             <p class="text-sm text-muted-foreground">
-              {m.import_successCount({ count: props.result.imported })}
+              {m.import_successCount({ count: createdCount() })}
             </p>
           </div>
         </div>
       </Show>
 
-      {/* 部分成功状态 */}
+      {/* 部分成功状态 - 既有创建又有更新 */}
       <Show when={isPartialSuccess()}>
         <div class="flex flex-col items-center gap-3 py-6">
           <div class="flex size-16 items-center justify-center rounded-full bg-warning/10">
             <IconAlertTriangle class="size-8 text-warning-foreground" />
           </div>
           <div class="text-center">
-            <h3 class="text-lg font-medium">{m.import_partialSuccess()}</h3>
+            <h3 class="text-lg font-medium">{m.import_success()}</h3>
             <p class="text-sm text-muted-foreground">
               {m.import_partialSuccessDesc({
-                imported: props.result.imported,
-                skipped: props.result.skipped,
-                failed: props.result.failed,
+                created: createdCount(),
+                updated: updatedCount(),
+                total: totalCount(),
               })}
             </p>
           </div>
         </div>
       </Show>
 
-      {/* 完全失败状态 */}
-      <Show when={isFullFailure()}>
+      {/* 只更新状态 */}
+      <Show when={isUpdateOnly()}>
         <div class="flex flex-col items-center gap-3 py-6">
-          <div class="flex size-16 items-center justify-center rounded-full bg-error/10">
-            <IconX class="size-8 text-error-foreground" />
+          <div class="flex size-16 items-center justify-center rounded-full bg-info/10">
+            <IconAlertTriangle class="size-8 text-info-foreground" />
           </div>
           <div class="text-center">
-            <h3 class="text-lg font-medium">{m.import_failed()}</h3>
-            <p class="text-sm text-muted-foreground">{m.import_allFailed()}</p>
+            <h3 class="text-lg font-medium">{m.import_success()}</h3>
+            <p class="text-sm text-muted-foreground">
+              {m.import_successCount({ count: updatedCount() })}
+            </p>
           </div>
-        </div>
-      </Show>
-
-      {/* 错误详情 */}
-      <Show when={props.result.errors && props.result.errors.length > 0}>
-        <div class="rounded-md border border-error/20 bg-error/5 p-4">
-          <h4 class="mb-2 font-medium text-error-foreground">{m.import_errorDetails()}</h4>
-          <ul class="space-y-1 text-sm text-error-foreground">
-            <For each={props.result.errors}>
-              {(error) => (
-                <li class="flex items-start gap-2">
-                  <IconX class="mt-0.5 size-4 shrink-0" />
-                  <span>{error}</span>
-                </li>
-              )}
-            </For>
-          </ul>
         </div>
       </Show>
 
       {/* 统计汇总 */}
       <div class="grid grid-cols-3 gap-4 rounded-md border p-4">
         <div class="text-center">
-          <div class="text-2xl font-semibold text-success-foreground">{props.result.imported}</div>
+          <div class="text-2xl font-semibold text-success-foreground">{createdCount()}</div>
           <div class="text-xs text-muted-foreground">{m.common_success()}</div>
         </div>
         <div class="text-center">
-          <div class="text-2xl font-semibold text-muted-foreground">{props.result.skipped}</div>
-          <div class="text-xs text-muted-foreground">{m.common_skipped()}</div>
+          <div class="text-2xl font-semibold text-info-foreground">{updatedCount()}</div>
+          <div class="text-xs text-muted-foreground">{m.connection_update()}</div>
         </div>
         <div class="text-center">
-          <div class="text-2xl font-semibold text-error-foreground">{props.result.failed}</div>
-          <div class="text-xs text-muted-foreground">{m.common_failed()}</div>
+          <div class="text-2xl font-semibold text-muted-foreground">{totalCount()}</div>
+          <div class="text-xs text-muted-foreground">{m.overview_total()}</div>
         </div>
       </div>
 
       <div class="flex justify-end gap-2 pt-4">
-        <Show when={props.result.failed > 0}>
-          <Button variant="outline" onClick={props.onBack}>
-            {m.import_backToRetry()}
-          </Button>
-        </Show>
         <Button onClick={props.onFinish}>{m.common_finish()}</Button>
       </div>
     </div>

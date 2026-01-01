@@ -22,6 +22,10 @@ input ImportExecuteInput {
 	要导入的连接列表
 	"""
 	connections: [ImportConnectionInput!]!
+	"""
+	是否覆盖已存在的连接（默认为 true）
+	"""
+	overwrite: Boolean! = true
 }
 
 """
@@ -98,13 +102,17 @@ union ImportParseResult = ImportParseSuccess | ImportParseError
 """
 type ImportExecuteResult {
 	"""
-	成功导入的连接列表
+成功导入的连接列表（包含新创建和更新的连接）
 	"""
 	connections: [Connection!]!
 	"""
-	跳过的连接数（名称冲突）
+	新创建的连接数
 	"""
-	skippedCount: Int!
+	createdCount: Int!
+	"""
+	更新的连接数
+	"""
+	updatedCount: Int!
 }
 
 # =============================================================================

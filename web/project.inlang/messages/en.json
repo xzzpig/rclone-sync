@@ -185,7 +185,7 @@
   "import_parseFailed": "Failed to parse configuration",
   "import_parsing": "Parsing...",
   "import_partialSuccess": "Partial Import Success",
-  "import_partialSuccessDesc": "{imported} succeeded, {skipped} skipped, {failed} failed",
+  "import_partialSuccessDesc": "{created} succeeded, {updated} updated, {total} total",
   "import_removeFromList": "Remove from list",
   "import_selectedCount": "{count} connections selected",
   "import_skipped": "Skipped",

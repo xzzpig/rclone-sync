@@ -136,6 +136,7 @@ func (s *ConnectionService) ListConnections(ctx context.Context) ([]*ent.Connect
 }
 
 // ListConnectionsPaginated 分页列出连接
+// 当 limit <= 0 时，返回全部连接（不分页）
 func (s *ConnectionService) ListConnectionsPaginated(ctx context.Context, limit, offset int) ([]*ent.Connection, int, error) {
 	query := s.client.Connection.Query().
 		Order(ent.Desc(connection.FieldCreatedAt))
@@ -146,11 +147,12 @@ func (s *ConnectionService) ListConnectionsPaginated(ctx context.Context, limit,
 		return nil, 0, fmt.Errorf("failed to count connections: %w", err)
 	}
 
-	// Apply pagination and fetch items
-	conns, err := query.
-		Limit(limit).
-		Offset(offset).
-		All(ctx)
+	// Apply pagination only when limit > 0
+	if limit > 0 {
+		query = query.Limit(limit).Offset(offset)
+	}
+
+	conns, err := query.All(ctx)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list connections: %w", err)
 	}

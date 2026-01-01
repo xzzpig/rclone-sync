@@ -223,8 +223,8 @@ func (r *connectionMutationResolver) TestUnsaved(ctx context.Context, obj *model
 
 // List is the resolver for the list field.
 func (r *connectionQueryResolver) List(ctx context.Context, obj *model.ConnectionQuery, pagination *model.PaginationInput) (*model.ConnectionConnection, error) {
-	// Default pagination values
-	limit := 20
+	// Default pagination values (0 means no limit, return all)
+	limit := 0
 	offset := 0
 	if pagination != nil {
 		if pagination.Limit != nil {
@@ -235,7 +235,7 @@ func (r *connectionQueryResolver) List(ctx context.Context, obj *model.Connectio
 		}
 	}
 
-	// Use ConnectionService to list connections
+	// Use ConnectionService to list connections (limit=0 returns all)
 	entConnections, totalCount, err := r.deps.ConnectionService.ListConnectionsPaginated(ctx, limit, offset)
 	if err != nil {
 		return nil, err
@@ -248,7 +248,7 @@ func (r *connectionQueryResolver) List(ctx context.Context, obj *model.Connectio
 	}
 
 	// Build page info
-	hasNextPage := offset+len(items) < totalCount
+	hasNextPage := limit > 0 && offset+len(items) < totalCount
 	hasPreviousPage := offset > 0
 
 	return &model.ConnectionConnection{

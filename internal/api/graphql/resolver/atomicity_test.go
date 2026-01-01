@@ -327,7 +327,8 @@ func (s *AtomicityTestSuite) TestImportMutation_PartialFailure() {
 						id
 						name
 					}
-					skippedCount
+					createdCount
+					updatedCount
 				}
 			}
 		}
@@ -336,13 +337,15 @@ func (s *AtomicityTestSuite) TestImportMutation_PartialFailure() {
 	importResp := s.Env.ExecuteGraphQL(s.T(), GraphQLRequest{Query: importMutation})
 	require.Empty(s.T(), importResp.Errors)
 
-	// Should have successfully imported one and skipped one
+	// Should have successfully created one and updated one (overwrite=true by default)
 	connections := gjson.Get(string(importResp.Data), "import.execute.connections").Array()
-	skippedCount := gjson.Get(string(importResp.Data), "import.execute.skippedCount").Int()
+	createdCount := gjson.Get(string(importResp.Data), "import.execute.createdCount").Int()
+	updatedCount := gjson.Get(string(importResp.Data), "import.execute.updatedCount").Int()
 
-	// At least one should be imported, and the duplicate should be skipped
-	assert.GreaterOrEqual(s.T(), len(connections), 1, "At least one connection should be imported")
-	assert.GreaterOrEqual(s.T(), skippedCount, int64(0), "Skipped count should be >= 0")
+	// Both should be processed: one created, one updated
+	assert.Equal(s.T(), 2, len(connections), "Both connections should be in result")
+	assert.Equal(s.T(), int64(1), createdCount, "One connection should be created")
+	assert.Equal(s.T(), int64(1), updatedCount, "One connection should be updated")
 }
 
 // TestConnectionMutation_UpdatePartialFields tests that partial updates

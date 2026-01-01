@@ -44,19 +44,40 @@ func (r *importMutationResolver) Execute(ctx context.Context, obj *model.ImportM
 	if len(input.Connections) == 0 {
 		return &model.ImportExecuteResult{
 			Connections:  []*model.Connection{},
-			SkippedCount: 0,
+			CreatedCount: 0,
+			UpdatedCount: 0,
 		}, nil
 	}
 
 	var importedConns []*model.Connection
-	var skippedCount int
+	var createdCount int
+	var updatedCount int
 
 	for _, connInput := range input.Connections {
 		// Check if connection already exists
 		existing, err := r.deps.ConnectionService.GetConnectionByName(ctx, connInput.Name)
 		if err == nil && existing != nil {
-			// Connection exists, skip it
-			skippedCount++
+			// Connection exists
+			if input.Overwrite {
+				// Update existing connection
+				err := r.deps.ConnectionService.UpdateConnection(ctx, existing.ID, nil, &connInput.Type, connInput.Config)
+				if err != nil {
+					return nil, err
+				}
+				updatedCount++
+				// Add to result (refetch to get updated info)
+				updated, err := r.deps.ConnectionService.GetConnectionByName(ctx, connInput.Name)
+				if err == nil && updated != nil {
+					importedConns = append(importedConns, &model.Connection{
+						ID:        updated.ID,
+						Name:      updated.Name,
+						Type:      updated.Type,
+						CreatedAt: updated.CreatedAt,
+						UpdatedAt: updated.UpdatedAt,
+					})
+				}
+			}
+			// If overwrite is false, skip existing connection
 			continue
 		}
 
@@ -65,6 +86,8 @@ func (r *importMutationResolver) Execute(ctx context.Context, obj *model.ImportM
 		if err != nil {
 			return nil, err
 		}
+
+		createdCount++
 
 		// Convert ent.Connection to model.Connection (config will be resolved by Connection.Config resolver)
 		importedConns = append(importedConns, &model.Connection{
@@ -78,7 +101,8 @@ func (r *importMutationResolver) Execute(ctx context.Context, obj *model.ImportM
 
 	return &model.ImportExecuteResult{
 		Connections:  importedConns,
-		SkippedCount: skippedCount,
+		CreatedCount: createdCount,
+		UpdatedCount: updatedCount,
 	}, nil
 }
 

@@ -117,7 +117,12 @@ export const client = new Client({
       // to be configured on the namespace types, not the root Mutation type
       updates: {
         Mutation: {
-          // Root-level Mutation updates if any non-namespaced mutations exist
+          // Handle namespaced import mutation cache invalidation
+          // Configure on root Mutation.import to avoid interfering with mutation return value
+          import: (_result, _args, cache) => {
+            // Always invalidate connection list when import mutation is called
+            invalidateListQuery(cache, 'Connection');
+          },
         },
         TaskMutation: {
           create: (_result, _args, cache) => {

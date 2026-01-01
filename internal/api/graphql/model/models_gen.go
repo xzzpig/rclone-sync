@@ -172,14 +172,18 @@ type ImportConnectionInput struct {
 type ImportExecuteInput struct {
 	// 要导入的连接列表
 	Connections []*ImportConnectionInput `json:"connections"`
+	// 是否覆盖已存在的连接（默认为 true）
+	Overwrite bool `json:"overwrite"`
 }
 
 // 导入执行结果
 type ImportExecuteResult struct {
-	// 成功导入的连接列表
+	// 成功导入的连接列表（包含新创建和更新的连接）
 	Connections []*Connection `json:"connections"`
-	// 跳过的连接数（名称冲突）
-	SkippedCount int `json:"skippedCount"`
+	// 新创建的连接数
+	CreatedCount int `json:"createdCount"`
+	// 更新的连接数
+	UpdatedCount int `json:"updatedCount"`
 }
 
 // 导入变更命名空间

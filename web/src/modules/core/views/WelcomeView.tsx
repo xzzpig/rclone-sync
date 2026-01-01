@@ -16,6 +16,7 @@ const WelcomeView: Component = () => {
   // Fetch all connections using GraphQL
   const [connectionsResult] = createQuery({
     query: ConnectionsListQuery,
+    variables: {},
   });
 
   // Fetch all tasks using GraphQL

@@ -230,16 +230,24 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger model.
 			e.logger.Info("Sync task cancelled", zap.Stringer("job_id", jobEntity.ID))
 			// Use a fresh context for DB operations since the original context is cancelled
 			dbCtx, dbCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer dbCancel()
+
+			// Get stats for cancelled job
+			s := accounting.Stats(statsCtx)
+			var files, bytes, filesDeleted, errorCount int64
+			if s != nil {
+				files, bytes, filesDeleted, errorCount = s.GetTransfers(), s.GetBytes(), s.GetDeletes(), s.GetErrors()
+				// Update job stats (like ResetStuckJobs does)
+				if _, updateErr := e.jobService.UpdateJobStats(dbCtx, jobEntity.ID, files, bytes, filesDeleted, errorCount); updateErr != nil {
+					e.logger.Error("Failed to update job stats for cancelled job", zap.Error(updateErr))
+				}
+			}
+
 			if _, updateErr := e.jobService.UpdateJobStatus(dbCtx, jobEntity.ID, string(model.JobStatusCancelled), "Task cancelled by user or shutdown"); updateErr != nil {
 				e.logger.Error("Failed to update job status to cancelled", zap.Error(updateErr))
 			}
-			dbCancel()
+
 			// Broadcast cancellation
-			s := accounting.Stats(statsCtx)
-			var files, bytes int64
-			if s != nil {
-				files, bytes = s.GetTransfers(), s.GetBytes()
-			}
 			e.broadcastJobUpdate(&model.JobProgressEvent{
 				JobID:            jobEntity.ID,
 				TaskID:           task.ID,
@@ -247,6 +255,8 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger model.
 				Status:           model.JobStatusCancelled,
 				FilesTransferred: int(files),
 				BytesTransferred: bytes,
+				FilesDeleted:     int(filesDeleted),
+				ErrorCount:       int(errorCount),
 				StartTime:        jobEntity.StartTime,
 				EndTime:          func() *time.Time { t := time.Now(); return &t }(),
 			})

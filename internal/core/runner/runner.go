@@ -16,6 +16,7 @@ import (
 type runInfo struct {
 	cancel context.CancelFunc
 	runID  uuid.UUID
+	done   chan struct{} // 任务完成时关闭，用于同步等待
 }
 
 // Runner manages the execution of sync tasks.
@@ -56,29 +57,48 @@ func (r *Runner) Stop() {
 }
 
 // StartTask starts a task execution asynchronously.
-// It cancels any existing execution of the same task before starting a new one.
+// For Realtime triggers, it skips if the task is already running to avoid interrupting ongoing syncs.
+// For Manual and Scheduled triggers, it cancels any existing execution before starting a new one.
 func (r *Runner) StartTask(task *ent.Task, trigger model.JobTrigger) error {
 	taskID := task.ID
 	runID := uuid.New()
 
 	r.mu.Lock()
-	// Cancel existing run if any
+	// Check if task is already running
 	if info, ok := r.running[taskID]; ok {
+		// For Realtime triggers, skip if task is already running
+		// This prevents file system events (like downloads) from canceling the ongoing sync
+		if trigger == model.JobTriggerRealtime {
+			r.mu.Unlock()
+			r.logger.Debug("Task already running, skipping realtime trigger",
+				zap.Stringer("task_id", taskID),
+				zap.Stringer("existing_run_id", info.runID))
+			return nil
+		}
+		// For other triggers (Manual, Scheduled), cancel existing run and wait for it to finish
 		r.logger.Info("Cancelling existing task execution", zap.Stringer("task_id", taskID), zap.Stringer("old_run_id", info.runID))
 		info.cancel()
+		// Wait for the old task to finish while holding the lock
+		// This is safe because the goroutine only closes the channel without acquiring the lock
+		<-info.done
+		r.logger.Debug("Old task execution finished", zap.Stringer("task_id", taskID), zap.Stringer("old_run_id", info.runID))
+		delete(r.running, taskID)
 	}
 
 	// Create new context for this run
 	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
 	r.running[taskID] = runInfo{
 		cancel: cancel,
 		runID:  runID,
+		done:   done,
 	}
 	r.mu.Unlock()
 
 	// Run asynchronously
 	r.wg.Go(func() {
 		defer func() {
+			close(done)
 			r.mu.Lock()
 			// Only delete if it's still the SAME execution
 			if info, ok := r.running[taskID]; ok && info.runID == runID {
@@ -106,6 +126,7 @@ func (r *Runner) StopTask(taskID uuid.UUID) error {
 	if info, ok := r.running[taskID]; ok {
 		r.logger.Info("Stopping task", zap.Stringer("task_id", taskID))
 		info.cancel()
+		<-info.done
 		delete(r.running, taskID)
 	}
 	return nil

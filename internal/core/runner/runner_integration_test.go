@@ -36,18 +36,39 @@ type testContext struct {
 	cleanup     func()
 }
 
+type setupOption func(*setupOptions)
+
+type setupOptions struct {
+	useSlowFs bool
+	dbName    string
+}
+
+func withSlowFs() setupOption {
+	return func(o *setupOptions) {
+		o.useSlowFs = true
+		o.dbName = "ent_cancel"
+	}
+}
+
 // setupIntegrationTest initializes all real components for integration testing.
-func setupIntegrationTest(t *testing.T) *testContext {
+func setupIntegrationTest(t *testing.T, opts ...setupOption) *testContext {
 	t.Helper()
 
-	// Initialize logger
-	{ // logger init block
-		logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug, nil)
+	options := &setupOptions{dbName: ""}
+	for _, opt := range opts {
+		opt(options)
 	}
 
+	// Initialize logger
+	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug, nil)
+
 	// Use in-memory sqlite for testing with db.InitDB
+	dsn := db.InMemoryDSN()
+	if options.dbName != "" {
+		dsn = "file:" + options.dbName + "?mode=memory&cache=shared&_fk=1"
+	}
 	client, err := db.InitDB(db.InitDBOptions{
-		DSN:           db.InMemoryDSN(),
+		DSN:           dsn,
 		MigrationMode: db.MigrationModeAuto,
 	})
 	require.NoError(t, err)
@@ -71,6 +92,9 @@ func setupIntegrationTest(t *testing.T) *testContext {
 	r := runner.NewRunner(syncEngine)
 
 	cleanup := func() {
+		if options.useSlowFs {
+			testutil.ClearSlowFsController()
+		}
 		r.Stop()
 		client.Close()
 	}
@@ -119,75 +143,8 @@ func createTestTask(t *testing.T, tc *testContext, name, sourceDir, destDir stri
 	return task
 }
 
-// cancelTestContext holds all the components needed for cancel behavior tests.
-type cancelTestContext struct {
-	client      *ent.Client
-	jobService  *services.JobService
-	taskService *services.TaskService
-	connService *services.ConnectionService
-	syncEngine  *rclone.SyncEngine
-	runner      *runner.Runner
-	dataDir     string
-	cleanup     func()
-}
-
-// setupCancelTest initializes all real components for cancel behavior testing.
-func setupCancelTest(t *testing.T) *cancelTestContext {
-	t.Helper()
-
-	// Initialize logger
-	{ // logger init block
-		logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug, nil)
-	}
-
-	// Use in-memory sqlite for testing with db.InitDB
-	client, err := db.InitDB(db.InitDBOptions{
-		DSN:           "file:ent_cancel?mode=memory&cache=shared&_fk=1",
-		MigrationMode: db.MigrationModeAuto,
-	})
-	require.NoError(t, err)
-
-	// Create services
-	jobService := services.NewJobService(client)
-	taskService := services.NewTaskService(client)
-	encryptor, err := crypto.NewEncryptor("test-secret-key-32-bytes-long!!")
-	require.NoError(t, err)
-	connService := services.NewConnectionService(client, encryptor)
-
-	// Setup data directory
-	dataDir := t.TempDir()
-
-	// Install DBStorage and register slowfs backend
-	storage := rclone.NewDBStorage(connService)
-	storage.Install()
-
-	// Register slowfs backend for testing (slowfs is a test backend)
-	_ = storage // DBStorage is installed, slowfs backend will be created via ConnectionService
-
-	// Create SyncEngine and Runner
-	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, dataDir, false, 0)
-	r := runner.NewRunner(syncEngine)
-
-	cleanup := func() {
-		testutil.ClearSlowFsController()
-		r.Stop()
-		client.Close()
-	}
-
-	return &cancelTestContext{
-		client:      client,
-		jobService:  jobService,
-		taskService: taskService,
-		connService: connService,
-		syncEngine:  syncEngine,
-		runner:      r,
-		dataDir:     dataDir,
-		cleanup:     cleanup,
-	}
-}
-
 // createSlowTask creates a task that uses the slowfs backend
-func createSlowTask(t *testing.T, tc *cancelTestContext, name, sourceDir, destDir string) *ent.Task {
+func createSlowTask(t *testing.T, tc *testContext, name, sourceDir, destDir string) *ent.Task {
 	t.Helper()
 	ctx := context.Background()
 
@@ -275,62 +232,6 @@ func TestRunner_Integration_BasicSyncFlow(t *testing.T) {
 	assert.Equal(t, string(model.JobStatusSuccess), string(jobs[0].Status), "Job should be successful")
 }
 
-// TestRunner_Integration_StopRunningTask tests stopping a task while it's running.
-// Uses slowfs to ensure the task is actually running when StopTask is called.
-func TestRunner_Integration_StopRunningTask(t *testing.T) {
-	tc := setupCancelTest(t)
-	defer tc.cleanup()
-
-	// Setup control channels
-	startedCh := make(chan struct{}, 10)
-	blockCh := make(chan struct{})
-	testutil.SetSlowFsController(startedCh, blockCh)
-
-	// Setup test directories
-	sourceDir := t.TempDir()
-	destDir := t.TempDir()
-
-	// Create a test file
-	testFilePath := filepath.Join(sourceDir, "test.txt")
-	err := os.WriteFile(testFilePath, []byte("hello world"), 0644)
-	require.NoError(t, err)
-
-	// Create task using slowfs
-	task := createSlowTask(t, tc, "StopTaskTest", sourceDir, destDir)
-
-	// Start task via Runner
-	err = tc.runner.StartTask(task, model.JobTriggerManual)
-	require.NoError(t, err)
-
-	// Wait for the task to actually start and reach the blocking point
-	select {
-	case <-startedCh:
-		t.Log("Task started and is now blocking")
-	case <-time.After(5 * time.Second):
-		t.Fatal("Task did not start within timeout")
-	}
-
-	// Give it a moment to ensure the job is created
-	time.Sleep(100 * time.Millisecond)
-
-	// Verify task is running
-	assert.True(t, tc.runner.IsRunning(task.ID), "Task should be running before StopTask")
-
-	// Stop the task
-	err = tc.runner.StopTask(task.ID)
-	require.NoError(t, err)
-	assert.False(t, tc.runner.IsRunning(task.ID), "Task should not be running after StopTask")
-
-	// Wait for job status to be updated
-	time.Sleep(500 * time.Millisecond)
-
-	// Verify job was created and is cancelled
-	jobs, err := tc.jobService.ListJobs(context.Background(), &task.ID, nil, 10, 0)
-	require.NoError(t, err)
-	require.Len(t, jobs, 1, "Should have exactly one job")
-	assert.Equal(t, string(model.JobStatusCancelled), string(jobs[0].Status), "Job should be cancelled after StopTask")
-}
-
 // TestRunner_Integration_MultipleTasks tests running multiple independent tasks sequentially.
 // Note: We run tasks sequentially because SQLite has limited concurrent write support.
 func TestRunner_Integration_MultipleTasks(t *testing.T) {
@@ -384,118 +285,10 @@ func TestRunner_Integration_MultipleTasks(t *testing.T) {
 	assert.Equal(t, string(model.JobStatusSuccess), string(jobs2[0].Status))
 }
 
-// TestRunner_Cancel_RestartSameTaskCancelsFirst tests that restarting the same task
-// properly cancels the first job and marks it as cancelled.
-//
-// This test uses the slowfs backend to precisely control the timing:
-// 1. Start task 1 - it will block waiting for permission
-// 2. Wait for task 1 to actually start (confirmed via channel)
-// 3. Start task 2 (same task) - this should cancel task 1
-// 4. Verify task 1's job status is "cancelled" (not stuck at "running")
-// 5. Let task 2 complete
-func TestRunner_Cancel_RestartSameTaskCancelsFirst(t *testing.T) {
-	tc := setupCancelTest(t)
-	defer tc.cleanup()
-
-	// Setup control channels
-	startedCh := make(chan struct{}, 10)
-	blockCh := make(chan struct{})
-	testutil.SetSlowFsController(startedCh, blockCh)
-
-	// Setup test directories
-	sourceDir := t.TempDir()
-	destDir := t.TempDir()
-
-	// Create a test file
-	testFilePath := filepath.Join(sourceDir, "test.txt")
-	err := os.WriteFile(testFilePath, []byte("hello world"), 0644)
-	require.NoError(t, err)
-
-	// Create task
-	task := createSlowTask(t, tc, "CancelTest", sourceDir, destDir)
-
-	// Start first task
-	t.Log("Starting first task...")
-	err = tc.runner.StartTask(task, model.JobTriggerManual)
-	require.NoError(t, err)
-
-	// Wait for the first task to actually start and reach the blocking point
-	t.Log("Waiting for first task to start...")
-	select {
-	case <-startedCh:
-		t.Log("First task started and is now blocking")
-	case <-time.After(5 * time.Second):
-		t.Fatal("First task did not start within timeout")
-	}
-
-	// Give it a moment to ensure the job is created and status is "running"
-	time.Sleep(100 * time.Millisecond)
-
-	// Check that we have a running job for this task
-	jobs, err := tc.jobService.ListJobs(context.Background(), &task.ID, nil, 10, 0)
-	require.NoError(t, err)
-	require.Len(t, jobs, 1, "Should have exactly one job")
-	firstJobID := jobs[0].ID
-	assert.Equal(t, string(model.JobStatusRunning), string(jobs[0].Status), "First job should be running")
-	t.Logf("First job ID: %s, status: %s", firstJobID, jobs[0].Status)
-
-	// Now start the second task (same task) - this should cancel the first one
-	t.Log("Starting second task (should cancel first)...")
-	err = tc.runner.StartTask(task, model.JobTriggerManual)
-	require.NoError(t, err)
-
-	// Give it time to process the cancellation
-	time.Sleep(500 * time.Millisecond)
-
-	// Check job statuses
-	jobs, err = tc.jobService.ListJobs(context.Background(), &task.ID, nil, 10, 0)
-	require.NoError(t, err)
-	t.Logf("Total jobs after second start: %d", len(jobs))
-
-	// Find the first job and check its status
-	var firstJob *ent.Job
-	for i := range jobs {
-		if jobs[i].ID == firstJobID {
-			firstJob = jobs[i]
-			break
-		}
-	}
-	require.NotNil(t, firstJob, "First job should still exist")
-	t.Logf("First job status after cancellation: %s", firstJob.Status)
-
-	// THIS IS THE KEY ASSERTION - the first job should be cancelled, not stuck at running
-	assert.Equal(t, string(model.JobStatusCancelled), string(firstJob.Status),
-		"First job should be cancelled when second task starts. If this fails, the bug exists!")
-
-	// Unblock the second task so it can complete
-	close(blockCh)
-
-	// Wait for the second task to complete
-	waitForTaskCompletion(t, tc.runner, task, 10*time.Second)
-
-	// Final verification
-	jobs, err = tc.jobService.ListJobs(context.Background(), &task.ID, nil, 10, 0)
-	require.NoError(t, err)
-	t.Logf("Final job count: %d", len(jobs))
-	for _, j := range jobs {
-		t.Logf("  Job %s: status=%s", j.ID, j.Status)
-	}
-
-	// Should have at least one successful job (the second one)
-	hasSuccess := false
-	for _, j := range jobs {
-		if j.Status == model.JobStatusSuccess {
-			hasSuccess = true
-			break
-		}
-	}
-	assert.True(t, hasSuccess, "Should have at least one successful job")
-}
-
 // TestRunner_Cancel_StopRunningTaskMarksCancelled tests that stopping a running task
 // properly marks the job as cancelled.
 func TestRunner_Cancel_StopRunningTaskMarksCancelled(t *testing.T) {
-	tc := setupCancelTest(t)
+	tc := setupIntegrationTest(t, withSlowFs())
 	defer tc.cleanup()
 
 	// Setup control channels
@@ -562,7 +355,7 @@ func TestRunner_Cancel_StopRunningTaskMarksCancelled(t *testing.T) {
 // TestRunner_Integration_StopCancelsAllTasks tests that Runner.Stop() cancels all running tasks.
 func TestRunner_Integration_StopCancelsAllTasks(t *testing.T) {
 	tc := setupIntegrationTest(t)
-	// Don't use defer tc.cleanup() because we're testing Stop() explicitly
+	// Don't defer tc.cleanup() because we're testing Stop() explicitly
 
 	// Setup two tasks
 	sourceDir1 := t.TempDir()
@@ -760,6 +553,127 @@ func TestRunner_Integration_StopNonExistentTask(t *testing.T) {
 	randomTask.ID = [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
 	err = tc.runner.StopTask(randomTask.ID)
 	assert.NoError(t, err, "StopTask on non-existent task should not return error")
+}
+
+// TestRunner_Integration_TriggerBehaviorWhenRunning tests how different trigger types
+// behave when a task is already running.
+// - Realtime triggers should skip (not cancel the running task)
+// - Manual triggers should cancel and restart
+func TestRunner_Integration_TriggerBehaviorWhenRunning(t *testing.T) {
+	tests := []struct {
+		name            string
+		secondTrigger   model.JobTrigger
+		expectCancelled bool // whether the first job should be cancelled
+		expectSecondJob bool // whether a second job should be created
+	}{
+		{
+			name:            "Realtime_Skips",
+			secondTrigger:   model.JobTriggerRealtime,
+			expectCancelled: false,
+			expectSecondJob: false,
+		},
+		{
+			name:            "Manual_Cancels",
+			secondTrigger:   model.JobTriggerManual,
+			expectCancelled: true,
+			expectSecondJob: true,
+		},
+		{
+			name:            "Schedule_Cancels",
+			secondTrigger:   model.JobTriggerSchedule,
+			expectCancelled: true,
+			expectSecondJob: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tc := setupIntegrationTest(t, withSlowFs())
+			defer tc.cleanup()
+
+			// Setup control channels
+			startedCh := make(chan struct{}, 10)
+			blockCh := make(chan struct{})
+			testutil.SetSlowFsController(startedCh, blockCh)
+
+			// Setup test directories
+			sourceDir := t.TempDir()
+			destDir := t.TempDir()
+			err := os.WriteFile(filepath.Join(sourceDir, "test.txt"), []byte("hello world"), 0644)
+			require.NoError(t, err)
+
+			// Create task
+			task := createSlowTask(t, tc, "TriggerTest_"+tt.name, sourceDir, destDir)
+
+			// Start first task with Manual trigger
+			err = tc.runner.StartTask(task, model.JobTriggerManual)
+			require.NoError(t, err)
+
+			// Wait for the first task to start
+			select {
+			case <-startedCh:
+			case <-time.After(5 * time.Second):
+				t.Fatal("First task did not start within timeout")
+			}
+			time.Sleep(100 * time.Millisecond)
+
+			// Check first job is running
+			jobs, err := tc.jobService.ListJobs(context.Background(), &task.ID, nil, 10, 0)
+			require.NoError(t, err)
+			require.Len(t, jobs, 1)
+			firstJobID := jobs[0].ID
+			assert.Equal(t, string(model.JobStatusRunning), string(jobs[0].Status))
+
+			// Trigger with second trigger type
+			err = tc.runner.StartTask(task, tt.secondTrigger)
+			require.NoError(t, err)
+			time.Sleep(500 * time.Millisecond)
+
+			// Check job statuses
+			jobs, err = tc.jobService.ListJobs(context.Background(), &task.ID, nil, 10, 0)
+			require.NoError(t, err)
+
+			var firstJob *ent.Job
+			for i := range jobs {
+				if jobs[i].ID == firstJobID {
+					firstJob = jobs[i]
+					break
+				}
+			}
+			require.NotNil(t, firstJob)
+
+			if tt.expectCancelled {
+				assert.Equal(t, string(model.JobStatusCancelled), string(firstJob.Status),
+					"First job should be cancelled")
+			} else {
+				assert.Equal(t, string(model.JobStatusRunning), string(firstJob.Status),
+					"First job should still be running")
+			}
+
+			if tt.expectSecondJob {
+				assert.Greater(t, len(jobs), 1, "Should have created a second job")
+			} else {
+				assert.Len(t, jobs, 1, "Should not have created a second job")
+			}
+
+			// Unblock and complete
+			close(blockCh)
+			waitForTaskCompletion(t, tc.runner, task, 5*time.Second)
+
+			// Final check - should have at least one successful job
+			time.Sleep(200 * time.Millisecond)
+			jobs, err = tc.jobService.ListJobs(context.Background(), &task.ID, nil, 10, 0)
+			require.NoError(t, err)
+			hasSuccess := false
+			for _, j := range jobs {
+				if j.Status == model.JobStatusSuccess {
+					hasSuccess = true
+					break
+				}
+			}
+			assert.True(t, hasSuccess, "Should have at least one successful job")
+		})
+	}
 }
 
 // TestRunner_Integration_RapidStartStop tests rapid start/stop sequences on the same task.

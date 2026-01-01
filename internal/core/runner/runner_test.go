@@ -94,7 +94,7 @@ func TestRunner_Concurrency_StartTaskTwiceCancelsFirst(t *testing.T) {
 
 	task := &ent.Task{ID: uuid.New()}
 	trigger1 := model.JobTriggerManual
-	trigger2 := model.JobTriggerRealtime
+	trigger2 := model.JobTriggerManual // Changed from Realtime to Manual to test cancellation behavior
 
 	var firstTaskCtx, secondTaskCtx context.Context
 	firstStarted := make(chan struct{})

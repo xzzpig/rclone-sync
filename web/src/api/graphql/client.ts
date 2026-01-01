@@ -140,10 +140,14 @@ export const client = new Client({
       // (mutation { task { delete(id) } }) in graphcache. The cache invalidation
       // in updates above handles refetching affected queries after mutations complete.
     }),
-    persistedExchange({
-      preferGetForPersistedQueries: true,
-      enableForMutation: true,
-    }),
+    ...(window.isSecureContext
+      ? [
+          persistedExchange({
+            preferGetForPersistedQueries: true,
+            enableForMutation: true,
+          }),
+        ]
+      : []),
     fetchExchange,
     subscriptionExchange({
       forwardSubscription: (request) => ({

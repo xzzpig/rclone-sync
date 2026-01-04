@@ -16,7 +16,7 @@ import (
 // Scheduler manages scheduled task executions using cron.
 type Scheduler struct {
 	cron    *cron.Cron
-	taskSvc ports.TaskService
+	taskSvc ports.TaskQuery
 	runner  ports.Runner
 	logger  *zap.Logger
 	mu      sync.Mutex
@@ -25,7 +25,7 @@ type Scheduler struct {
 }
 
 // NewScheduler creates a new Scheduler instance.
-func NewScheduler(taskSvc ports.TaskService, runner ports.Runner, opts ...cron.Option) *Scheduler {
+func NewScheduler(taskSvc ports.TaskQuery, runner ports.Runner, opts ...cron.Option) *Scheduler {
 	return &Scheduler{
 		cron:    cron.New(opts...), // Standard 5-field cron (minute, hour, day, month, weekday)
 		taskSvc: taskSvc,

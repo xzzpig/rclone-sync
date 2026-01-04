@@ -4,7 +4,7 @@ package context
 const (
 	ContextKeySyncEngine = "SyncEngine"
 	ContextKeyTaskRunner = "TaskRunner"
-	ContextKeyJobService = "JobService"
+	ContextKeyJobQuery   = "JobQuery"
 	ContextKeyWatcher    = "Watcher"
 	ContextKeyScheduler  = "Scheduler"
 )

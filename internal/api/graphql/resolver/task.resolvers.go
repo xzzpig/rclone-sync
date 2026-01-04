@@ -27,8 +27,8 @@ func (r *queryResolver) Task(ctx context.Context) (*model.TaskQuery, error) {
 
 // Options is the resolver for the options field.
 func (r *taskResolver) Options(ctx context.Context, obj *model.Task) (*model.TaskSyncOptions, error) {
-	// Fetch task from database to get options via TaskService
-	entTask, err := r.deps.TaskService.GetTask(ctx, obj.ID)
+	// Fetch task from database to get options via TaskQuery
+	entTask, err := r.deps.TaskQuery.GetTask(ctx, obj.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -62,8 +62,8 @@ func (r *taskResolver) Jobs(ctx context.Context, obj *model.Task, pagination *mo
 		}
 	}
 
-	// Use TaskService to list jobs for this task
-	entJobs, totalCount, err := r.deps.TaskService.ListJobsByTaskPaginated(ctx, obj.ID, limit, offset)
+	// Use TaskQuery to list jobs for this task
+	entJobs, totalCount, err := r.deps.TaskQuery.ListJobsByTaskPaginated(ctx, obj.ID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (r *taskResolver) Jobs(ctx context.Context, obj *model.Task, pagination *mo
 
 // LatestJob is the resolver for the latestJob field.
 func (r *taskResolver) LatestJob(ctx context.Context, obj *model.Task) (*model.Job, error) {
-	entJob, err := r.deps.JobService.GetLastJobByTaskID(ctx, obj.ID)
+	entJob, err := r.deps.JobQuery.GetLastJobByTaskID(ctx, obj.ID)
 	if err != nil {
 		//nolint:nilerr // Return nil for no job found, this is valid for GraphQL nullable queries
 		return nil, nil
@@ -124,7 +124,7 @@ func (r *taskMutationResolver) Create(ctx context.Context, obj *model.TaskMutati
 	}
 
 	// Create task
-	entTask, err := r.deps.TaskService.CreateTask(
+	entTask, err := r.deps.TaskQuery.CreateTask(
 		ctx,
 		input.Name,
 		input.SourcePath,
@@ -158,7 +158,7 @@ func (r *taskMutationResolver) Create(ctx context.Context, obj *model.TaskMutati
 // Update is the resolver for the update field.
 func (r *taskMutationResolver) Update(ctx context.Context, obj *model.TaskMutation, id uuid.UUID, input model.UpdateTaskInput) (*model.Task, error) {
 	// Get existing task
-	existingTask, err := r.deps.TaskService.GetTask(ctx, id)
+	existingTask, err := r.deps.TaskQuery.GetTask(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +206,7 @@ func (r *taskMutationResolver) Update(ctx context.Context, obj *model.TaskMutati
 	options := buildOptions(input.Options)
 
 	// Update task
-	updatedTask, err := r.deps.TaskService.UpdateTask(
+	updatedTask, err := r.deps.TaskQuery.UpdateTask(
 		ctx,
 		id,
 		name,
@@ -258,7 +258,7 @@ func (r *taskMutationResolver) Update(ctx context.Context, obj *model.TaskMutati
 // Delete is the resolver for the delete field.
 func (r *taskMutationResolver) Delete(ctx context.Context, obj *model.TaskMutation, id uuid.UUID) (*model.Task, error) {
 	// Get task before deleting
-	taskToDelete, err := r.deps.TaskService.GetTask(ctx, id)
+	taskToDelete, err := r.deps.TaskQuery.GetTask(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +274,7 @@ func (r *taskMutationResolver) Delete(ctx context.Context, obj *model.TaskMutati
 	}
 
 	// Delete the task
-	if err := r.deps.TaskService.DeleteTask(ctx, id); err != nil {
+	if err := r.deps.TaskQuery.DeleteTask(ctx, id); err != nil {
 		return nil, err
 	}
 
@@ -284,7 +284,7 @@ func (r *taskMutationResolver) Delete(ctx context.Context, obj *model.TaskMutati
 // Run is the resolver for the run field.
 func (r *taskMutationResolver) Run(ctx context.Context, obj *model.TaskMutation, taskID uuid.UUID) (*model.Job, error) {
 	// Get task with connection
-	entTask, err := r.deps.TaskService.GetTaskWithConnection(ctx, taskID)
+	entTask, err := r.deps.TaskQuery.GetTaskWithConnection(ctx, taskID)
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +295,7 @@ func (r *taskMutationResolver) Run(ctx context.Context, obj *model.TaskMutation,
 	}
 
 	// Get the latest job created for this task
-	entJob, err := r.deps.JobService.GetLastJobByTaskID(ctx, taskID)
+	entJob, err := r.deps.JobQuery.GetLastJobByTaskID(ctx, taskID)
 	if err != nil {
 		return nil, err
 	}
@@ -317,8 +317,8 @@ func (r *taskQueryResolver) List(ctx context.Context, obj *model.TaskQuery, pagi
 		}
 	}
 
-	// Use TaskService to list tasks
-	entTasks, totalCount, err := r.deps.TaskService.ListTasksPaginated(ctx, limit, offset)
+	// Use TaskQuery to list tasks
+	entTasks, totalCount, err := r.deps.TaskQuery.ListTasksPaginated(ctx, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -347,7 +347,7 @@ func (r *taskQueryResolver) List(ctx context.Context, obj *model.TaskQuery, pagi
 
 // Get is the resolver for the get field.
 func (r *taskQueryResolver) Get(ctx context.Context, obj *model.TaskQuery, id uuid.UUID) (*model.Task, error) {
-	entTask, err := r.deps.TaskService.GetTask(ctx, id)
+	entTask, err := r.deps.TaskQuery.GetTask(ctx, id)
 	if err != nil {
 		//nolint:nilerr // Return nil for not found, this is valid for GraphQL nullable queries
 		return nil, nil

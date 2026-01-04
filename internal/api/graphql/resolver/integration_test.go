@@ -59,7 +59,7 @@ func (s *IntegrationTestSuite) TestUserJourney_CompleteWorkflow() {
 
 	// Phase 3: Run the task manually and verify job is created
 	ctx := context.Background()
-	job, err := s.Env.JobService.CreateJob(ctx, task.ID, "MANUAL")
+	job, err := s.Env.JobQuery.CreateJob(ctx, task.ID, "MANUAL")
 	require.NoError(s.T(), err)
 
 	// Verify job appears in the job list
@@ -87,7 +87,7 @@ func (s *IntegrationTestSuite) TestUserJourney_CompleteWorkflow() {
 	assert.Equal(s.T(), "MANUAL", items[0].Get("trigger").String())
 
 	// Phase 4: Add job logs and verify they appear
-	_, err = s.Env.JobService.AddJobLog(ctx, job.ID, "INFO", "UPLOAD", "/test/file.txt", 1024)
+	_, err = s.Env.JobQuery.AddJobLog(ctx, job.ID, "INFO", "UPLOAD", "/test/file.txt", 1024)
 	require.NoError(s.T(), err)
 
 	// Query task with latestJob
@@ -191,9 +191,9 @@ func (s *IntegrationTestSuite) TestUserJourney_MultipleConnections() {
 
 	// Create jobs for each task
 	ctx := context.Background()
-	job1, _ := s.Env.JobService.CreateJob(ctx, task1.ID, "MANUAL")
-	job2, _ := s.Env.JobService.CreateJob(ctx, task2.ID, "SCHEDULE")
-	job3, _ := s.Env.JobService.CreateJob(ctx, task3.ID, "REALTIME")
+	job1, _ := s.Env.JobQuery.CreateJob(ctx, task1.ID, "MANUAL")
+	job2, _ := s.Env.JobQuery.CreateJob(ctx, task2.ID, "SCHEDULE")
+	job3, _ := s.Env.JobQuery.CreateJob(ctx, task3.ID, "REALTIME")
 
 	// Query all jobs and verify they're correctly associated
 	jobQuery := `
@@ -278,11 +278,11 @@ func (s *IntegrationTestSuite) TestUserJourney_FileBrowsingAndSync() {
 
 	// Run the task and create a job
 	ctx := context.Background()
-	job, err := s.Env.JobService.CreateJob(ctx, task.ID, "MANUAL")
+	job, err := s.Env.JobQuery.CreateJob(ctx, task.ID, "MANUAL")
 	require.NoError(s.T(), err)
 
 	// Add file transfer logs
-	_, err = s.Env.JobService.AddJobLog(ctx, job.ID, "INFO", "UPLOAD", testFile, 12)
+	_, err = s.Env.JobQuery.AddJobLog(ctx, job.ID, "INFO", "UPLOAD", testFile, 12)
 	require.NoError(s.T(), err)
 
 	// Query job logs to verify file transfer was recorded
@@ -383,9 +383,9 @@ func (s *IntegrationTestSuite) TestUserJourney_CompleteFlow() {
 	// Phase 5: Create a job and add logs
 	id, err := uuid.Parse(taskID)
 	require.NoError(s.T(), err)
-	job, err := s.Env.JobService.CreateJob(s.T().Context(), id, "MANUAL")
+	job, err := s.Env.JobQuery.CreateJob(s.T().Context(), id, "MANUAL")
 	require.NoError(s.T(), err)
-	_, err = s.Env.JobService.AddJobLog(s.T().Context(), job.ID, "INFO", "UPLOAD", "/test.txt", 100)
+	_, err = s.Env.JobQuery.AddJobLog(s.T().Context(), job.ID, "INFO", "UPLOAD", "/test.txt", 100)
 	require.NoError(s.T(), err)
 
 	// Phase 6: Query jobs with task reference

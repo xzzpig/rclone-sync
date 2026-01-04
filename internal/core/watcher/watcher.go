@@ -28,7 +28,7 @@ type FileWatcher interface {
 // Watcher monitors file system changes for realtime sync tasks.
 type Watcher struct {
 	recWatcher FileWatcher
-	taskSvc    ports.TaskService
+	taskSvc    ports.TaskQuery
 	runner     ports.Runner
 	logger     *zap.Logger
 	mu         sync.Mutex
@@ -38,7 +38,7 @@ type Watcher struct {
 }
 
 // NewWatcher creates a new Watcher instance.
-func NewWatcher(taskSvc ports.TaskService, runner ports.Runner) (*Watcher, error) {
+func NewWatcher(taskSvc ports.TaskQuery, runner ports.Runner) (*Watcher, error) {
 	recWatcher, err := NewRecursiveWatcher()
 	if err != nil {
 		return nil, err
@@ -46,7 +46,7 @@ func NewWatcher(taskSvc ports.TaskService, runner ports.Runner) (*Watcher, error
 	return newWatcher(taskSvc, runner, recWatcher), nil
 }
 
-func newWatcher(taskSvc ports.TaskService, runner ports.Runner, fw FileWatcher) *Watcher {
+func newWatcher(taskSvc ports.TaskQuery, runner ports.Runner, fw FileWatcher) *Watcher {
 	return &Watcher{
 		recWatcher: fw,
 		taskSvc:    taskSvc,

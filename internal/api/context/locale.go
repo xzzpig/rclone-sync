@@ -20,7 +20,7 @@ func LocaleMiddleware() gin.HandlerFunc {
 		c.Set("locale", locale)
 		c.Set(GinContextKeyLocalizer, localizer)
 
-		// 2. Store in context.Context (for business logic / services)
+		// 2. Store in context.Context (for business logic / queryies)
 		// 通过修改 c.Request 的 Context 来传递到业务层
 		ctx := c.Request.Context()
 		ctx = i18npkg.WithLocalizer(ctx, localizer)

@@ -36,7 +36,7 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 	// Middleware
 	r.Use(ginLogger(logger.Named("api.http")))
 	r.Use(gin.Recovery())
-	r.Use(context.Middleware(deps.SyncEngine, deps.Runner, deps.JobService, deps.Watcher, deps.Scheduler))
+	r.Use(context.Middleware(deps.SyncEngine, deps.Runner, deps.JobQuery, deps.Watcher, deps.Scheduler))
 	r.Use(context.LocaleMiddleware())    // Parse Accept-Language header
 	r.Use(context.I18nErrorMiddleware()) // Handle I18nError responses
 	r.Use(cors.New(cors.Config{
@@ -68,16 +68,16 @@ func SetupRouter(deps RouterDeps) *gin.Engine {
 	}
 
 	// Serve Frontend
-	if err := setupFrontendService(r, cfg); err != nil {
-		srvLog().Error("Failed to setup frontend service", zap.Error(err))
+	if err := setupFrontendQuery(r, cfg); err != nil {
+		srvLog().Error("Failed to setup frontend query", zap.Error(err))
 	}
 
 	return r
 }
 
-// setupFrontendService configures the frontend file serving for the router
+// setupFrontendQuery configures the frontend file serving for the router
 // and returns an error if setup fails
-func setupFrontendService(r *gin.Engine, cfg *config.Config) error {
+func setupFrontendQuery(r *gin.Engine, cfg *config.Config) error {
 	// In development, we can also serve from the dist folder if it exists,
 	// which is useful for testing production build locally.
 	// But usually in dev mode we use the Vite dev server.

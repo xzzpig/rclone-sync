@@ -19,7 +19,7 @@ import (
 
 // Config is the resolver for the config field.
 func (r *connectionResolver) Config(ctx context.Context, obj *model.Connection) (map[string]string, error) {
-	return r.deps.ConnectionService.GetConnectionConfigByID(ctx, obj.ID)
+	return r.deps.ConnectionQuery.GetConnectionConfigByID(ctx, obj.ID)
 }
 
 // LoadStatus is the resolver for the loadStatus field.
@@ -56,8 +56,8 @@ func (r *connectionResolver) Tasks(ctx context.Context, obj *model.Connection, p
 		}
 	}
 
-	// Use TaskService to list tasks by connection
-	entTasks, totalCount, err := r.deps.TaskService.ListTasksByConnectionPaginated(ctx, obj.ID, limit, offset)
+	// Use TaskQuery to list tasks by connection
+	entTasks, totalCount, err := r.deps.TaskQuery.ListTasksByConnectionPaginated(ctx, obj.ID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,7 @@ func (r *connectionResolver) Quota(ctx context.Context, obj *model.Connection) (
 
 // Create is the resolver for the create field.
 func (r *connectionMutationResolver) Create(ctx context.Context, obj *model.ConnectionMutation, input model.CreateConnectionInput) (*model.Connection, error) {
-	entConn, err := r.deps.ConnectionService.CreateConnection(ctx, input.Name, input.Type, input.Config)
+	entConn, err := r.deps.ConnectionQuery.CreateConnection(ctx, input.Name, input.Type, input.Config)
 	if err != nil {
 		return nil, err
 	}
@@ -118,13 +118,13 @@ func (r *connectionMutationResolver) Create(ctx context.Context, obj *model.Conn
 // Update is the resolver for the update field.
 func (r *connectionMutationResolver) Update(ctx context.Context, obj *model.ConnectionMutation, id uuid.UUID, input model.UpdateConnectionInput) (*model.Connection, error) {
 	// Get old connection name before update for cache invalidation
-	oldConn, err := r.deps.ConnectionService.GetConnectionByID(ctx, id)
+	oldConn, err := r.deps.ConnectionQuery.GetConnectionByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	oldName := oldConn.Name
 
-	err = r.deps.ConnectionService.UpdateConnection(ctx, id, input.Name, nil, input.Config)
+	err = r.deps.ConnectionQuery.UpdateConnection(ctx, id, input.Name, nil, input.Config)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ func (r *connectionMutationResolver) Update(ctx context.Context, obj *model.Conn
 	}
 
 	// Fetch updated connection
-	entConn, err := r.deps.ConnectionService.GetConnectionByID(ctx, id)
+	entConn, err := r.deps.ConnectionQuery.GetConnectionByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +150,7 @@ func (r *connectionMutationResolver) Update(ctx context.Context, obj *model.Conn
 // Delete is the resolver for the delete field.
 func (r *connectionMutationResolver) Delete(ctx context.Context, obj *model.ConnectionMutation, id uuid.UUID) (*model.Connection, error) {
 	// Get connection before delete to return it and for cache invalidation
-	entConn, err := r.deps.ConnectionService.GetConnectionByID(ctx, id)
+	entConn, err := r.deps.ConnectionQuery.GetConnectionByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +158,7 @@ func (r *connectionMutationResolver) Delete(ctx context.Context, obj *model.Conn
 	connName := entConn.Name
 
 	// Check if connection has dependent tasks
-	taskCount, err := r.deps.ConnectionService.CountAssociatedTasks(ctx, id)
+	taskCount, err := r.deps.ConnectionQuery.CountAssociatedTasks(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +166,7 @@ func (r *connectionMutationResolver) Delete(ctx context.Context, obj *model.Conn
 		return nil, i18n.ErrBadRequestI18n(i18n.ErrConnectionHasDependentTasks)
 	}
 
-	err = r.deps.ConnectionService.DeleteConnectionByID(ctx, id)
+	err = r.deps.ConnectionQuery.DeleteConnectionByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -182,13 +182,13 @@ func (r *connectionMutationResolver) Delete(ctx context.Context, obj *model.Conn
 // Test is the resolver for the test field.
 func (r *connectionMutationResolver) Test(ctx context.Context, obj *model.ConnectionMutation, id uuid.UUID) (model.TestConnectionResult, error) {
 	// Get connection to get its type
-	entConn, err := r.deps.ConnectionService.GetConnectionByID(ctx, id)
+	entConn, err := r.deps.ConnectionQuery.GetConnectionByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get connection config
-	config, err := r.deps.ConnectionService.GetConnectionConfigByID(ctx, id)
+	config, err := r.deps.ConnectionQuery.GetConnectionConfigByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -235,8 +235,8 @@ func (r *connectionQueryResolver) List(ctx context.Context, obj *model.Connectio
 		}
 	}
 
-	// Use ConnectionService to list connections (limit=0 returns all)
-	entConnections, totalCount, err := r.deps.ConnectionService.ListConnectionsPaginated(ctx, limit, offset)
+	// Use ConnectionQuery to list connections (limit=0 returns all)
+	entConnections, totalCount, err := r.deps.ConnectionQuery.ListConnectionsPaginated(ctx, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +265,7 @@ func (r *connectionQueryResolver) List(ctx context.Context, obj *model.Connectio
 
 // Get is the resolver for the get field.
 func (r *connectionQueryResolver) Get(ctx context.Context, obj *model.ConnectionQuery, id uuid.UUID) (*model.Connection, error) {
-	entConnection, err := r.deps.ConnectionService.GetConnectionByID(ctx, id)
+	entConnection, err := r.deps.ConnectionQuery.GetConnectionByID(ctx, id)
 	if err != nil {
 		//nolint:nilerr // Return nil for not found, this is valid for GraphQL nullable queries
 		return nil, nil

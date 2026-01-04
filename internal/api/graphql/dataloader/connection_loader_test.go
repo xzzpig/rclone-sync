@@ -12,14 +12,14 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/dataloader"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/db"
+	"github.com/xzzpig/rclone-sync/internal/core/db/query"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
-	"github.com/xzzpig/rclone-sync/internal/core/services"
 	"github.com/xzzpig/rclone-sync/internal/rclone"
 )
 
-// setupConnectionTestDB creates an in-memory database with connection service for testing.
-func setupConnectionTestDB(t *testing.T) (*ent.Client, *services.ConnectionService) {
+// setupConnectionTestDB creates an in-memory database with connection query for testing.
+func setupConnectionTestDB(t *testing.T) (*ent.Client, *query.ConnectionQuery) {
 	t.Helper()
 
 	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug, nil)
@@ -33,25 +33,25 @@ func setupConnectionTestDB(t *testing.T) (*ent.Client, *services.ConnectionServi
 	encryptor, err := crypto.NewEncryptor("test-encryption-key-32-bytes!!")
 	require.NoError(t, err)
 
-	connectionService := services.NewConnectionService(client, encryptor)
+	connectionQuery := query.NewConnectionQuery(client, encryptor)
 
 	// Install DBStorage for rclone configuration
-	storage := rclone.NewDBStorage(connectionService)
+	storage := rclone.NewDBStorage(connectionQuery)
 	storage.Install()
 
 	t.Cleanup(func() {
 		client.Close()
 	})
 
-	return client, connectionService
+	return client, connectionQuery
 }
 
 func TestConnectionLoader_Load_ExistingConnection(t *testing.T) {
-	client, connectionService := setupConnectionTestDB(t)
+	client, connectionQuery := setupConnectionTestDB(t)
 	ctx := context.Background()
 
 	// Create a test connection
-	conn, err := connectionService.CreateConnection(ctx, "test-connection", "local", map[string]string{
+	conn, err := connectionQuery.CreateConnection(ctx, "test-connection", "local", map[string]string{
 		"type": "local",
 	})
 	require.NoError(t, err)
@@ -84,21 +84,21 @@ func TestConnectionLoader_Load_NonExistentConnection(t *testing.T) {
 }
 
 func TestConnectionLoader_LoadAll_MultipleConnections(t *testing.T) {
-	client, connectionService := setupConnectionTestDB(t)
+	client, connectionQuery := setupConnectionTestDB(t)
 	ctx := context.Background()
 
 	// Create multiple test connections
-	conn1, err := connectionService.CreateConnection(ctx, "connection-1", "local", map[string]string{
+	conn1, err := connectionQuery.CreateConnection(ctx, "connection-1", "local", map[string]string{
 		"type": "local",
 	})
 	require.NoError(t, err)
 
-	conn2, err := connectionService.CreateConnection(ctx, "connection-2", "local", map[string]string{
+	conn2, err := connectionQuery.CreateConnection(ctx, "connection-2", "local", map[string]string{
 		"type": "local",
 	})
 	require.NoError(t, err)
 
-	conn3, err := connectionService.CreateConnection(ctx, "connection-3", "local", map[string]string{
+	conn3, err := connectionQuery.CreateConnection(ctx, "connection-3", "local", map[string]string{
 		"type": "local",
 	})
 	require.NoError(t, err)
@@ -120,11 +120,11 @@ func TestConnectionLoader_LoadAll_MultipleConnections(t *testing.T) {
 }
 
 func TestConnectionLoader_LoadAll_MixedExistingAndNonExistent(t *testing.T) {
-	client, connectionService := setupConnectionTestDB(t)
+	client, connectionQuery := setupConnectionTestDB(t)
 	ctx := context.Background()
 
 	// Create one test connection
-	conn1, err := connectionService.CreateConnection(ctx, "connection-1", "local", map[string]string{
+	conn1, err := connectionQuery.CreateConnection(ctx, "connection-1", "local", map[string]string{
 		"type": "local",
 	})
 	require.NoError(t, err)
@@ -151,13 +151,13 @@ func TestConnectionLoader_LoadAll_MixedExistingAndNonExistent(t *testing.T) {
 }
 
 func TestConnectionLoader_LoadAll_PreservesOrder(t *testing.T) {
-	client, connectionService := setupConnectionTestDB(t)
+	client, connectionQuery := setupConnectionTestDB(t)
 	ctx := context.Background()
 
 	// Create connections in specific order
 	var connections []*ent.Connection
 	for i := 0; i < 5; i++ {
-		conn, err := connectionService.CreateConnection(ctx, "connection-"+string(rune('A'+i)), "local", map[string]string{
+		conn, err := connectionQuery.CreateConnection(ctx, "connection-"+string(rune('A'+i)), "local", map[string]string{
 			"type": "local",
 		})
 		require.NoError(t, err)
@@ -204,11 +204,11 @@ func TestConnectionLoader_LoadAll_EmptySlice(t *testing.T) {
 }
 
 func TestConnectionLoader_LoadAll_DuplicateIDs(t *testing.T) {
-	client, connectionService := setupConnectionTestDB(t)
+	client, connectionQuery := setupConnectionTestDB(t)
 	ctx := context.Background()
 
 	// Create a test connection
-	conn, err := connectionService.CreateConnection(ctx, "test-connection", "local", map[string]string{
+	conn, err := connectionQuery.CreateConnection(ctx, "test-connection", "local", map[string]string{
 		"type": "local",
 	})
 	require.NoError(t, err)

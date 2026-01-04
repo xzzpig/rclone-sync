@@ -12,14 +12,14 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/dataloader"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/db"
+	"github.com/xzzpig/rclone-sync/internal/core/db/query"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
-	"github.com/xzzpig/rclone-sync/internal/core/services"
 	"github.com/xzzpig/rclone-sync/internal/rclone"
 )
 
-// setupTaskTestDB creates an in-memory database with task and connection services for testing.
-func setupTaskTestDB(t *testing.T) (*ent.Client, *services.TaskService, *services.ConnectionService) {
+// setupTaskTestDB creates an in-memory database with task and connection queries for testing.
+func setupTaskTestDB(t *testing.T) (*ent.Client, *query.TaskQuery, *query.ConnectionQuery) {
 	t.Helper()
 
 	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug, nil)
@@ -33,25 +33,25 @@ func setupTaskTestDB(t *testing.T) (*ent.Client, *services.TaskService, *service
 	encryptor, err := crypto.NewEncryptor("test-encryption-key-32-bytes!!")
 	require.NoError(t, err)
 
-	connectionService := services.NewConnectionService(client, encryptor)
-	taskService := services.NewTaskService(client)
+	connectionQuery := query.NewConnectionQuery(client, encryptor)
+	taskQuery := query.NewTaskQuery(client)
 
 	// Install DBStorage for rclone configuration
-	storage := rclone.NewDBStorage(connectionService)
+	storage := rclone.NewDBStorage(connectionQuery)
 	storage.Install()
 
 	t.Cleanup(func() {
 		client.Close()
 	})
 
-	return client, taskService, connectionService
+	return client, taskQuery, connectionQuery
 }
 
 // createTestConnectionForTask creates a test connection for task tests.
-func createTestConnectionForTask(t *testing.T, connectionService *services.ConnectionService) uuid.UUID {
+func createTestConnectionForTask(t *testing.T, connectionQuery *query.ConnectionQuery) uuid.UUID {
 	t.Helper()
 	ctx := context.Background()
-	conn, err := connectionService.CreateConnection(ctx, "test-connection", "local", map[string]string{
+	conn, err := connectionQuery.CreateConnection(ctx, "test-connection", "local", map[string]string{
 		"type": "local",
 	})
 	require.NoError(t, err)
@@ -59,14 +59,14 @@ func createTestConnectionForTask(t *testing.T, connectionService *services.Conne
 }
 
 func TestTaskLoader_Load_ExistingTask(t *testing.T) {
-	client, taskService, connectionService := setupTaskTestDB(t)
+	client, taskQuery, connectionQuery := setupTaskTestDB(t)
 	ctx := context.Background()
 
 	// Create a connection first
-	connID := createTestConnectionForTask(t, connectionService)
+	connID := createTestConnectionForTask(t, connectionQuery)
 
 	// Create a test task
-	task, err := taskService.CreateTask(
+	task, err := taskQuery.CreateTask(
 		ctx,
 		"test-task",
 		"/tmp/source",
@@ -109,20 +109,20 @@ func TestTaskLoader_Load_NonExistentTask(t *testing.T) {
 }
 
 func TestTaskLoader_LoadAll_MultipleTasks(t *testing.T) {
-	client, taskService, connectionService := setupTaskTestDB(t)
+	client, taskQuery, connectionQuery := setupTaskTestDB(t)
 	ctx := context.Background()
 
 	// Create a connection first
-	connID := createTestConnectionForTask(t, connectionService)
+	connID := createTestConnectionForTask(t, connectionQuery)
 
 	// Create multiple test tasks
-	task1, err := taskService.CreateTask(ctx, "task-1", "/source1", connID, "/remote1", "UPLOAD", "", false, nil)
+	task1, err := taskQuery.CreateTask(ctx, "task-1", "/source1", connID, "/remote1", "UPLOAD", "", false, nil)
 	require.NoError(t, err)
 
-	task2, err := taskService.CreateTask(ctx, "task-2", "/source2", connID, "/remote2", "DOWNLOAD", "", false, nil)
+	task2, err := taskQuery.CreateTask(ctx, "task-2", "/source2", connID, "/remote2", "DOWNLOAD", "", false, nil)
 	require.NoError(t, err)
 
-	task3, err := taskService.CreateTask(ctx, "task-3", "/source3", connID, "/remote3", "BIDIRECTIONAL", "", false, nil)
+	task3, err := taskQuery.CreateTask(ctx, "task-3", "/source3", connID, "/remote3", "BIDIRECTIONAL", "", false, nil)
 	require.NoError(t, err)
 
 	// Create loader
@@ -147,14 +147,14 @@ func TestTaskLoader_LoadAll_MultipleTasks(t *testing.T) {
 }
 
 func TestTaskLoader_LoadAll_MixedExistingAndNonExistent(t *testing.T) {
-	client, taskService, connectionService := setupTaskTestDB(t)
+	client, taskQuery, connectionQuery := setupTaskTestDB(t)
 	ctx := context.Background()
 
 	// Create a connection first
-	connID := createTestConnectionForTask(t, connectionService)
+	connID := createTestConnectionForTask(t, connectionQuery)
 
 	// Create one test task
-	task1, err := taskService.CreateTask(ctx, "task-1", "/source1", connID, "/remote1", "UPLOAD", "", false, nil)
+	task1, err := taskQuery.CreateTask(ctx, "task-1", "/source1", connID, "/remote1", "UPLOAD", "", false, nil)
 	require.NoError(t, err)
 
 	nonExistentID := uuid.New()
@@ -178,16 +178,16 @@ func TestTaskLoader_LoadAll_MixedExistingAndNonExistent(t *testing.T) {
 }
 
 func TestTaskLoader_LoadAll_PreservesOrder(t *testing.T) {
-	client, taskService, connectionService := setupTaskTestDB(t)
+	client, taskQuery, connectionQuery := setupTaskTestDB(t)
 	ctx := context.Background()
 
 	// Create a connection first
-	connID := createTestConnectionForTask(t, connectionService)
+	connID := createTestConnectionForTask(t, connectionQuery)
 
 	// Create tasks in specific order
 	var tasks []*ent.Task
 	for i := 0; i < 5; i++ {
-		task, err := taskService.CreateTask(
+		task, err := taskQuery.CreateTask(
 			ctx,
 			"task-"+string(rune('A'+i)),
 			"/source"+string(rune('A'+i)),
@@ -242,14 +242,14 @@ func TestTaskLoader_LoadAll_EmptySlice(t *testing.T) {
 }
 
 func TestTaskLoader_LoadAll_DuplicateIDs(t *testing.T) {
-	client, taskService, connectionService := setupTaskTestDB(t)
+	client, taskQuery, connectionQuery := setupTaskTestDB(t)
 	ctx := context.Background()
 
 	// Create a connection first
-	connID := createTestConnectionForTask(t, connectionService)
+	connID := createTestConnectionForTask(t, connectionQuery)
 
 	// Create a test task
-	task, err := taskService.CreateTask(ctx, "test-task", "/source", connID, "/remote", "UPLOAD", "", false, nil)
+	task, err := taskQuery.CreateTask(ctx, "test-task", "/source", connID, "/remote", "UPLOAD", "", false, nil)
 	require.NoError(t, err)
 
 	// Create loader
@@ -271,14 +271,14 @@ func TestTaskLoader_LoadAll_DuplicateIDs(t *testing.T) {
 }
 
 func TestTaskLoader_Load_TaskWithSchedule(t *testing.T) {
-	client, taskService, connectionService := setupTaskTestDB(t)
+	client, taskQuery, connectionQuery := setupTaskTestDB(t)
 	ctx := context.Background()
 
 	// Create a connection first
-	connID := createTestConnectionForTask(t, connectionService)
+	connID := createTestConnectionForTask(t, connectionQuery)
 
 	// Create a task with schedule
-	task, err := taskService.CreateTask(
+	task, err := taskQuery.CreateTask(
 		ctx,
 		"scheduled-task",
 		"/source",
@@ -302,14 +302,14 @@ func TestTaskLoader_Load_TaskWithSchedule(t *testing.T) {
 }
 
 func TestTaskLoader_Load_TaskWithRealtime(t *testing.T) {
-	client, taskService, connectionService := setupTaskTestDB(t)
+	client, taskQuery, connectionQuery := setupTaskTestDB(t)
 	ctx := context.Background()
 
 	// Create a connection first
-	connID := createTestConnectionForTask(t, connectionService)
+	connID := createTestConnectionForTask(t, connectionQuery)
 
 	// Create a task with realtime enabled
-	task, err := taskService.CreateTask(
+	task, err := taskQuery.CreateTask(
 		ctx,
 		"realtime-task",
 		"/source",

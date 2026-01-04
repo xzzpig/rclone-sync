@@ -17,9 +17,9 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 )
 
-// MockJobService is a mock for services.JobService
+// MockJobQuery is a mock for query.JobQuery
 // We only need to mock the methods used by pollStats
-type MockJobService struct {
+type MockJobQuery struct {
 	mock.Mock
 }
 
@@ -31,7 +31,7 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func (m *MockJobService) CreateJob(ctx context.Context, taskID uuid.UUID, trigger model.JobTrigger) (*ent.Job, error) {
+func (m *MockJobQuery) CreateJob(ctx context.Context, taskID uuid.UUID, trigger model.JobTrigger) (*ent.Job, error) {
 	args := m.Called(ctx, taskID, trigger)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -39,7 +39,7 @@ func (m *MockJobService) CreateJob(ctx context.Context, taskID uuid.UUID, trigge
 	return args.Get(0).(*ent.Job), args.Error(1)
 }
 
-func (m *MockJobService) UpdateJobStatus(ctx context.Context, jobID uuid.UUID, status string, errStr string) (*ent.Job, error) {
+func (m *MockJobQuery) UpdateJobStatus(ctx context.Context, jobID uuid.UUID, status string, errStr string) (*ent.Job, error) {
 	args := m.Called(ctx, jobID, status, errStr)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -47,12 +47,12 @@ func (m *MockJobService) UpdateJobStatus(ctx context.Context, jobID uuid.UUID, s
 	return args.Get(0).(*ent.Job), args.Error(1)
 }
 
-func (m *MockJobService) AddJobLogsBatch(ctx context.Context, jobID uuid.UUID, logs []*ent.JobLog) error {
+func (m *MockJobQuery) AddJobLogsBatch(ctx context.Context, jobID uuid.UUID, logs []*ent.JobLog) error {
 	args := m.Called(ctx, jobID, logs)
 	return args.Error(0)
 }
 
-func (m *MockJobService) UpdateJobStats(ctx context.Context, jobID uuid.UUID, files, bytes, filesDeleted, errorCount int64) (*ent.Job, error) {
+func (m *MockJobQuery) UpdateJobStats(ctx context.Context, jobID uuid.UUID, files, bytes, filesDeleted, errorCount int64) (*ent.Job, error) {
 	args := m.Called(ctx, jobID, files, bytes, filesDeleted, errorCount)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -60,7 +60,7 @@ func (m *MockJobService) UpdateJobStats(ctx context.Context, jobID uuid.UUID, fi
 	return args.Get(0).(*ent.Job), args.Error(1)
 }
 
-func (m *MockJobService) AddJobLog(ctx context.Context, jobID uuid.UUID, level, what, path string, size int64) (*ent.JobLog, error) {
+func (m *MockJobQuery) AddJobLog(ctx context.Context, jobID uuid.UUID, level, what, path string, size int64) (*ent.JobLog, error) {
 	args := m.Called(ctx, jobID, level, what, path, size)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -68,7 +68,7 @@ func (m *MockJobService) AddJobLog(ctx context.Context, jobID uuid.UUID, level, 
 	return args.Get(0).(*ent.JobLog), args.Error(1)
 }
 
-func (m *MockJobService) GetJob(ctx context.Context, jobID uuid.UUID) (*ent.Job, error) {
+func (m *MockJobQuery) GetJob(ctx context.Context, jobID uuid.UUID) (*ent.Job, error) {
 	args := m.Called(ctx, jobID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -76,7 +76,7 @@ func (m *MockJobService) GetJob(ctx context.Context, jobID uuid.UUID) (*ent.Job,
 	return args.Get(0).(*ent.Job), args.Error(1)
 }
 
-func (m *MockJobService) GetLastJobByTaskID(ctx context.Context, taskID uuid.UUID) (*ent.Job, error) {
+func (m *MockJobQuery) GetLastJobByTaskID(ctx context.Context, taskID uuid.UUID) (*ent.Job, error) {
 	args := m.Called(ctx, taskID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -84,7 +84,7 @@ func (m *MockJobService) GetLastJobByTaskID(ctx context.Context, taskID uuid.UUI
 	return args.Get(0).(*ent.Job), args.Error(1)
 }
 
-func (m *MockJobService) ListJobs(ctx context.Context, taskID *uuid.UUID, connectionID *uuid.UUID, limit, offset int) ([]*ent.Job, error) {
+func (m *MockJobQuery) ListJobs(ctx context.Context, taskID *uuid.UUID, connectionID *uuid.UUID, limit, offset int) ([]*ent.Job, error) {
 	args := m.Called(ctx, taskID, connectionID, limit, offset)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -92,7 +92,7 @@ func (m *MockJobService) ListJobs(ctx context.Context, taskID *uuid.UUID, connec
 	return args.Get(0).([]*ent.Job), args.Error(1)
 }
 
-func (m *MockJobService) GetJobWithLogs(ctx context.Context, jobID uuid.UUID) (*ent.Job, error) {
+func (m *MockJobQuery) GetJobWithLogs(ctx context.Context, jobID uuid.UUID) (*ent.Job, error) {
 	args := m.Called(ctx, jobID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -100,12 +100,12 @@ func (m *MockJobService) GetJobWithLogs(ctx context.Context, jobID uuid.UUID) (*
 	return args.Get(0).(*ent.Job), args.Error(1)
 }
 
-func (m *MockJobService) CountJobs(ctx context.Context, taskID *uuid.UUID, connectionID *uuid.UUID) (int, error) {
+func (m *MockJobQuery) CountJobs(ctx context.Context, taskID *uuid.UUID, connectionID *uuid.UUID) (int, error) {
 	args := m.Called(ctx, taskID, connectionID)
 	return args.Int(0), args.Error(1)
 }
 
-func (m *MockJobService) ListJobLogs(ctx context.Context, connectionID *uuid.UUID, taskID *uuid.UUID, jobID *uuid.UUID, level string, limit, offset int) ([]*ent.JobLog, error) {
+func (m *MockJobQuery) ListJobLogs(ctx context.Context, connectionID *uuid.UUID, taskID *uuid.UUID, jobID *uuid.UUID, level string, limit, offset int) ([]*ent.JobLog, error) {
 	args := m.Called(ctx, connectionID, taskID, jobID, level, limit, offset)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -113,24 +113,24 @@ func (m *MockJobService) ListJobLogs(ctx context.Context, connectionID *uuid.UUI
 	return args.Get(0).([]*ent.JobLog), args.Error(1)
 }
 
-func (m *MockJobService) CountJobLogs(ctx context.Context, connectionID *uuid.UUID, taskID *uuid.UUID, jobID *uuid.UUID, level string) (int, error) {
+func (m *MockJobQuery) CountJobLogs(ctx context.Context, connectionID *uuid.UUID, taskID *uuid.UUID, jobID *uuid.UUID, level string) (int, error) {
 	args := m.Called(ctx, connectionID, taskID, jobID, level)
 	return args.Int(0), args.Error(1)
 }
 
-func (m *MockJobService) DeleteJob(ctx context.Context, jobID uuid.UUID) error {
+func (m *MockJobQuery) DeleteJob(ctx context.Context, jobID uuid.UUID) error {
 	args := m.Called(ctx, jobID)
 	return args.Error(0)
 }
 
-// TestPollStatsLogic tests the logic of pollStats using a mocked JobService
+// TestPollStatsLogic tests the logic of pollStats using a mocked JobQuery
 func TestPollStatsLogic(t *testing.T) {
 	// 1. Setup Mock
-	mockJobService := new(MockJobService)
+	mockJobQuery := new(MockJobQuery)
 	jobID := uuid.New()
 
 	// 2. Setup SyncEngine
-	engine := NewSyncEngine(mockJobService, nil, nil, t.TempDir(), false, 0)
+	engine := NewSyncEngine(mockJobQuery, nil, nil, t.TempDir(), false, 0)
 	engine.logger = zap.NewNop() // Setup logger
 
 	// 3. Setup Context with Stats
@@ -158,8 +158,8 @@ func TestPollStatsLogic(t *testing.T) {
 // TestGetJobProgress tests the GetJobProgress method of SyncEngine
 func TestGetJobProgress(t *testing.T) {
 	// Setup
-	mockJobService := new(MockJobService)
-	engine := NewSyncEngine(mockJobService, nil, nil, t.TempDir(), false, 0)
+	mockJobQuery := new(MockJobQuery)
+	engine := NewSyncEngine(mockJobQuery, nil, nil, t.TempDir(), false, 0)
 
 	// Test case 1: Job ID exists in lastEvents
 	jobID1 := uuid.New()
@@ -250,21 +250,21 @@ func TestGetConflictResolutionFromOptions(t *testing.T) {
 
 // TestFailJob tests the failJob method
 func TestFailJob(t *testing.T) {
-	mockJobService := new(MockJobService)
-	engine := NewSyncEngine(mockJobService, nil, nil, t.TempDir(), false, 0)
+	mockJobQuery := new(MockJobQuery)
+	engine := NewSyncEngine(mockJobQuery, nil, nil, t.TempDir(), false, 0)
 	engine.logger = zap.NewNop()
 
 	jobID := uuid.New()
 	testErr := assert.AnError
 
 	// Expect UpdateJobStatus to be called
-	mockJobService.On("UpdateJobStatus", mock.Anything, jobID, string(model.JobStatusFailed), testErr.Error()).
+	mockJobQuery.On("UpdateJobStatus", mock.Anything, jobID, string(model.JobStatusFailed), testErr.Error()).
 		Return((*ent.Job)(nil), nil).Once()
 
 	ctx := context.Background()
 	engine.failJob(ctx, jobID, testErr)
 
-	mockJobService.AssertExpectations(t)
+	mockJobQuery.AssertExpectations(t)
 }
 
 // TestRemoteStatsIntegration tests that RemoteStats can be called on the accounting.Stats.

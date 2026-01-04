@@ -1,4 +1,4 @@
-package services
+package query
 
 import (
 	"context"
@@ -14,14 +14,14 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/ports"
 )
 
-// TaskService provides operations for managing sync tasks.
-type TaskService struct {
+// TaskQuery provides operations for managing sync tasks.
+type TaskQuery struct {
 	client *ent.Client
 }
 
-// NewTaskService creates a new TaskService instance.
-func NewTaskService(client *ent.Client) *TaskService {
-	return &TaskService{client: client}
+// NewTaskQuery creates a new TaskQuery instance.
+func NewTaskQuery(client *ent.Client) *TaskQuery {
+	return &TaskQuery{client: client}
 }
 
 // withLatestJobPredicate 返回一个 JobQuery 的过滤器,用于只查询每个 task 的最新 job
@@ -45,7 +45,7 @@ func withLatestJobPredicate(q *ent.JobQuery) {
 }
 
 // CreateTask creates a new sync task with the given parameters.
-func (s *TaskService) CreateTask(ctx context.Context, name, sourcePath string, connectionID uuid.UUID, remotePath, direction, schedule string, realtime bool, options *model.TaskSyncOptions) (*ent.Task, error) {
+func (s *TaskQuery) CreateTask(ctx context.Context, name, sourcePath string, connectionID uuid.UUID, remotePath, direction, schedule string, realtime bool, options *model.TaskSyncOptions) (*ent.Task, error) {
 	t, err := s.client.Task.Create().
 		SetName(name).
 		SetSourcePath(sourcePath).
@@ -66,7 +66,7 @@ func (s *TaskService) CreateTask(ctx context.Context, name, sourcePath string, c
 }
 
 // ListAllTasks retrieves all tasks with their latest job and connection.
-func (s *TaskService) ListAllTasks(ctx context.Context) ([]*ent.Task, error) {
+func (s *TaskQuery) ListAllTasks(ctx context.Context) ([]*ent.Task, error) {
 	tasks, err := s.client.Task.Query().
 		WithJobs(withLatestJobPredicate).
 		WithConnection().
@@ -78,7 +78,7 @@ func (s *TaskService) ListAllTasks(ctx context.Context) ([]*ent.Task, error) {
 }
 
 // ListTasksByConnection retrieves tasks by connection ID with their latest job.
-func (s *TaskService) ListTasksByConnection(ctx context.Context, connectionID uuid.UUID) ([]*ent.Task, error) {
+func (s *TaskQuery) ListTasksByConnection(ctx context.Context, connectionID uuid.UUID) ([]*ent.Task, error) {
 	query := s.client.Task.Query()
 	if connectionID != uuid.Nil {
 		query = query.Where(task.ConnectionIDEQ(connectionID))
@@ -94,7 +94,7 @@ func (s *TaskService) ListTasksByConnection(ctx context.Context, connectionID uu
 }
 
 // GetTask retrieves a task by ID.
-func (s *TaskService) GetTask(ctx context.Context, id uuid.UUID) (*ent.Task, error) {
+func (s *TaskQuery) GetTask(ctx context.Context, id uuid.UUID) (*ent.Task, error) {
 	t, err := s.client.Task.Get(ctx, id)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -106,7 +106,7 @@ func (s *TaskService) GetTask(ctx context.Context, id uuid.UUID) (*ent.Task, err
 }
 
 // GetTaskWithConnection retrieves a task by ID with its connection.
-func (s *TaskService) GetTaskWithConnection(ctx context.Context, id uuid.UUID) (*ent.Task, error) {
+func (s *TaskQuery) GetTaskWithConnection(ctx context.Context, id uuid.UUID) (*ent.Task, error) {
 	t, err := s.client.Task.Query().
 		Where(task.IDEQ(id)).
 		WithConnection().
@@ -121,7 +121,7 @@ func (s *TaskService) GetTaskWithConnection(ctx context.Context, id uuid.UUID) (
 }
 
 // GetTaskWithJobs retrieves a task by ID with its latest job.
-func (s *TaskService) GetTaskWithJobs(ctx context.Context, id uuid.UUID) (*ent.Task, error) {
+func (s *TaskQuery) GetTaskWithJobs(ctx context.Context, id uuid.UUID) (*ent.Task, error) {
 	t, err := s.client.Task.Query().
 		Where(task.IDEQ(id)).
 		WithJobs(withLatestJobPredicate).
@@ -136,7 +136,7 @@ func (s *TaskService) GetTaskWithJobs(ctx context.Context, id uuid.UUID) (*ent.T
 }
 
 // UpdateTask updates an existing task with the given parameters.
-func (s *TaskService) UpdateTask(ctx context.Context, id uuid.UUID, name, sourcePath string, connectionID uuid.UUID, remotePath, direction, schedule string, realtime bool, options *model.TaskSyncOptions) (*ent.Task, error) {
+func (s *TaskQuery) UpdateTask(ctx context.Context, id uuid.UUID, name, sourcePath string, connectionID uuid.UUID, remotePath, direction, schedule string, realtime bool, options *model.TaskSyncOptions) (*ent.Task, error) {
 	t, err := s.client.Task.UpdateOneID(id).
 		SetName(name).
 		SetSourcePath(sourcePath).
@@ -160,7 +160,7 @@ func (s *TaskService) UpdateTask(ctx context.Context, id uuid.UUID, name, source
 }
 
 // DeleteTask deletes a task by ID.
-func (s *TaskService) DeleteTask(ctx context.Context, id uuid.UUID) error {
+func (s *TaskQuery) DeleteTask(ctx context.Context, id uuid.UUID) error {
 	err := s.client.Task.DeleteOneID(id).Exec(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -172,7 +172,7 @@ func (s *TaskService) DeleteTask(ctx context.Context, id uuid.UUID) error {
 }
 
 // ListTasksPaginated lists tasks with pagination.
-func (s *TaskService) ListTasksPaginated(ctx context.Context, limit, offset int) ([]*ent.Task, int, error) {
+func (s *TaskQuery) ListTasksPaginated(ctx context.Context, limit, offset int) ([]*ent.Task, int, error) {
 	query := s.client.Task.Query().
 		Order(ent.Desc(task.FieldCreatedAt))
 
@@ -195,7 +195,7 @@ func (s *TaskService) ListTasksPaginated(ctx context.Context, limit, offset int)
 }
 
 // ListTasksByConnectionPaginated lists tasks by connection ID with pagination.
-func (s *TaskService) ListTasksByConnectionPaginated(ctx context.Context, connectionID uuid.UUID, limit, offset int) ([]*ent.Task, int, error) {
+func (s *TaskQuery) ListTasksByConnectionPaginated(ctx context.Context, connectionID uuid.UUID, limit, offset int) ([]*ent.Task, int, error) {
 	query := s.client.Task.Query().
 		Where(task.ConnectionID(connectionID)).
 		Order(ent.Desc(task.FieldCreatedAt))
@@ -219,7 +219,7 @@ func (s *TaskService) ListTasksByConnectionPaginated(ctx context.Context, connec
 }
 
 // ListJobsByTaskPaginated lists jobs for a task with pagination.
-func (s *TaskService) ListJobsByTaskPaginated(ctx context.Context, taskID uuid.UUID, limit, offset int) ([]*ent.Job, int, error) {
+func (s *TaskQuery) ListJobsByTaskPaginated(ctx context.Context, taskID uuid.UUID, limit, offset int) ([]*ent.Job, int, error) {
 	query := s.client.Job.Query().
 		Where(job.HasTaskWith(task.ID(taskID))).
 		Order(ent.Desc(job.FieldStartTime))
@@ -242,4 +242,4 @@ func (s *TaskService) ListJobsByTaskPaginated(ctx context.Context, taskID uuid.U
 	return jobs, totalCount, nil
 }
 
-var _ ports.TaskService = (*TaskService)(nil)
+var _ ports.TaskQuery = (*TaskQuery)(nil)

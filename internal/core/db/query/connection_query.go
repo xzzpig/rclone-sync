@@ -1,5 +1,5 @@
-// Package services provides business logic services for the application.
-package services
+// Package query provides database query operations for the application.
+package query
 
 import (
 	"context"
@@ -20,15 +20,15 @@ const (
 	errConnectionNotFound = errs.ConstError("connection not found")
 )
 
-// ConnectionService 处理云存储连接的业务逻辑
-type ConnectionService struct {
+// ConnectionQuery 处理云存储连接的业务逻辑
+type ConnectionQuery struct {
 	client    *ent.Client
 	encryptor *crypto.Encryptor
 }
 
-// NewConnectionService 创建新的 ConnectionService 实例
-func NewConnectionService(client *ent.Client, encryptor *crypto.Encryptor) *ConnectionService {
-	return &ConnectionService{
+// NewConnectionQuery 创建新的 ConnectionQuery 实例
+func NewConnectionQuery(client *ent.Client, encryptor *crypto.Encryptor) *ConnectionQuery {
+	return &ConnectionQuery{
 		client:    client,
 		encryptor: encryptor,
 	}
@@ -48,7 +48,7 @@ func ValidateConnectionName(name string) error {
 }
 
 // CreateConnection 创建新的云存储连接
-func (s *ConnectionService) CreateConnection(ctx context.Context, name, connType string, config map[string]string) (*ent.Connection, error) {
+func (s *ConnectionQuery) CreateConnection(ctx context.Context, name, connType string, config map[string]string) (*ent.Connection, error) {
 	// 验证名称
 	if err := ValidateConnectionName(name); err != nil {
 		return nil, err
@@ -97,7 +97,7 @@ func (s *ConnectionService) CreateConnection(ctx context.Context, name, connType
 }
 
 // GetConnectionByName 根据名称获取连接
-func (s *ConnectionService) GetConnectionByName(ctx context.Context, name string) (*ent.Connection, error) {
+func (s *ConnectionQuery) GetConnectionByName(ctx context.Context, name string) (*ent.Connection, error) {
 	conn, err := s.client.Connection.
 		Query().
 		Where(connection.Name(name)).
@@ -112,7 +112,7 @@ func (s *ConnectionService) GetConnectionByName(ctx context.Context, name string
 }
 
 // GetConnectionByID 根据 ID 获取连接
-func (s *ConnectionService) GetConnectionByID(ctx context.Context, id uuid.UUID) (*ent.Connection, error) {
+func (s *ConnectionQuery) GetConnectionByID(ctx context.Context, id uuid.UUID) (*ent.Connection, error) {
 	conn, err := s.client.Connection.Get(ctx, id)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -124,7 +124,7 @@ func (s *ConnectionService) GetConnectionByID(ctx context.Context, id uuid.UUID)
 }
 
 // ListConnections 列出所有连接
-func (s *ConnectionService) ListConnections(ctx context.Context) ([]*ent.Connection, error) {
+func (s *ConnectionQuery) ListConnections(ctx context.Context) ([]*ent.Connection, error) {
 	conns, err := s.client.Connection.
 		Query().
 		Order(ent.Asc(connection.FieldName)).
@@ -137,7 +137,7 @@ func (s *ConnectionService) ListConnections(ctx context.Context) ([]*ent.Connect
 
 // ListConnectionsPaginated 分页列出连接
 // 当 limit <= 0 时，返回全部连接（不分页）
-func (s *ConnectionService) ListConnectionsPaginated(ctx context.Context, limit, offset int) ([]*ent.Connection, int, error) {
+func (s *ConnectionQuery) ListConnectionsPaginated(ctx context.Context, limit, offset int) ([]*ent.Connection, int, error) {
 	query := s.client.Connection.Query().
 		Order(ent.Desc(connection.FieldCreatedAt))
 
@@ -161,7 +161,7 @@ func (s *ConnectionService) ListConnectionsPaginated(ctx context.Context, limit,
 }
 
 // CountAssociatedTasks 返回连接关联的任务数量
-func (s *ConnectionService) CountAssociatedTasks(ctx context.Context, connectionID uuid.UUID) (int, error) {
+func (s *ConnectionQuery) CountAssociatedTasks(ctx context.Context, connectionID uuid.UUID) (int, error) {
 	conn, err := s.client.Connection.Get(ctx, connectionID)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -179,7 +179,7 @@ func (s *ConnectionService) CountAssociatedTasks(ctx context.Context, connection
 }
 
 // ListConnectionNames 仅返回连接名称列表（优化查询，不加载 encrypted_config）
-func (s *ConnectionService) ListConnectionNames(ctx context.Context) ([]string, error) {
+func (s *ConnectionQuery) ListConnectionNames(ctx context.Context) ([]string, error) {
 	conns, err := s.client.Connection.
 		Query().
 		Select(connection.FieldName).
@@ -197,7 +197,7 @@ func (s *ConnectionService) ListConnectionNames(ctx context.Context) ([]string, 
 }
 
 // GetConnectionConfig 获取连接的解密配置（用于编辑）- 按名称
-func (s *ConnectionService) GetConnectionConfig(ctx context.Context, name string) (map[string]string, error) {
+func (s *ConnectionQuery) GetConnectionConfig(ctx context.Context, name string) (map[string]string, error) {
 	conn, err := s.GetConnectionByName(ctx, name)
 	if err != nil {
 		return nil, err
@@ -213,7 +213,7 @@ func (s *ConnectionService) GetConnectionConfig(ctx context.Context, name string
 }
 
 // GetConnectionConfigByID 获取连接的解密配置（用于编辑）- 按 ID
-func (s *ConnectionService) GetConnectionConfigByID(ctx context.Context, id uuid.UUID) (map[string]string, error) {
+func (s *ConnectionQuery) GetConnectionConfigByID(ctx context.Context, id uuid.UUID) (map[string]string, error) {
 	conn, err := s.GetConnectionByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -228,7 +228,7 @@ func (s *ConnectionService) GetConnectionConfigByID(ctx context.Context, id uuid
 }
 
 // UpdateConnection 更新连接配置（基于 ID）
-func (s *ConnectionService) UpdateConnection(ctx context.Context, id uuid.UUID, name, connType *string, config map[string]string) error {
+func (s *ConnectionQuery) UpdateConnection(ctx context.Context, id uuid.UUID, name, connType *string, config map[string]string) error {
 	// 根据 ID 查询连接
 	conn, err := s.client.Connection.Get(ctx, id)
 	if err != nil {
@@ -287,7 +287,7 @@ func (s *ConnectionService) UpdateConnection(ctx context.Context, id uuid.UUID, 
 }
 
 // DeleteConnectionByName 根据名称删除连接（级联删除关联的任务）
-func (s *ConnectionService) DeleteConnectionByName(ctx context.Context, name string) error {
+func (s *ConnectionQuery) DeleteConnectionByName(ctx context.Context, name string) error {
 	conn, err := s.GetConnectionByName(ctx, name)
 	if err != nil {
 		return err
@@ -303,7 +303,7 @@ func (s *ConnectionService) DeleteConnectionByName(ctx context.Context, name str
 }
 
 // DeleteConnectionByID 根据 ID 删除连接（级联删除关联的任务）
-func (s *ConnectionService) DeleteConnectionByID(ctx context.Context, id uuid.UUID) error {
+func (s *ConnectionQuery) DeleteConnectionByID(ctx context.Context, id uuid.UUID) error {
 	conn, err := s.GetConnectionByID(ctx, id)
 	if err != nil {
 		return err
@@ -319,7 +319,7 @@ func (s *ConnectionService) DeleteConnectionByID(ctx context.Context, id uuid.UU
 }
 
 // HasAssociatedTasks 检查连接是否有关联的任务
-func (s *ConnectionService) HasAssociatedTasks(ctx context.Context, connectionID uuid.UUID) (bool, error) {
+func (s *ConnectionQuery) HasAssociatedTasks(ctx context.Context, connectionID uuid.UUID) (bool, error) {
 	conn, err := s.client.Connection.Get(ctx, connectionID)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -336,4 +336,4 @@ func (s *ConnectionService) HasAssociatedTasks(ctx context.Context, connectionID
 	return count > 0, nil
 }
 
-var _ ports.ConnectionService = (*ConnectionService)(nil)
+var _ ports.ConnectionQuery = (*ConnectionQuery)(nil)

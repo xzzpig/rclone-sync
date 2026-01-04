@@ -14,14 +14,14 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/db"
+	"github.com/xzzpig/rclone-sync/internal/core/db/query"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
-	"github.com/xzzpig/rclone-sync/internal/core/services"
 	"github.com/xzzpig/rclone-sync/internal/rclone"
 )
 
-// setupJobTestDB creates an in-memory database with all required services for testing.
-func setupJobTestDB(t *testing.T) (*ent.Client, *services.JobService, *services.TaskService, *services.ConnectionService) {
+// setupJobTestDB creates an in-memory database with all required queries for testing.
+func setupJobTestDB(t *testing.T) (*ent.Client, *query.JobQuery, *query.TaskQuery, *query.ConnectionQuery) {
 	t.Helper()
 
 	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug, nil)
@@ -35,32 +35,32 @@ func setupJobTestDB(t *testing.T) (*ent.Client, *services.JobService, *services.
 	encryptor, err := crypto.NewEncryptor("test-encryption-key-32-bytes!!")
 	require.NoError(t, err)
 
-	connectionService := services.NewConnectionService(client, encryptor)
-	taskService := services.NewTaskService(client)
-	jobService := services.NewJobService(client)
+	connectionQuery := query.NewConnectionQuery(client, encryptor)
+	taskQuery := query.NewTaskQuery(client)
+	jobQuery := query.NewJobQuery(client)
 
 	// Install DBStorage for rclone configuration
-	storage := rclone.NewDBStorage(connectionService)
+	storage := rclone.NewDBStorage(connectionQuery)
 	storage.Install()
 
 	t.Cleanup(func() {
 		client.Close()
 	})
 
-	return client, jobService, taskService, connectionService
+	return client, jobQuery, taskQuery, connectionQuery
 }
 
 // createTestTask creates a test task for job tests.
-func createTestTask(t *testing.T, taskService *services.TaskService, connectionService *services.ConnectionService) *ent.Task {
+func createTestTask(t *testing.T, taskQuery *query.TaskQuery, connectionQuery *query.ConnectionQuery) *ent.Task {
 	t.Helper()
 	ctx := context.Background()
 
-	conn, err := connectionService.CreateConnection(ctx, "test-connection", "local", map[string]string{
+	conn, err := connectionQuery.CreateConnection(ctx, "test-connection", "local", map[string]string{
 		"type": "local",
 	})
 	require.NoError(t, err)
 
-	task, err := taskService.CreateTask(
+	task, err := taskQuery.CreateTask(
 		ctx,
 		"test-task",
 		"/source",
@@ -91,11 +91,11 @@ func createTestJob(t *testing.T, client *ent.Client, taskID uuid.UUID) *ent.Job 
 }
 
 func TestJobLoader_Load_ExistingJob(t *testing.T) {
-	client, _, taskService, connectionService := setupJobTestDB(t)
+	client, _, taskQuery, connectionQuery := setupJobTestDB(t)
 	ctx := context.Background()
 
 	// Create a task first
-	task := createTestTask(t, taskService, connectionService)
+	task := createTestTask(t, taskQuery, connectionQuery)
 
 	// Create a test job
 	testJob := createTestJob(t, client, task.ID)
@@ -129,11 +129,11 @@ func TestJobLoader_Load_NonExistentJob(t *testing.T) {
 }
 
 func TestJobLoader_LoadAll_MultipleJobs(t *testing.T) {
-	client, _, taskService, connectionService := setupJobTestDB(t)
+	client, _, taskQuery, connectionQuery := setupJobTestDB(t)
 	ctx := context.Background()
 
 	// Create a task first
-	task := createTestTask(t, taskService, connectionService)
+	task := createTestTask(t, taskQuery, connectionQuery)
 
 	// Create multiple test jobs
 	job1 := createTestJob(t, client, task.ID)
@@ -157,11 +157,11 @@ func TestJobLoader_LoadAll_MultipleJobs(t *testing.T) {
 }
 
 func TestJobLoader_LoadAll_MixedExistingAndNonExistent(t *testing.T) {
-	client, _, taskService, connectionService := setupJobTestDB(t)
+	client, _, taskQuery, connectionQuery := setupJobTestDB(t)
 	ctx := context.Background()
 
 	// Create a task first
-	task := createTestTask(t, taskService, connectionService)
+	task := createTestTask(t, taskQuery, connectionQuery)
 
 	// Create one test job
 	job1 := createTestJob(t, client, task.ID)
@@ -187,11 +187,11 @@ func TestJobLoader_LoadAll_MixedExistingAndNonExistent(t *testing.T) {
 }
 
 func TestJobLoader_LoadAll_PreservesOrder(t *testing.T) {
-	client, _, taskService, connectionService := setupJobTestDB(t)
+	client, _, taskQuery, connectionQuery := setupJobTestDB(t)
 	ctx := context.Background()
 
 	// Create a task first
-	task := createTestTask(t, taskService, connectionService)
+	task := createTestTask(t, taskQuery, connectionQuery)
 
 	// Create jobs
 	var jobs []*ent.Job
@@ -240,11 +240,11 @@ func TestJobLoader_LoadAll_EmptySlice(t *testing.T) {
 }
 
 func TestJobLoader_LoadAll_DuplicateIDs(t *testing.T) {
-	client, _, taskService, connectionService := setupJobTestDB(t)
+	client, _, taskQuery, connectionQuery := setupJobTestDB(t)
 	ctx := context.Background()
 
 	// Create a task first
-	task := createTestTask(t, taskService, connectionService)
+	task := createTestTask(t, taskQuery, connectionQuery)
 
 	// Create a test job
 	testJob := createTestJob(t, client, task.ID)
@@ -267,11 +267,11 @@ func TestJobLoader_LoadAll_DuplicateIDs(t *testing.T) {
 }
 
 func TestJobLoader_Load_JobWithDifferentStatuses(t *testing.T) {
-	client, _, taskService, connectionService := setupJobTestDB(t)
+	client, _, taskQuery, connectionQuery := setupJobTestDB(t)
 	ctx := context.Background()
 
 	// Create a task first
-	task := createTestTask(t, taskService, connectionService)
+	task := createTestTask(t, taskQuery, connectionQuery)
 
 	testCases := []struct {
 		name   string
@@ -307,11 +307,11 @@ func TestJobLoader_Load_JobWithDifferentStatuses(t *testing.T) {
 }
 
 func TestJobLoader_Load_JobWithTriggerTypes(t *testing.T) {
-	client, _, taskService, connectionService := setupJobTestDB(t)
+	client, _, taskQuery, connectionQuery := setupJobTestDB(t)
 	ctx := context.Background()
 
 	// Create a task first
-	task := createTestTask(t, taskService, connectionService)
+	task := createTestTask(t, taskQuery, connectionQuery)
 
 	triggerTypes := []model.JobTrigger{
 		model.JobTriggerManual,

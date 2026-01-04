@@ -23,29 +23,29 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/subscription"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/db"
+	"github.com/xzzpig/rclone-sync/internal/core/db/query"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 	"github.com/xzzpig/rclone-sync/internal/core/ports"
 	"github.com/xzzpig/rclone-sync/internal/core/runner"
-	"github.com/xzzpig/rclone-sync/internal/core/services"
 	"github.com/xzzpig/rclone-sync/internal/i18n"
 	"github.com/xzzpig/rclone-sync/internal/rclone"
 )
 
 // TestEnv holds the components for GraphQL resolver testing.
 type TestEnv struct {
-	Client            *ent.Client
-	Server            *handler.Server
-	Router            *gin.Engine
-	Deps              *resolver.Dependencies
-	TaskService       *services.TaskService
-	JobService        *services.JobService
-	ConnectionService *services.ConnectionService
-	Runner            ports.Runner
-	Cleanup           func()
+	Client          *ent.Client
+	Server          *handler.Server
+	Router          *gin.Engine
+	Deps            *resolver.Dependencies
+	TaskQuery       *query.TaskQuery
+	JobQuery        *query.JobQuery
+	ConnectionQuery *query.ConnectionQuery
+	Runner          ports.Runner
+	Cleanup         func()
 }
 
-// NewTestEnv initializes a test environment with a file-based database and all services.
+// NewTestEnv initializes a test environment with a file-based database and all queries.
 func NewTestEnv(t *testing.T) *TestEnv {
 	t.Helper()
 
@@ -66,20 +66,20 @@ func NewTestEnv(t *testing.T) *TestEnv {
 	})
 	require.NoError(t, err)
 
-	// Initialize services
-	jobService := services.NewJobService(client)
-	taskService := services.NewTaskService(client)
+	// Initialize queries
+	jobQuery := query.NewJobQuery(client)
+	taskQuery := query.NewTaskQuery(client)
 
-	// Initialize encryption for ConnectionService
+	// Initialize encryption for ConnectionQuery
 	encryptor, err := crypto.NewEncryptor("test-encryption-key-32-bytes!!")
 	require.NoError(t, err)
-	connectionService := services.NewConnectionService(client, encryptor)
+	connectionQuery := query.NewConnectionQuery(client, encryptor)
 
 	// Install DBStorage for rclone configuration
-	storage := rclone.NewDBStorage(connectionService)
+	storage := rclone.NewDBStorage(connectionQuery)
 	storage.Install()
 
-	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, appDataDir, false, 0)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, appDataDir, false, 0)
 	runnerInstance := runner.NewRunner(syncEngine)
 
 	// Create mock watcher and scheduler for testing
@@ -94,11 +94,11 @@ func NewTestEnv(t *testing.T) *TestEnv {
 	deps := &resolver.Dependencies{
 		SyncEngine:          syncEngine,
 		Runner:              runnerInstance,
-		JobService:          jobService,
+		JobQuery:            jobQuery,
 		Watcher:             mockWatcher,
 		Scheduler:           mockScheduler,
-		TaskService:         taskService,
-		ConnectionService:   connectionService,
+		TaskQuery:           taskQuery,
+		ConnectionQuery:     connectionQuery,
 		Encryptor:           encryptor,
 		JobProgressBus:      jobProgressBus,
 		TransferProgressBus: transferProgressBus,
@@ -122,15 +122,15 @@ func NewTestEnv(t *testing.T) *TestEnv {
 	}
 
 	return &TestEnv{
-		Client:            client,
-		Server:            srv,
-		Router:            router,
-		Deps:              deps,
-		TaskService:       taskService,
-		JobService:        jobService,
-		ConnectionService: connectionService,
-		Runner:            runnerInstance,
-		Cleanup:           cleanup,
+		Client:          client,
+		Server:          srv,
+		Router:          router,
+		Deps:            deps,
+		TaskQuery:       taskQuery,
+		JobQuery:        jobQuery,
+		ConnectionQuery: connectionQuery,
+		Runner:          runnerInstance,
+		Cleanup:         cleanup,
 	}
 }
 
@@ -186,7 +186,7 @@ func (e *TestEnv) ExecuteGraphQLWithVars(t *testing.T, query string, vars map[st
 // CreateTestConnection creates a test connection and returns its ID.
 func (e *TestEnv) CreateTestConnection(t *testing.T, name string) uuid.UUID {
 	t.Helper()
-	conn, err := e.ConnectionService.CreateConnection(context.Background(), name, "local", map[string]string{
+	conn, err := e.ConnectionQuery.CreateConnection(context.Background(), name, "local", map[string]string{
 		"type": "local",
 	})
 	require.NoError(t, err)
@@ -196,7 +196,7 @@ func (e *TestEnv) CreateTestConnection(t *testing.T, name string) uuid.UUID {
 // CreateTestTask creates a test task and returns it.
 func (e *TestEnv) CreateTestTask(t *testing.T, name string, connectionID uuid.UUID) *ent.Task {
 	t.Helper()
-	task, err := e.TaskService.CreateTask(
+	task, err := e.TaskQuery.CreateTask(
 		context.Background(),
 		name,
 		"/tmp/source",

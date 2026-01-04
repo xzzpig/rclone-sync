@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
-	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
 	"github.com/xzzpig/rclone-sync/internal/core/db"
-	"github.com/xzzpig/rclone-sync/internal/core/services"
+	"github.com/xzzpig/rclone-sync/internal/core/db/query"
+	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
 	"github.com/xzzpig/rclone-sync/internal/rclone"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -121,7 +121,7 @@ func TestDBStorage_Integration_ConfigFileSet(t *testing.T) {
 	// Update value via config.FileSetValue (simulating rclone token refresh)
 	config.FileSetValue("set-test", "token", "new-refreshed-token")
 
-	// Verify the update via DBStorage (through ConnectionService)
+	// Verify the update via DBStorage (through ConnectionQuery)
 	cfg, err := connSvc.GetConnectionConfig(ctx, "set-test")
 	require.NoError(t, err)
 	assert.Equal(t, "new-refreshed-token", cfg["token"], "Token should be updated in database")
@@ -214,10 +214,10 @@ func TestSyncEngine_WithDBStorage_Integration(t *testing.T) {
 	encryptor, err := crypto.NewEncryptor("")
 	require.NoError(t, err)
 
-	// Create services
-	connSvc := services.NewConnectionService(client, encryptor)
-	jobSvc := services.NewJobService(client)
-	taskSvc := services.NewTaskService(client)
+	// Create queries
+	connSvc := query.NewConnectionQuery(client, encryptor)
+	jobSvc := query.NewJobQuery(client)
+	taskSvc := query.NewTaskQuery(client)
 
 	// Install DBStorage
 	storage := rclone.NewDBStorage(connSvc)
@@ -234,7 +234,7 @@ func TestSyncEngine_WithDBStorage_Integration(t *testing.T) {
 	err = os.WriteFile(testFilePath, []byte("sync test content"), 0644)
 	require.NoError(t, err)
 
-	// Create local connection via ConnectionService (this goes to database)
+	// Create local connection via ConnectionQuery (this goes to database)
 	testConn, err := connSvc.CreateConnection(ctx, "db-local", "local", map[string]string{})
 	require.NoError(t, err)
 

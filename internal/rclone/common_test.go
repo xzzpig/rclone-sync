@@ -5,9 +5,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
-	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
 	"github.com/xzzpig/rclone-sync/internal/core/db"
-	"github.com/xzzpig/rclone-sync/internal/core/services"
+	"github.com/xzzpig/rclone-sync/internal/core/db/query"
+	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
 	"github.com/xzzpig/rclone-sync/internal/rclone"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -16,7 +16,7 @@ import (
 )
 
 // setupTestConfig initializes rclone configuration for testing using DBStorage
-func setupTestConfig(t *testing.T) (*rclone.DBStorage, *services.ConnectionService) {
+func setupTestConfig(t *testing.T) (*rclone.DBStorage, *query.ConnectionQuery) {
 	t.Helper()
 
 	// Create test database client
@@ -27,8 +27,8 @@ func setupTestConfig(t *testing.T) (*rclone.DBStorage, *services.ConnectionServi
 	encryptor, err := crypto.NewEncryptor("")
 	require.NoError(t, err)
 
-	// Create connection service
-	connSvc := services.NewConnectionService(client, encryptor)
+	// Create connection query
+	connSvc := query.NewConnectionQuery(client, encryptor)
 
 	// Create DBStorage and install it
 	storage := rclone.NewDBStorage(connSvc)

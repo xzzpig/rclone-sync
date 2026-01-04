@@ -35,22 +35,22 @@ func (m *MockRunner) IsRunning(taskID uuid.UUID) bool {
 	return args.Bool(0)
 }
 
-// MockTaskService is a mock for the TaskService interface
-type MockTaskService struct {
+// MockTaskQuery is a mock for the TaskQuery interface
+type MockTaskQuery struct {
 	mock.Mock
 }
 
-func (m *MockTaskService) GetTask(ctx context.Context, id uuid.UUID) (*ent.Task, error) {
+func (m *MockTaskQuery) GetTask(ctx context.Context, id uuid.UUID) (*ent.Task, error) {
 	args := m.Called(ctx, id)
 	return args.Get(0).(*ent.Task), args.Error(1)
 }
 
-func (m *MockTaskService) GetTaskWithConnection(ctx context.Context, id uuid.UUID) (*ent.Task, error) {
+func (m *MockTaskQuery) GetTaskWithConnection(ctx context.Context, id uuid.UUID) (*ent.Task, error) {
 	args := m.Called(ctx, id)
 	return args.Get(0).(*ent.Task), args.Error(1)
 }
 
-func (m *MockTaskService) ListAllTasks(ctx context.Context) ([]*ent.Task, error) {
+func (m *MockTaskQuery) ListAllTasks(ctx context.Context) ([]*ent.Task, error) {
 	args := m.Called(ctx)
 	return args.Get(0).([]*ent.Task), args.Error(1)
 }
@@ -62,7 +62,7 @@ func setupTest(t *testing.T) {
 
 func TestScheduler_Start_LoadsScheduledTasks(t *testing.T) {
 	setupTest(t)
-	mockTaskSvc := new(MockTaskService)
+	mockTaskSvc := new(MockTaskQuery)
 	mockRunner := new(MockRunner)
 
 	task1 := &ent.Task{ID: uuid.New(), Name: "Scheduled Task", Schedule: "* * * * * *"}
@@ -97,7 +97,7 @@ func TestScheduler_Start_LoadsScheduledTasks(t *testing.T) {
 
 func TestScheduler_AddTask_And_RemoveTask(t *testing.T) {
 	setupTest(t)
-	mockTaskSvc := new(MockTaskService)
+	mockTaskSvc := new(MockTaskQuery)
 	mockRunner := new(MockRunner)
 
 	task := &ent.Task{ID: uuid.New(), Name: "Dynamic Task", Schedule: "* * * * * *"}
@@ -143,7 +143,7 @@ func TestScheduler_AddTask_And_RemoveTask(t *testing.T) {
 
 func TestScheduler_StartStopIdempotency(t *testing.T) {
 	setupTest(t)
-	mockTaskSvc := new(MockTaskService)
+	mockTaskSvc := new(MockTaskQuery)
 	mockRunner := new(MockRunner)
 
 	// Expect ListAllTasks to be called only once initially

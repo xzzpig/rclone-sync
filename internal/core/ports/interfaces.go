@@ -1,4 +1,4 @@
-// Package ports defines interfaces for core application services.
+// Package ports defines interfaces for core application queries.
 // These interfaces allow for dependency inversion, making the system
 // more modular, testable, and maintainable.
 package ports
@@ -41,16 +41,16 @@ type Scheduler interface {
 	RemoveTask(task *ent.Task) error
 }
 
-// TaskService provides CRUD operations for tasks.
-type TaskService interface {
+// TaskQuery provides CRUD operations for tasks.
+type TaskQuery interface {
 	GetTask(ctx context.Context, id uuid.UUID) (*ent.Task, error)
 	GetTaskWithConnection(ctx context.Context, id uuid.UUID) (*ent.Task, error)
 	ListAllTasks(ctx context.Context) ([]*ent.Task, error)
 	// Add other methods as needed for testing
 }
 
-// JobService defines the interface for job management operations.
-type JobService interface {
+// JobQuery defines the interface for job management operations.
+type JobQuery interface {
 	CreateJob(ctx context.Context, taskID uuid.UUID, trigger model.JobTrigger) (*ent.Job, error)
 	UpdateJobStatus(ctx context.Context, jobID uuid.UUID, status string, errStr string) (*ent.Job, error)
 	UpdateJobStats(ctx context.Context, jobID uuid.UUID, files, bytes, filesDeleted, errorCount int64) (*ent.Job, error)
@@ -66,8 +66,8 @@ type JobService interface {
 	DeleteJob(ctx context.Context, jobID uuid.UUID) error
 }
 
-// ConnectionService defines the interface for connection management operations.
-type ConnectionService interface {
+// ConnectionQuery defines the interface for connection management operations.
+type ConnectionQuery interface {
 	CreateConnection(ctx context.Context, name, providerType string, config map[string]string) (*ent.Connection, error)
 	ListConnections(ctx context.Context) ([]*ent.Connection, error)
 	ListConnectionNames(ctx context.Context) ([]string, error)

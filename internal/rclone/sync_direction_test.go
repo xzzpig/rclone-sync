@@ -15,7 +15,7 @@ import (
 )
 
 func TestSyncEngine_RunTask_Upload(t *testing.T) {
-	connService, taskService, jobService, _ := setupIntegrationTest(t)
+	connQuery, taskQuery, jobQuery, _ := setupIntegrationTest(t)
 	ctx := context.Background()
 
 	// 1. Setup test directories
@@ -32,11 +32,11 @@ func TestSyncEngine_RunTask_Upload(t *testing.T) {
 	err = os.WriteFile(destGarbagePath, []byte("garbage"), 0644)
 	require.NoError(t, err)
 
-	// 2. Create Connection and Task via ConnectionService (this goes to database)
-	testConn, err := connService.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"})
+	// 2. Create Connection and Task via ConnectionQuery (this goes to database)
+	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"})
 	require.NoError(t, err)
 
-	testTask, err := taskService.CreateTask(ctx,
+	testTask, err := taskQuery.CreateTask(ctx,
 		"TestUploadSync",
 		sourceDir,
 		testConn.ID,
@@ -50,10 +50,10 @@ func TestSyncEngine_RunTask_Upload(t *testing.T) {
 
 	// 3. Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, dataDir, false, 0)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0)
 
 	// 4. Reload task with Connection edge before running
-	testTask, err = taskService.GetTaskWithConnection(ctx, testTask.ID)
+	testTask, err = taskQuery.GetTaskWithConnection(ctx, testTask.ID)
 	require.NoError(t, err)
 
 	// 5. Run the task - this should use DBStorage to read the connection config
@@ -77,14 +77,14 @@ func TestSyncEngine_RunTask_Upload(t *testing.T) {
 	assert.True(t, os.IsNotExist(err), "Extra file in destination should be deleted")
 
 	// Verify Job Status
-	jobs, err := jobService.ListJobs(ctx, &testTask.ID, nil, 10, 0)
+	jobs, err := jobQuery.ListJobs(ctx, &testTask.ID, nil, 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs, 1)
 	assert.Equal(t, string(model.JobStatusSuccess), string(jobs[0].Status))
 }
 
 func TestSyncEngine_RunTask_Download(t *testing.T) {
-	connService, taskService, jobService, _ := setupIntegrationTest(t)
+	connQuery, taskQuery, jobQuery, _ := setupIntegrationTest(t)
 	ctx := context.Background()
 
 	// 1. Setup test directories
@@ -101,11 +101,11 @@ func TestSyncEngine_RunTask_Download(t *testing.T) {
 	err = os.WriteFile(sourceGarbagePath, []byte("local garbage"), 0644)
 	require.NoError(t, err)
 
-	// 2. Create Connection and Task via ConnectionService (this goes to database)
-	testConn, err := connService.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"})
+	// 2. Create Connection and Task via ConnectionQuery (this goes to database)
+	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"})
 	require.NoError(t, err)
 
-	testTask, err := taskService.CreateTask(ctx,
+	testTask, err := taskQuery.CreateTask(ctx,
 		"TestDownloadSync",
 		sourceDir,
 		testConn.ID,
@@ -119,10 +119,10 @@ func TestSyncEngine_RunTask_Download(t *testing.T) {
 
 	// 3. Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, dataDir, false, 0)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0)
 
 	// 4. Reload task with Connection edge before running
-	testTask, err = taskService.GetTaskWithConnection(ctx, testTask.ID)
+	testTask, err = taskQuery.GetTaskWithConnection(ctx, testTask.ID)
 	require.NoError(t, err)
 
 	// 5. Run the task - this should use DBStorage to read the connection config
@@ -140,14 +140,14 @@ func TestSyncEngine_RunTask_Download(t *testing.T) {
 	assert.True(t, os.IsNotExist(err), "Extra file in source should be deleted")
 
 	// Verify Job Status
-	jobs, err := jobService.ListJobs(ctx, &testTask.ID, nil, 10, 0)
+	jobs, err := jobQuery.ListJobs(ctx, &testTask.ID, nil, 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs, 1)
 	assert.Equal(t, string(model.JobStatusSuccess), string(jobs[0].Status))
 }
 
 func TestSyncEngine_RunTask_Bidirectional(t *testing.T) {
-	connService, taskService, jobService, _ := setupIntegrationTest(t)
+	connQuery, taskQuery, jobQuery, _ := setupIntegrationTest(t)
 	ctx := context.Background()
 
 	// 1. Setup test directories
@@ -164,11 +164,11 @@ func TestSyncEngine_RunTask_Bidirectional(t *testing.T) {
 	err = os.WriteFile(destFilePath, []byte("dest content"), 0644)
 	require.NoError(t, err)
 
-	// 2. Create Connection and Task via ConnectionService (this goes to database)
-	testConn, err := connService.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"})
+	// 2. Create Connection and Task via ConnectionQuery (this goes to database)
+	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"})
 	require.NoError(t, err)
 
-	testTask, err := taskService.CreateTask(ctx,
+	testTask, err := taskQuery.CreateTask(ctx,
 		"TestBidirectionalSync",
 		sourceDir,
 		testConn.ID,
@@ -182,10 +182,10 @@ func TestSyncEngine_RunTask_Bidirectional(t *testing.T) {
 
 	// 3. Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, dataDir, false, 0)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0)
 
 	// 4. Reload task with Connection edge before running
-	testTask, err = taskService.GetTaskWithConnection(ctx, testTask.ID)
+	testTask, err = taskQuery.GetTaskWithConnection(ctx, testTask.ID)
 	require.NoError(t, err)
 
 	// 5. Run the task - this should use DBStorage to read the connection config
@@ -204,7 +204,7 @@ func TestSyncEngine_RunTask_Bidirectional(t *testing.T) {
 	assert.NoError(t, err, "Destination file should be synced to source")
 
 	// Verify Job Status
-	jobs, err := jobService.ListJobs(ctx, &testTask.ID, nil, 10, 0)
+	jobs, err := jobQuery.ListJobs(ctx, &testTask.ID, nil, 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs, 1)
 	assert.Equal(t, string(model.JobStatusSuccess), string(jobs[0].Status))

@@ -16,19 +16,19 @@ import (
 // This allows rclone to read/write configuration directly from/to the database,
 // enabling automatic token refresh persistence.
 type DBStorage struct {
-	svc ports.ConnectionService
+	svc ports.ConnectionQuery
 	mu  sync.RWMutex
 }
 
 // NewDBStorage creates a new database-backed storage instance.
-func NewDBStorage(svc ports.ConnectionService) *DBStorage {
+func NewDBStorage(svc ports.ConnectionQuery) *DBStorage {
 	return &DBStorage{
 		svc: svc,
 	}
 }
 
 // Install sets this DBStorage as the active rclone configuration storage.
-// This should be called during application startup, after ConnectionService is initialized.
+// This should be called during application startup, after ConnectionQuery is initialized.
 // Note: Do NOT call configfile.Install() when using DBStorage.
 func (s *DBStorage) Install() {
 	config.SetData(s)

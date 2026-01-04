@@ -1,4 +1,4 @@
-package services
+package query
 
 import (
 	"context"
@@ -10,23 +10,23 @@ import (
 	"go.uber.org/zap"
 )
 
-// LogCleanupService provides operations for cleaning up old job logs.
-type LogCleanupService struct {
+// LogCleanupQuery provides operations for cleaning up old job logs.
+type LogCleanupQuery struct {
 	client   *ent.Client
 	logger   *zap.Logger
 	maxLogs  int
 	cron     *cron.Cron
 	entryID  cron.EntryID
-	jobSvc   *JobService
+	jobSvc   *JobQuery
 	connList func(ctx context.Context) ([]*ent.Connection, error)
 }
 
-// NewLogCleanupService creates a new LogCleanupService instance.
-func NewLogCleanupService(client *ent.Client, maxLogsPerConnection int) *LogCleanupService {
-	jobSvc := NewJobService(client)
-	return &LogCleanupService{
+// NewLogCleanupQuery creates a new LogCleanupQuery instance.
+func NewLogCleanupQuery(client *ent.Client, maxLogsPerConnection int) *LogCleanupQuery {
+	jobSvc := NewJobQuery(client)
+	return &LogCleanupQuery{
 		client:  client,
-		logger:  logger.Named("service.log_cleanup"),
+		logger:  logger.Named("query.log_cleanup"),
 		maxLogs: maxLogsPerConnection,
 		jobSvc:  jobSvc,
 		connList: func(ctx context.Context) ([]*ent.Connection, error) {
@@ -36,8 +36,8 @@ func NewLogCleanupService(client *ent.Client, maxLogsPerConnection int) *LogClea
 }
 
 // Start starts the log cleanup cron job with the given schedule.
-func (s *LogCleanupService) Start(schedule string) error {
-	s.logger.Info("Starting log cleanup service",
+func (s *LogCleanupQuery) Start(schedule string) error {
+	s.logger.Info("Starting log cleanup",
 		zap.String("schedule", schedule),
 		zap.Int("max_logs_per_connection", s.maxLogs))
 
@@ -57,21 +57,21 @@ func (s *LogCleanupService) Start(schedule string) error {
 	s.entryID = entryID
 	s.cron.Start()
 
-	s.logger.Info("Log cleanup service started")
+	s.logger.Info("Log cleanup started")
 	return nil
 }
 
 // Stop stops the log cleanup cron job.
-func (s *LogCleanupService) Stop() {
+func (s *LogCleanupQuery) Stop() {
 	if s.cron != nil {
-		s.logger.Info("Stopping log cleanup service")
+		s.logger.Info("Stopping log cleanup")
 		s.cron.Stop()
 		s.cron = nil
 	}
 }
 
 // CleanupLogs cleans up old logs for all connections.
-func (s *LogCleanupService) CleanupLogs(ctx context.Context) error {
+func (s *LogCleanupQuery) CleanupLogs(ctx context.Context) error {
 	s.logger.Info("Starting log cleanup for all connections")
 
 	// Get all connections
@@ -99,7 +99,7 @@ func (s *LogCleanupService) CleanupLogs(ctx context.Context) error {
 
 // CleanupLogsForConnection cleans up old logs for a specific connection.
 // Returns the number of logs deleted.
-func (s *LogCleanupService) CleanupLogsForConnection(ctx context.Context, connectionID uuid.UUID) error {
+func (s *LogCleanupQuery) CleanupLogsForConnection(ctx context.Context, connectionID uuid.UUID) error {
 	deleted, err := s.jobSvc.DeleteOldLogsForConnection(ctx, connectionID, s.maxLogs)
 	if err != nil {
 		return err

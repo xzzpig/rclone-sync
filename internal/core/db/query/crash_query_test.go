@@ -1,4 +1,4 @@
-package services_test
+package query_test
 
 import (
 	"context"
@@ -10,10 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
-	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
 	"github.com/xzzpig/rclone-sync/internal/core/db"
+	"github.com/xzzpig/rclone-sync/internal/core/db/query"
+	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
-	"github.com/xzzpig/rclone-sync/internal/core/services"
 )
 
 func TestCrashRecovery_ResetStuckJobs(t *testing.T) {
@@ -30,13 +30,13 @@ func TestCrashRecovery_ResetStuckJobs(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	jobSvc := services.NewJobService(client)
-	taskSvc := services.NewTaskService(client)
+	jobSvc := query.NewJobQuery(client)
+	taskSvc := query.NewTaskQuery(client)
 
 	// Create a test connection
 	encryptor, err := crypto.NewEncryptor("test-secret-key-32-bytes-long!!")
 	require.NoError(t, err)
-	connSvc := services.NewConnectionService(client, encryptor)
+	connSvc := query.NewConnectionQuery(client, encryptor)
 	testConn, err := connSvc.CreateConnection(ctx, "test-local", "local", map[string]string{
 		"type": "local",
 	})

@@ -29,10 +29,10 @@ func GetTaskRunner(c *gin.Context) (ports.Runner, error) {
 	return getContextValue[ports.Runner](c, ContextKeyTaskRunner)
 }
 
-// GetJobService retrieves the JobService from the gin context
-// Returns an error if the JobService is not found
-func GetJobService(c *gin.Context) (ports.JobService, error) {
-	return getContextValue[ports.JobService](c, ContextKeyJobService)
+// GetJobQuery retrieves the JobQuery from the gin context
+// Returns an error if the JobQuery is not found
+func GetJobQuery(c *gin.Context) (ports.JobQuery, error) {
+	return getContextValue[ports.JobQuery](c, ContextKeyJobQuery)
 }
 
 // GetWatcher retrieves the Watcher from the gin context

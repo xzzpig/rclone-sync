@@ -19,11 +19,11 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/subscription"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/db"
+	"github.com/xzzpig/rclone-sync/internal/core/db/query"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 	"github.com/xzzpig/rclone-sync/internal/core/ports"
 	"github.com/xzzpig/rclone-sync/internal/core/runner"
-	"github.com/xzzpig/rclone-sync/internal/core/services"
 	"github.com/xzzpig/rclone-sync/internal/rclone"
 )
 
@@ -41,17 +41,17 @@ func setupHandlerTest(t *testing.T) (*gin.Engine, *ent.Client, func()) {
 
 	appDataDir := t.TempDir()
 
-	jobService := services.NewJobService(client)
-	taskService := services.NewTaskService(client)
+	jobQuery := query.NewJobQuery(client)
+	taskQuery := query.NewTaskQuery(client)
 
 	encryptor, err := crypto.NewEncryptor("test-encryption-key-32-bytes!!")
 	require.NoError(t, err)
-	connectionService := services.NewConnectionService(client, encryptor)
+	connectionQuery := query.NewConnectionQuery(client, encryptor)
 
-	storage := rclone.NewDBStorage(connectionService)
+	storage := rclone.NewDBStorage(connectionQuery)
 	storage.Install()
 
-	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, appDataDir, false, 0)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, appDataDir, false, 0)
 	runnerInstance := runner.NewRunner(syncEngine)
 
 	mockWatcher := &mockWatcher{}
@@ -60,15 +60,15 @@ func setupHandlerTest(t *testing.T) (*gin.Engine, *ent.Client, func()) {
 	jobProgressBus := subscription.NewJobProgressBus()
 
 	deps := &resolver.Dependencies{
-		SyncEngine:        syncEngine,
-		Runner:            runnerInstance,
-		JobService:        jobService,
-		Watcher:           mockWatcher,
-		Scheduler:         mockScheduler,
-		TaskService:       taskService,
-		ConnectionService: connectionService,
-		Encryptor:         encryptor,
-		JobProgressBus:    jobProgressBus,
+		SyncEngine:      syncEngine,
+		Runner:          runnerInstance,
+		JobQuery:        jobQuery,
+		Watcher:         mockWatcher,
+		Scheduler:       mockScheduler,
+		TaskQuery:       taskQuery,
+		ConnectionQuery: connectionQuery,
+		Encryptor:       encryptor,
+		JobProgressBus:  jobProgressBus,
 	}
 
 	srv := graphql.NewHandler(deps)
@@ -188,11 +188,11 @@ func TestHandler_ConnectionQuery(t *testing.T) {
 
 	// Create a test connection
 	encryptor, _ := crypto.NewEncryptor("test-encryption-key-32-bytes!!")
-	connectionService := services.NewConnectionService(client, encryptor)
-	storage := rclone.NewDBStorage(connectionService)
+	connectionQuery := query.NewConnectionQuery(client, encryptor)
+	storage := rclone.NewDBStorage(connectionQuery)
 	storage.Install()
 
-	_, err := connectionService.CreateConnection(context.Background(), "test-conn", "local", map[string]string{
+	_, err := connectionQuery.CreateConnection(context.Background(), "test-conn", "local", map[string]string{
 		"type": "local",
 	})
 	require.NoError(t, err)

@@ -25,7 +25,7 @@ func TestJobResolverSuite(t *testing.T) {
 // createTestJob creates a test job for a task and returns the job ID.
 func (s *JobResolverTestSuite) createTestJob(taskID uuid.UUID) uuid.UUID {
 	ctx := context.Background()
-	job, err := s.Env.JobService.CreateJob(ctx, taskID, "MANUAL")
+	job, err := s.Env.JobQuery.CreateJob(ctx, taskID, "MANUAL")
 	require.NoError(s.T(), err)
 	return job.ID
 }
@@ -143,7 +143,7 @@ func (s *JobResolverTestSuite) TestJobQuery_ListWithPagination() {
 				CreateFunc: func(env *TestEnv, t *testing.T, i int) {
 					t.Helper()
 					ctx := context.Background()
-					job, err := env.JobService.CreateJob(ctx, task.ID, "MANUAL")
+					job, err := env.JobQuery.CreateJob(ctx, task.ID, "MANUAL")
 					require.NoError(t, err)
 					_ = job.ID
 				},
@@ -199,7 +199,7 @@ func (s *JobResolverTestSuite) TestJob_Logs() {
 	// Add some logs to the job
 	ctx := context.Background()
 	for i := 0; i < 3; i++ {
-		_, err := s.Env.JobService.AddJobLog(ctx, jobID, "INFO", "UPLOAD", "/test/path", 1024)
+		_, err := s.Env.JobQuery.AddJobLog(ctx, jobID, "INFO", "UPLOAD", "/test/path", 1024)
 		require.NoError(s.T(), err)
 	}
 
@@ -287,7 +287,7 @@ func (s *JobResolverTestSuite) TestLogQuery_List() {
 	// Add logs
 	ctx := context.Background()
 	for i := 0; i < 5; i++ {
-		_, err := s.Env.JobService.AddJobLog(ctx, jobID, "INFO", "UPLOAD", "/test/path", 1024)
+		_, err := s.Env.JobQuery.AddJobLog(ctx, jobID, "INFO", "UPLOAD", "/test/path", 1024)
 		require.NoError(s.T(), err)
 	}
 
@@ -333,7 +333,7 @@ func (s *JobResolverTestSuite) TestLogQuery_ListWithPagination() {
 	// Add logs
 	ctx := context.Background()
 	for i := 0; i < 10; i++ {
-		_, err := s.Env.JobService.AddJobLog(ctx, jobID, "INFO", "UPLOAD", "/test/path", 1024)
+		_, err := s.Env.JobQuery.AddJobLog(ctx, jobID, "INFO", "UPLOAD", "/test/path", 1024)
 		require.NoError(s.T(), err)
 	}
 
@@ -380,7 +380,7 @@ func (s *JobResolverTestSuite) TestJobLog_Job() {
 
 	// Add a log
 	ctx := context.Background()
-	_, err := s.Env.JobService.AddJobLog(ctx, jobID, "INFO", "UPLOAD", "/test/path", 1024)
+	_, err := s.Env.JobQuery.AddJobLog(ctx, jobID, "INFO", "UPLOAD", "/test/path", 1024)
 	require.NoError(s.T(), err)
 
 	query := `
@@ -682,7 +682,7 @@ func (s *JobResolverTestSuite) TestJob_LogsWithPagination() {
 	// Add 10 logs to job
 	ctx := context.Background()
 	for i := 0; i < 10; i++ {
-		_, err := s.Env.JobService.AddJobLog(ctx, jobID, "INFO", "UPLOAD", fmt.Sprintf("/test/path%d", i), 1024)
+		_, err := s.Env.JobQuery.AddJobLog(ctx, jobID, "INFO", "UPLOAD", fmt.Sprintf("/test/path%d", i), 1024)
 		require.NoError(s.T(), err)
 	}
 
@@ -754,11 +754,11 @@ func (s *JobResolverTestSuite) TestLogQuery_ListWithLevel() {
 
 	// Add logs with different levels
 	ctx := context.Background()
-	_, err := s.Env.JobService.AddJobLog(ctx, jobID, "INFO", "UPLOAD", "/test/path1", 1024)
+	_, err := s.Env.JobQuery.AddJobLog(ctx, jobID, "INFO", "UPLOAD", "/test/path1", 1024)
 	require.NoError(s.T(), err)
-	_, err = s.Env.JobService.AddJobLog(ctx, jobID, "ERROR", "DOWNLOAD", "/test/path2", 2048)
+	_, err = s.Env.JobQuery.AddJobLog(ctx, jobID, "ERROR", "DOWNLOAD", "/test/path2", 2048)
 	require.NoError(s.T(), err)
-	_, err = s.Env.JobService.AddJobLog(ctx, jobID, "INFO", "UPLOAD", "/test/path3", 512)
+	_, err = s.Env.JobQuery.AddJobLog(ctx, jobID, "INFO", "UPLOAD", "/test/path3", 512)
 	require.NoError(s.T(), err)
 
 	query := `
@@ -806,9 +806,9 @@ func (s *JobResolverTestSuite) TestLogQuery_ListWithTaskFilter() {
 
 	// Add logs for each job
 	ctx := context.Background()
-	_, err := s.Env.JobService.AddJobLog(ctx, jobID1, "INFO", "UPLOAD", "/task1/path", 1024)
+	_, err := s.Env.JobQuery.AddJobLog(ctx, jobID1, "INFO", "UPLOAD", "/task1/path", 1024)
 	require.NoError(s.T(), err)
-	_, err = s.Env.JobService.AddJobLog(ctx, jobID2, "INFO", "UPLOAD", "/task2/path", 2048)
+	_, err = s.Env.JobQuery.AddJobLog(ctx, jobID2, "INFO", "UPLOAD", "/task2/path", 2048)
 	require.NoError(s.T(), err)
 
 	query := `
@@ -846,7 +846,7 @@ func (s *JobResolverTestSuite) TestJobLog_AllFields() {
 
 	// Add a log with specific values
 	ctx := context.Background()
-	_, err := s.Env.JobService.AddJobLog(ctx, jobID, "WARNING", "DELETE", "/special/file.txt", 4096)
+	_, err := s.Env.JobQuery.AddJobLog(ctx, jobID, "WARNING", "DELETE", "/special/file.txt", 4096)
 	require.NoError(s.T(), err)
 
 	query := `
@@ -898,7 +898,7 @@ func (s *JobResolverTestSuite) TestJob_EndTimeFieldForCompletedJob() {
 
 	// Update job to SUCCESS status
 	ctx := context.Background()
-	_, err := s.Env.JobService.UpdateJobStatus(ctx, jobID, "SUCCESS", "")
+	_, err := s.Env.JobQuery.UpdateJobStatus(ctx, jobID, "SUCCESS", "")
 	require.NoError(s.T(), err)
 
 	query := `
@@ -940,7 +940,7 @@ func (s *JobResolverTestSuite) TestJob_ErrorsFieldForFailedJob() {
 
 	// Update job to FAILED status with error message
 	ctx := context.Background()
-	_, err := s.Env.JobService.UpdateJobStatus(ctx, jobID, "FAILED", "Connection timeout")
+	_, err := s.Env.JobQuery.UpdateJobStatus(ctx, jobID, "FAILED", "Connection timeout")
 	require.NoError(s.T(), err)
 
 	query := `

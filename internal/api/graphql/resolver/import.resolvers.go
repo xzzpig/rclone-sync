@@ -55,18 +55,18 @@ func (r *importMutationResolver) Execute(ctx context.Context, obj *model.ImportM
 
 	for _, connInput := range input.Connections {
 		// Check if connection already exists
-		existing, err := r.deps.ConnectionService.GetConnectionByName(ctx, connInput.Name)
+		existing, err := r.deps.ConnectionQuery.GetConnectionByName(ctx, connInput.Name)
 		if err == nil && existing != nil {
 			// Connection exists
 			if input.Overwrite {
 				// Update existing connection
-				err := r.deps.ConnectionService.UpdateConnection(ctx, existing.ID, nil, &connInput.Type, connInput.Config)
+				err := r.deps.ConnectionQuery.UpdateConnection(ctx, existing.ID, nil, &connInput.Type, connInput.Config)
 				if err != nil {
 					return nil, err
 				}
 				updatedCount++
 				// Add to result (refetch to get updated info)
-				updated, err := r.deps.ConnectionService.GetConnectionByName(ctx, connInput.Name)
+				updated, err := r.deps.ConnectionQuery.GetConnectionByName(ctx, connInput.Name)
 				if err == nil && updated != nil {
 					importedConns = append(importedConns, &model.Connection{
 						ID:        updated.ID,
@@ -82,7 +82,7 @@ func (r *importMutationResolver) Execute(ctx context.Context, obj *model.ImportM
 		}
 
 		// Create new connection
-		conn, err := r.deps.ConnectionService.CreateConnection(ctx, connInput.Name, connInput.Type, connInput.Config)
+		conn, err := r.deps.ConnectionQuery.CreateConnection(ctx, connInput.Name, connInput.Type, connInput.Config)
 		if err != nil {
 			return nil, err
 		}

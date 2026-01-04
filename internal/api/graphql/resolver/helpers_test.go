@@ -131,7 +131,7 @@ func (s *HelpersTestSuite) TestEntJobToModel() {
 	task := s.Env.CreateTestTask(s.T(), "test-task", connID)
 
 	// Create a job
-	job, err := s.Env.JobService.CreateJob(s.T().Context(), task.ID, "MANUAL")
+	job, err := s.Env.JobQuery.CreateJob(s.T().Context(), task.ID, "MANUAL")
 	require.NoError(s.T(), err)
 
 	query := `
@@ -178,10 +178,10 @@ func (s *HelpersTestSuite) TestEntJobToModelWithErrors() {
 	task := s.Env.CreateTestTask(s.T(), "test-task", connID)
 
 	// Create a job and update it with error
-	job, err := s.Env.JobService.CreateJob(s.T().Context(), task.ID, model.JobTriggerManual)
+	job, err := s.Env.JobQuery.CreateJob(s.T().Context(), task.ID, model.JobTriggerManual)
 	require.NoError(s.T(), err)
 
-	_, err = s.Env.JobService.UpdateJobStatus(s.T().Context(), job.ID, "FAILED", "Test error message")
+	_, err = s.Env.JobQuery.UpdateJobStatus(s.T().Context(), job.ID, "FAILED", "Test error message")
 	require.NoError(s.T(), err)
 
 	query := `
@@ -220,10 +220,10 @@ func (s *HelpersTestSuite) TestEntJobToModelWithEndTime() {
 	task := s.Env.CreateTestTask(s.T(), "test-task", connID)
 
 	// Create a job and complete it
-	job, err := s.Env.JobService.CreateJob(s.T().Context(), task.ID, model.JobTriggerSchedule)
+	job, err := s.Env.JobQuery.CreateJob(s.T().Context(), task.ID, model.JobTriggerSchedule)
 	require.NoError(s.T(), err)
 
-	_, err = s.Env.JobService.UpdateJobStatus(s.T().Context(), job.ID, "SUCCESS", "")
+	_, err = s.Env.JobQuery.UpdateJobStatus(s.T().Context(), job.ID, "SUCCESS", "")
 	require.NoError(s.T(), err)
 
 	query := `
@@ -263,10 +263,10 @@ func (s *HelpersTestSuite) TestEntJobLogToModel() {
 	task := s.Env.CreateTestTask(s.T(), "test-task", connID)
 
 	// Create a job and add logs
-	job, err := s.Env.JobService.CreateJob(s.T().Context(), task.ID, "MANUAL")
+	job, err := s.Env.JobQuery.CreateJob(s.T().Context(), task.ID, "MANUAL")
 	require.NoError(s.T(), err)
 
-	_, err = s.Env.JobService.AddJobLog(s.T().Context(), job.ID, "INFO", "UPLOAD", "/test/path/file.txt", 1024)
+	_, err = s.Env.JobQuery.AddJobLog(s.T().Context(), job.ID, "INFO", "UPLOAD", "/test/path/file.txt", 1024)
 	require.NoError(s.T(), err)
 
 	query := `
@@ -310,10 +310,10 @@ func (s *HelpersTestSuite) TestEntJobLogToModelWithJobReference() {
 	task := s.Env.CreateTestTask(s.T(), "test-task", connID)
 
 	// Create a job and add logs
-	job, err := s.Env.JobService.CreateJob(s.T().Context(), task.ID, "MANUAL")
+	job, err := s.Env.JobQuery.CreateJob(s.T().Context(), task.ID, "MANUAL")
 	require.NoError(s.T(), err)
 
-	_, err = s.Env.JobService.AddJobLog(s.T().Context(), job.ID, "ERROR", "DOWNLOAD", "/error/path", 0)
+	_, err = s.Env.JobQuery.AddJobLog(s.T().Context(), job.ID, "ERROR", "DOWNLOAD", "/error/path", 0)
 	require.NoError(s.T(), err)
 
 	query := `
@@ -356,7 +356,7 @@ func (s *HelpersTestSuite) TestJobTriggersConversion() {
 	triggers := []model.JobTrigger{model.JobTriggerManual, model.JobTriggerSchedule, model.JobTriggerRealtime}
 
 	for _, trigger := range triggers {
-		job, err := s.Env.JobService.CreateJob(s.T().Context(), task.ID, trigger)
+		job, err := s.Env.JobQuery.CreateJob(s.T().Context(), task.ID, trigger)
 		require.NoError(s.T(), err)
 
 		query := `
@@ -464,7 +464,7 @@ func (s *HelpersTestSuite) TestTaskIDInJob() {
 	connID := s.Env.CreateTestConnection(s.T(), "conn-for-job")
 	task := s.Env.CreateTestTask(s.T(), "task-for-job", connID)
 
-	job, err := s.Env.JobService.CreateJob(s.T().Context(), task.ID, "MANUAL")
+	job, err := s.Env.JobQuery.CreateJob(s.T().Context(), task.ID, "MANUAL")
 	require.NoError(s.T(), err)
 
 	query := `
@@ -502,10 +502,10 @@ func (s *HelpersTestSuite) TestJobIDInJobLog() {
 	connID := s.Env.CreateTestConnection(s.T(), "conn-for-log")
 	task := s.Env.CreateTestTask(s.T(), "task-for-log", connID)
 
-	job, err := s.Env.JobService.CreateJob(s.T().Context(), task.ID, "MANUAL")
+	job, err := s.Env.JobQuery.CreateJob(s.T().Context(), task.ID, "MANUAL")
 	require.NoError(s.T(), err)
 
-	_, err = s.Env.JobService.AddJobLog(s.T().Context(), job.ID, "INFO", "UPLOAD", "/log/path", 512)
+	_, err = s.Env.JobQuery.AddJobLog(s.T().Context(), job.ID, "INFO", "UPLOAD", "/log/path", 512)
 	require.NoError(s.T(), err)
 
 	query := `

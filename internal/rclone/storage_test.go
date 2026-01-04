@@ -7,14 +7,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
-	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
 	"github.com/xzzpig/rclone-sync/internal/core/db"
-	"github.com/xzzpig/rclone-sync/internal/core/services"
+	"github.com/xzzpig/rclone-sync/internal/core/db/query"
+	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func setupStorageTest(t *testing.T) (*DBStorage, *services.ConnectionService) {
+func setupStorageTest(t *testing.T) (*DBStorage, *query.ConnectionQuery) {
 	t.Helper()
 
 	// Create test database client
@@ -25,8 +25,8 @@ func setupStorageTest(t *testing.T) (*DBStorage, *services.ConnectionService) {
 	encryptor, err := crypto.NewEncryptor("")
 	require.NoError(t, err)
 
-	// Create connection service
-	connSvc := services.NewConnectionService(client, encryptor)
+	// Create connection query
+	connSvc := query.NewConnectionQuery(client, encryptor)
 
 	// Create DBStorage
 	storage := NewDBStorage(connSvc)
@@ -328,7 +328,7 @@ func TestDBStorage_SetValue_UpdateType(t *testing.T) {
 	assert.Equal(t, "alias", value)
 }
 
-// TestDBStorage_GetSectionList_Empty tests GetSectionList when service returns error
+// TestDBStorage_GetSectionList_Empty tests GetSectionList when query returns error
 func TestDBStorage_GetSectionList_Empty(t *testing.T) {
 	storage, _ := setupStorageTest(t)
 

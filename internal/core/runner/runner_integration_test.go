@@ -16,24 +16,24 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/db"
+	"github.com/xzzpig/rclone-sync/internal/core/db/query"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 	"github.com/xzzpig/rclone-sync/internal/core/runner"
-	"github.com/xzzpig/rclone-sync/internal/core/services"
 	"github.com/xzzpig/rclone-sync/internal/rclone"
 	"github.com/xzzpig/rclone-sync/internal/rclone/testutil"
 )
 
 // testContext holds all the components needed for integration tests.
 type testContext struct {
-	client      *ent.Client
-	jobService  *services.JobService
-	taskService *services.TaskService
-	connService *services.ConnectionService
-	syncEngine  *rclone.SyncEngine
-	runner      *runner.Runner
-	dataDir     string
-	cleanup     func()
+	client     *ent.Client
+	jobQuery   *query.JobQuery
+	taskQuery  *query.TaskQuery
+	connQuery  *query.ConnectionQuery
+	syncEngine *rclone.SyncEngine
+	runner     *runner.Runner
+	dataDir    string
+	cleanup    func()
 }
 
 type setupOption func(*setupOptions)
@@ -73,22 +73,22 @@ func setupIntegrationTest(t *testing.T, opts ...setupOption) *testContext {
 	})
 	require.NoError(t, err)
 
-	// Create services
-	jobService := services.NewJobService(client)
-	taskService := services.NewTaskService(client)
+	// Create queries
+	jobQuery := query.NewJobQuery(client)
+	taskQuery := query.NewTaskQuery(client)
 	encryptor, err := crypto.NewEncryptor("test-secret-key-32-bytes-long!!")
 	require.NoError(t, err)
-	connService := services.NewConnectionService(client, encryptor)
+	connQuery := query.NewConnectionQuery(client, encryptor)
 
 	// Setup data directory
 	dataDir := t.TempDir()
 
 	// Install DBStorage for rclone configuration
-	storage := rclone.NewDBStorage(connService)
+	storage := rclone.NewDBStorage(connQuery)
 	storage.Install()
 
 	// Create SyncEngine and Runner
-	syncEngine := rclone.NewSyncEngine(jobService, nil, nil, dataDir, false, 0)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0)
 	r := runner.NewRunner(syncEngine)
 
 	cleanup := func() {
@@ -100,14 +100,14 @@ func setupIntegrationTest(t *testing.T, opts ...setupOption) *testContext {
 	}
 
 	return &testContext{
-		client:      client,
-		jobService:  jobService,
-		taskService: taskService,
-		connService: connService,
-		syncEngine:  syncEngine,
-		runner:      r,
-		dataDir:     dataDir,
-		cleanup:     cleanup,
+		client:     client,
+		jobQuery:   jobQuery,
+		taskQuery:  taskQuery,
+		connQuery:  connQuery,
+		syncEngine: syncEngine,
+		runner:     r,
+		dataDir:    dataDir,
+		cleanup:    cleanup,
 	}
 }
 
@@ -117,14 +117,14 @@ func createTestTask(t *testing.T, tc *testContext, name, sourceDir, destDir stri
 	ctx := context.Background()
 
 	// Create or get local connection
-	conn, err := tc.connService.GetConnectionByName(ctx, "local")
+	conn, err := tc.connQuery.GetConnectionByName(ctx, "local")
 	if err != nil {
-		conn, err = tc.connService.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"})
+		conn, err = tc.connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"})
 		require.NoError(t, err)
 	}
 
 	// Create task
-	task, err := tc.taskService.CreateTask(ctx,
+	task, err := tc.taskQuery.CreateTask(ctx,
 		name,
 		sourceDir,
 		conn.ID,
@@ -137,7 +137,7 @@ func createTestTask(t *testing.T, tc *testContext, name, sourceDir, destDir stri
 	require.NoError(t, err)
 
 	// Reload task with Connection edge
-	task, err = tc.taskService.GetTaskWithConnection(ctx, task.ID)
+	task, err = tc.taskQuery.GetTaskWithConnection(ctx, task.ID)
 	require.NoError(t, err)
 
 	return task
@@ -149,9 +149,9 @@ func createSlowTask(t *testing.T, tc *testContext, name, sourceDir, destDir stri
 	ctx := context.Background()
 
 	// Create slowfs connection
-	conn, err := tc.connService.GetConnectionByName(ctx, "slowlocal")
+	conn, err := tc.connQuery.GetConnectionByName(ctx, "slowlocal")
 	if err != nil {
-		conn, err = tc.connService.CreateConnection(ctx, "slowlocal", "slowfs", map[string]string{
+		conn, err = tc.connQuery.CreateConnection(ctx, "slowlocal", "slowfs", map[string]string{
 			"type":   "slowfs",
 			"remote": "/",
 		})
@@ -159,7 +159,7 @@ func createSlowTask(t *testing.T, tc *testContext, name, sourceDir, destDir stri
 	}
 
 	// Create task - source uses local path, destination uses slowfs connection
-	task, err := tc.taskService.CreateTask(ctx,
+	task, err := tc.taskQuery.CreateTask(ctx,
 		name,
 		sourceDir,
 		conn.ID,
@@ -172,7 +172,7 @@ func createSlowTask(t *testing.T, tc *testContext, name, sourceDir, destDir stri
 	require.NoError(t, err)
 
 	// Reload task with Connection edge
-	task, err = tc.taskService.GetTaskWithConnection(ctx, task.ID)
+	task, err = tc.taskQuery.GetTaskWithConnection(ctx, task.ID)
 	require.NoError(t, err)
 
 	return task
@@ -226,7 +226,7 @@ func TestRunner_Integration_BasicSyncFlow(t *testing.T) {
 	assert.Equal(t, "hello world", string(content))
 
 	// Verify job record
-	jobs, err := tc.jobService.ListJobs(context.Background(), &task.ID, nil, 10, 0)
+	jobs, err := tc.jobQuery.ListJobs(context.Background(), &task.ID, nil, 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs, 1, "Should have one job")
 	assert.Equal(t, string(model.JobStatusSuccess), string(jobs[0].Status), "Job should be successful")
@@ -274,12 +274,12 @@ func TestRunner_Integration_MultipleTasks(t *testing.T) {
 	assert.Equal(t, "task2", string(content2))
 
 	// Verify job records
-	jobs1, err := tc.jobService.ListJobs(context.Background(), &task1.ID, nil, 10, 0)
+	jobs1, err := tc.jobQuery.ListJobs(context.Background(), &task1.ID, nil, 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs1, 1)
 	assert.Equal(t, string(model.JobStatusSuccess), string(jobs1[0].Status))
 
-	jobs2, err := tc.jobService.ListJobs(context.Background(), &task2.ID, nil, 10, 0)
+	jobs2, err := tc.jobQuery.ListJobs(context.Background(), &task2.ID, nil, 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs2, 1)
 	assert.Equal(t, string(model.JobStatusSuccess), string(jobs2[0].Status))
@@ -326,7 +326,7 @@ func TestRunner_Cancel_StopRunningTaskMarksCancelled(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Check that the job is running
-	jobs, err := tc.jobService.ListJobs(context.Background(), &task.ID, nil, 10, 0)
+	jobs, err := tc.jobQuery.ListJobs(context.Background(), &task.ID, nil, 10, 0)
 	require.NoError(t, err)
 	require.Len(t, jobs, 1)
 	jobID := jobs[0].ID
@@ -341,7 +341,7 @@ func TestRunner_Cancel_StopRunningTaskMarksCancelled(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 
 	// Check job status
-	jobs, err = tc.jobService.ListJobs(context.Background(), &task.ID, nil, 10, 0)
+	jobs, err = tc.jobQuery.ListJobs(context.Background(), &task.ID, nil, 10, 0)
 	require.NoError(t, err)
 	require.Len(t, jobs, 1)
 	assert.Equal(t, jobID, jobs[0].ID)
@@ -426,7 +426,7 @@ func TestRunner_Integration_TaskExecutionError(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Verify job has failed status
-	jobs, err := tc.jobService.ListJobs(context.Background(), &task.ID, nil, 10, 0)
+	jobs, err := tc.jobQuery.ListJobs(context.Background(), &task.ID, nil, 10, 0)
 	require.NoError(t, err)
 	assert.Len(t, jobs, 1, "Should have one job")
 	assert.Equal(t, string(model.JobStatusFailed), string(jobs[0].Status), "Job should have failed status")
@@ -479,7 +479,7 @@ func TestRunner_Integration_ConcurrentStartStop(t *testing.T) {
 	_ = tc.runner.IsRunning(task.ID)
 
 	// Verify jobs were created (count may vary due to race conditions)
-	jobs, err := tc.jobService.ListJobs(context.Background(), &task.ID, nil, 100, 0)
+	jobs, err := tc.jobQuery.ListJobs(context.Background(), &task.ID, nil, 100, 0)
 	require.NoError(t, err)
 	t.Logf("Created %d jobs during concurrent operations", len(jobs))
 	assert.NotEmpty(t, jobs, "Should have created at least one job")
@@ -516,7 +516,7 @@ func TestRunner_Integration_DifferentTriggerTypes(t *testing.T) {
 			assert.True(t, completed, "Task should complete")
 
 			// Verify trigger type is recorded correctly
-			jobs, err := tc.jobService.ListJobs(context.Background(), &task.ID, nil, 10, 0)
+			jobs, err := tc.jobQuery.ListJobs(context.Background(), &task.ID, nil, 10, 0)
 			require.NoError(t, err)
 			assert.Len(t, jobs, 1)
 			assert.Equal(t, trigger, jobs[0].Trigger, "Trigger type should match")
@@ -618,7 +618,7 @@ func TestRunner_Integration_TriggerBehaviorWhenRunning(t *testing.T) {
 			time.Sleep(100 * time.Millisecond)
 
 			// Check first job is running
-			jobs, err := tc.jobService.ListJobs(context.Background(), &task.ID, nil, 10, 0)
+			jobs, err := tc.jobQuery.ListJobs(context.Background(), &task.ID, nil, 10, 0)
 			require.NoError(t, err)
 			require.Len(t, jobs, 1)
 			firstJobID := jobs[0].ID
@@ -630,7 +630,7 @@ func TestRunner_Integration_TriggerBehaviorWhenRunning(t *testing.T) {
 			time.Sleep(500 * time.Millisecond)
 
 			// Check job statuses
-			jobs, err = tc.jobService.ListJobs(context.Background(), &task.ID, nil, 10, 0)
+			jobs, err = tc.jobQuery.ListJobs(context.Background(), &task.ID, nil, 10, 0)
 			require.NoError(t, err)
 
 			var firstJob *ent.Job
@@ -662,7 +662,7 @@ func TestRunner_Integration_TriggerBehaviorWhenRunning(t *testing.T) {
 
 			// Final check - should have at least one successful job
 			time.Sleep(200 * time.Millisecond)
-			jobs, err = tc.jobService.ListJobs(context.Background(), &task.ID, nil, 10, 0)
+			jobs, err = tc.jobQuery.ListJobs(context.Background(), &task.ID, nil, 10, 0)
 			require.NoError(t, err)
 			hasSuccess := false
 			for _, j := range jobs {
@@ -705,7 +705,7 @@ func TestRunner_Integration_RapidStartStop(t *testing.T) {
 	assert.True(t, completed, "Final task should complete")
 
 	// Verify jobs were created
-	jobs, err := tc.jobService.ListJobs(context.Background(), &task.ID, nil, 100, 0)
+	jobs, err := tc.jobQuery.ListJobs(context.Background(), &task.ID, nil, 100, 0)
 	require.NoError(t, err)
 	assert.NotEmpty(t, jobs, "Should have created jobs")
 	t.Logf("Created %d jobs during rapid start/stop sequence", len(jobs))

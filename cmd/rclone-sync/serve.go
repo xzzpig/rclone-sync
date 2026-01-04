@@ -19,10 +19,10 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/config"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/db"
+	"github.com/xzzpig/rclone-sync/internal/core/db/query"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 	"github.com/xzzpig/rclone-sync/internal/core/runner"
 	"github.com/xzzpig/rclone-sync/internal/core/scheduler"
-	"github.com/xzzpig/rclone-sync/internal/core/services"
 	"github.com/xzzpig/rclone-sync/internal/core/watcher"
 	"github.com/xzzpig/rclone-sync/internal/i18n"
 	"github.com/xzzpig/rclone-sync/internal/rclone"
@@ -80,17 +80,17 @@ var serveCmd = &cobra.Command{
 			log.Fatal("Failed to initialize encryptor", zap.Error(err))
 		}
 
-		// 6. Initialize connection service and DBStorage
-		connSvc := services.NewConnectionService(dbClient, encryptor)
+		// 6. Initialize connection query and DBStorage
+		connSvc := query.NewConnectionQuery(dbClient, encryptor)
 		dbStorage := rclone.NewDBStorage(connSvc)
 		dbStorage.Install()
 		log.Info("DBStorage installed - rclone will use database for configuration")
 
 		// Note: rclone.InitConfig is no longer needed as DBStorage replaces it
 
-		// 7. Initialize services
-		taskSvc := services.NewTaskService(dbClient)
-		jobSvc := services.NewJobService(dbClient)
+		// 7. Initialize queries
+		taskSvc := query.NewTaskQuery(dbClient)
+		jobSvc := query.NewJobQuery(dbClient)
 		jobProgressBus := subscription.NewJobProgressBus()
 		transferProgressBus := subscription.NewTransferProgressBus()
 		syncEngine := rclone.NewSyncEngine(jobSvc, jobProgressBus, transferProgressBus, cfg.App.DataDir, cfg.App.Job.AutoDeleteEmptyJobs, cfg.App.Sync.Transfers)
@@ -114,11 +114,11 @@ var serveCmd = &cobra.Command{
 		watch.Start()
 		defer watch.Stop()
 
-		// 10. Initialize and start log cleanup service
+		// 10. Initialize and start log cleanup query
 		if cfg.App.Job.MaxLogsPerConnection > 0 && cfg.App.Job.CleanupSchedule != "" {
-			logCleanupSvc := services.NewLogCleanupService(dbClient, cfg.App.Job.MaxLogsPerConnection)
+			logCleanupSvc := query.NewLogCleanupQuery(dbClient, cfg.App.Job.MaxLogsPerConnection)
 			if err := logCleanupSvc.Start(cfg.App.Job.CleanupSchedule); err != nil {
-				log.Fatal("Failed to start log cleanup service", zap.Error(err))
+				log.Fatal("Failed to start log cleanup query", zap.Error(err))
 			}
 			defer logCleanupSvc.Stop()
 		}
@@ -129,7 +129,7 @@ var serveCmd = &cobra.Command{
 			Config:              cfg,
 			SyncEngine:          syncEngine,
 			Runner:              taskRunner,
-			JobService:          jobSvc,
+			JobQuery:            jobSvc,
 			Watcher:             watch,
 			Scheduler:           sched,
 			JobProgressBus:      jobProgressBus,

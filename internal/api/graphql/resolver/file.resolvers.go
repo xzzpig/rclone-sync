@@ -24,7 +24,7 @@ func (r *fileQueryResolver) List(ctx context.Context, obj *model.FileQuery, conn
 	// Determine remote name: empty for local, connection name for remote
 	var remoteName string
 	if connectionID != nil {
-		conn, err := r.deps.ConnectionService.GetConnectionByID(ctx, *connectionID)
+		conn, err := r.deps.ConnectionQuery.GetConnectionByID(ctx, *connectionID)
 		if err != nil {
 			return nil, err
 		}

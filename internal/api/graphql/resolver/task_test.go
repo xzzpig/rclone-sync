@@ -863,7 +863,7 @@ func (s *TaskResolverTestSuite) TestTask_Jobs() {
 	// Create some jobs for the task
 	ctx := context.Background()
 	for i := 0; i < 3; i++ {
-		_, err := s.Env.JobService.CreateJob(ctx, task.ID, "MANUAL")
+		_, err := s.Env.JobQuery.CreateJob(ctx, task.ID, "MANUAL")
 		require.NoError(s.T(), err)
 	}
 
@@ -904,7 +904,7 @@ func (s *TaskResolverTestSuite) TestTask_LatestJob() {
 	ctx := context.Background()
 	var lastJobID uuid.UUID
 	for i := 0; i < 3; i++ {
-		job, err := s.Env.JobService.CreateJob(ctx, task.ID, "MANUAL")
+		job, err := s.Env.JobQuery.CreateJob(ctx, task.ID, "MANUAL")
 		require.NoError(s.T(), err)
 		lastJobID = job.ID
 	}
@@ -1147,7 +1147,7 @@ func (s *TaskResolverTestSuite) TestTask_JobsWithPagination() {
 	// Create 10 jobs for this task
 	ctx := context.Background()
 	for i := 0; i < 10; i++ {
-		_, err := s.Env.JobService.CreateJob(ctx, task.ID, "MANUAL")
+		_, err := s.Env.JobQuery.CreateJob(ctx, task.ID, "MANUAL")
 		require.NoError(s.T(), err)
 	}
 
@@ -1243,7 +1243,7 @@ func (s *TaskResolverTestSuite) TestTaskMutation_DeleteWithJobs() {
 
 	// Create a job for this task
 	ctx := context.Background()
-	_, err := s.Env.JobService.CreateJob(ctx, task.ID, "MANUAL")
+	_, err := s.Env.JobQuery.CreateJob(ctx, task.ID, "MANUAL")
 	require.NoError(s.T(), err)
 
 	// Delete the task
@@ -1421,7 +1421,7 @@ func (s *TaskResolverTestSuite) TestTask_AllFields() {
 
 	// Create a job
 	ctx := context.Background()
-	_, err := s.Env.JobService.CreateJob(ctx, uuid.MustParse(taskID), "MANUAL")
+	_, err := s.Env.JobQuery.CreateJob(ctx, uuid.MustParse(taskID), "MANUAL")
 	require.NoError(s.T(), err)
 
 	query := `

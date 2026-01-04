@@ -48,7 +48,7 @@ type SyncOptions struct {
 
 // SyncEngine handles file synchronization operations using rclone.
 type SyncEngine struct {
-	jobService          ports.JobService
+	jobQuery            ports.JobQuery
 	jobProgressBus      *subscription.JobProgressBus
 	transferProgressBus *subscription.TransferProgressBus
 	logger              *zap.Logger
@@ -66,13 +66,13 @@ const DefaultTransfers = 4
 // NewSyncEngine creates a new SyncEngine instance.
 // defaultTransfers specifies the global default for parallel transfers (from config).
 // If defaultTransfers is 0 or negative, DefaultTransfers (4) will be used.
-func NewSyncEngine(jobService ports.JobService, jobProgressBus *subscription.JobProgressBus, transferProgressBus *subscription.TransferProgressBus, dataDir string, autoDeleteEmptyJobs bool, defaultTransfers int) *SyncEngine {
+func NewSyncEngine(jobQuery ports.JobQuery, jobProgressBus *subscription.JobProgressBus, transferProgressBus *subscription.TransferProgressBus, dataDir string, autoDeleteEmptyJobs bool, defaultTransfers int) *SyncEngine {
 	workDir := filepath.Join(dataDir, "bisync_state")
 	if defaultTransfers <= 0 {
 		defaultTransfers = DefaultTransfers
 	}
 	return &SyncEngine{
-		jobService:          jobService,
+		jobQuery:            jobQuery,
 		jobProgressBus:      jobProgressBus,
 		transferProgressBus: transferProgressBus,
 		logger:              logger.Named("sync.engine"),
@@ -138,7 +138,7 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger model.
 	connectionName := task.Edges.Connection.Name
 
 	// 1. Create Job record
-	jobEntity, err := e.jobService.CreateJob(ctx, task.ID, trigger)
+	jobEntity, err := e.jobQuery.CreateJob(ctx, task.ID, trigger)
 	if err != nil {
 		return errors.Join(errs.ErrSystem, errs.ConstError("failed to create job"), err)
 	}
@@ -154,7 +154,7 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger model.
 	e.logger.Info("Starting sync task", zap.String("task", task.Name), zap.String("job_id", jobEntity.ID.String()))
 
 	// 2. Update Job status to running
-	_, err = e.jobService.UpdateJobStatus(ctx, jobEntity.ID, string(model.JobStatusRunning), "")
+	_, err = e.jobQuery.UpdateJobStatus(ctx, jobEntity.ID, string(model.JobStatusRunning), "")
 	if err != nil {
 		return errors.Join(errs.ErrSystem, errs.ConstError("failed to update job status"), err)
 	}
@@ -238,12 +238,12 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger model.
 			if s != nil {
 				files, bytes, filesDeleted, errorCount = s.GetTransfers(), s.GetBytes(), s.GetDeletes(), s.GetErrors()
 				// Update job stats (like ResetStuckJobs does)
-				if _, updateErr := e.jobService.UpdateJobStats(dbCtx, jobEntity.ID, files, bytes, filesDeleted, errorCount); updateErr != nil {
+				if _, updateErr := e.jobQuery.UpdateJobStats(dbCtx, jobEntity.ID, files, bytes, filesDeleted, errorCount); updateErr != nil {
 					e.logger.Error("Failed to update job stats for cancelled job", zap.Error(updateErr))
 				}
 			}
 
-			if _, updateErr := e.jobService.UpdateJobStatus(dbCtx, jobEntity.ID, string(model.JobStatusCancelled), "Task cancelled by user or shutdown"); updateErr != nil {
+			if _, updateErr := e.jobQuery.UpdateJobStatus(dbCtx, jobEntity.ID, string(model.JobStatusCancelled), "Task cancelled by user or shutdown"); updateErr != nil {
 				e.logger.Error("Failed to update job status to cancelled", zap.Error(updateErr))
 			}
 
@@ -263,12 +263,12 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger model.
 			return syncErr
 		}
 
-		if _, updateErr := e.jobService.AddJobLog(ctx, jobEntity.ID, string(model.LogLevelError), string(model.LogActionError), syncErr.Error(), 0); updateErr != nil {
+		if _, updateErr := e.jobQuery.AddJobLog(ctx, jobEntity.ID, string(model.LogLevelError), string(model.LogActionError), syncErr.Error(), 0); updateErr != nil {
 			e.logger.Error("Failed to add job log for sync failure", zap.Error(updateErr))
 		}
 
 		e.logger.Error("Sync operation failed", zap.Error(syncErr))
-		if _, updateErr := e.jobService.UpdateJobStatus(ctx, jobEntity.ID, string(model.JobStatusFailed), syncErr.Error()); updateErr != nil {
+		if _, updateErr := e.jobQuery.UpdateJobStatus(ctx, jobEntity.ID, string(model.JobStatusFailed), syncErr.Error()); updateErr != nil {
 			e.logger.Error("Failed to update job status to failed", zap.Error(updateErr))
 		}
 		// Broadcast failure
@@ -295,12 +295,12 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger model.
 	var files, bytes, filesDeleted, errorCount int64
 	if s != nil {
 		files, bytes, filesDeleted, errorCount = s.GetTransfers(), s.GetBytes(), s.GetDeletes(), s.GetErrors()
-		if _, updateErr := e.jobService.UpdateJobStats(ctx, jobEntity.ID, files, bytes, filesDeleted, errorCount); updateErr != nil {
+		if _, updateErr := e.jobQuery.UpdateJobStats(ctx, jobEntity.ID, files, bytes, filesDeleted, errorCount); updateErr != nil {
 			e.logger.Error("Failed to update final job stats", zap.Error(updateErr))
 		}
 	}
 
-	if _, updateErr := e.jobService.UpdateJobStatus(ctx, jobEntity.ID, string(model.JobStatusSuccess), ""); updateErr != nil {
+	if _, updateErr := e.jobQuery.UpdateJobStatus(ctx, jobEntity.ID, string(model.JobStatusSuccess), ""); updateErr != nil {
 		e.logger.Error("Failed to update job status to success", zap.Error(updateErr))
 	}
 
@@ -321,7 +321,7 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger model.
 	// Auto-delete empty jobs if configured
 	if shouldDeleteEmptyJob(e.autoDeleteEmptyJobs, model.JobStatusSuccess, int(files), bytes, int(filesDeleted), int(errorCount)) {
 		e.logger.Debug("Auto-deleting empty job", zap.Stringer("job_id", jobEntity.ID))
-		if err := e.jobService.DeleteJob(ctx, jobEntity.ID); err != nil {
+		if err := e.jobQuery.DeleteJob(ctx, jobEntity.ID); err != nil {
 			// Log warning but don't fail the task - the job has already succeeded
 			e.logger.Warn("Failed to auto-delete empty job", zap.Stringer("job_id", jobEntity.ID), zap.Error(err))
 		} else {
@@ -334,7 +334,7 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger model.
 
 func (e *SyncEngine) failJob(ctx context.Context, jobID uuid.UUID, err error) {
 	e.logger.Error("Job failed during setup", zap.Error(err))
-	_, _ = e.jobService.UpdateJobStatus(ctx, jobID, string(model.JobStatusFailed), err.Error())
+	_, _ = e.jobQuery.UpdateJobStatus(ctx, jobID, string(model.JobStatusFailed), err.Error())
 }
 
 // shouldDeleteEmptyJob determines if a job should be deleted based on its configuration and result.
@@ -635,7 +635,7 @@ func (e *SyncEngine) processStats(ctx context.Context, jobID uuid.UUID, task *en
 	if len(logsToSave) > 0 {
 		// Use a separate context for DB operations to ensure they complete even if the job context is cancelling
 		dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		err := e.jobService.AddJobLogsBatch(dbCtx, jobID, logsToSave)
+		err := e.jobQuery.AddJobLogsBatch(dbCtx, jobID, logsToSave)
 		if err != nil {
 			e.logger.Error("Failed to save job logs", zap.Error(err))
 		}

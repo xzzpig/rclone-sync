@@ -15,7 +15,7 @@ import (
 
 func TestRecursiveWatcher_RecursiveAdd(t *testing.T) {
 	setupTest(t)
-	mockTaskSvc := new(MockTaskService)
+	mockTaskSvc := new(MockTaskQuery)
 	mockRunner := new(MockRunner)
 
 	// Create directory structure:
@@ -69,7 +69,7 @@ func TestRecursiveWatcher_RecursiveAdd(t *testing.T) {
 
 func TestRecursiveWatcher_DynamicAdd(t *testing.T) {
 	setupTest(t)
-	mockTaskSvc := new(MockTaskService)
+	mockTaskSvc := new(MockTaskQuery)
 	mockRunner := new(MockRunner)
 
 	rootDir := t.TempDir()

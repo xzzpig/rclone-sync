@@ -1,4 +1,4 @@
-package services
+package query
 
 import (
 	"context"
@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
+	"github.com/xzzpig/rclone-sync/internal/core/db"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
-	"github.com/xzzpig/rclone-sync/internal/core/db"
 )
 
 // setupTestDB creates a test database and returns the client
@@ -27,13 +27,13 @@ func setupTestEncryptor(t *testing.T) *crypto.Encryptor {
 	return encryptor
 }
 
-// T015: 单元测试：ConnectionService.CreateConnection
-func TestConnectionService_CreateConnection(t *testing.T) {
+// T015: 单元测试：ConnectionQuery.CreateConnection
+func TestConnectionQuery_CreateConnection(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
@@ -46,7 +46,7 @@ func TestConnectionService_CreateConnection(t *testing.T) {
 	}
 
 	// Create connection
-	conn, err := service.CreateConnection(ctx, "my-onedrive", "onedrive", config)
+	conn, err := query.CreateConnection(ctx, "my-onedrive", "onedrive", config)
 	require.NoError(t, err)
 	assert.NotNil(t, conn)
 	assert.Equal(t, "my-onedrive", conn.Name)
@@ -57,7 +57,7 @@ func TestConnectionService_CreateConnection(t *testing.T) {
 	assert.NotZero(t, conn.UpdatedAt)
 
 	// Verify connection can be retrieved
-	retrieved, err := service.GetConnectionByName(ctx, "my-onedrive")
+	retrieved, err := query.GetConnectionByName(ctx, "my-onedrive")
 	require.NoError(t, err)
 	assert.Equal(t, conn.ID, retrieved.ID)
 	assert.Equal(t, "my-onedrive", retrieved.Name)
@@ -71,12 +71,12 @@ func TestConnectionService_CreateConnection(t *testing.T) {
 }
 
 // T016: 单元测试：重复名称创建失败
-func TestConnectionService_CreateConnection_DuplicateName(t *testing.T) {
+func TestConnectionQuery_CreateConnection_DuplicateName(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
@@ -85,21 +85,21 @@ func TestConnectionService_CreateConnection_DuplicateName(t *testing.T) {
 	}
 
 	// Create first connection
-	_, err := service.CreateConnection(ctx, "duplicate-test", "s3", config)
+	_, err := query.CreateConnection(ctx, "duplicate-test", "s3", config)
 	require.NoError(t, err)
 
 	// Try to create second connection with same name
-	_, err = service.CreateConnection(ctx, "duplicate-test", "s3", config)
+	_, err = query.CreateConnection(ctx, "duplicate-test", "s3", config)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "already exists")
 }
 
-func TestConnectionService_CreateConnection_InvalidName(t *testing.T) {
+func TestConnectionQuery_CreateConnection_InvalidName(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
@@ -135,7 +135,7 @@ func TestConnectionService_CreateConnection_InvalidName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := service.CreateConnection(ctx, tt.connName, "s3", config)
+			_, err := query.CreateConnection(ctx, tt.connName, "s3", config)
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -145,22 +145,22 @@ func TestConnectionService_CreateConnection_InvalidName(t *testing.T) {
 	}
 }
 
-func TestConnectionService_CreateConnection_EmptyConfig(t *testing.T) {
+func TestConnectionQuery_CreateConnection_EmptyConfig(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
 	// Empty config should be allowed (some providers have minimal config)
-	conn, err := service.CreateConnection(ctx, "minimal-conn", "local", map[string]string{})
+	conn, err := query.CreateConnection(ctx, "minimal-conn", "local", map[string]string{})
 	require.NoError(t, err)
 	assert.NotNil(t, conn)
 }
 
-func TestConnectionService_CreateConnection_PlaintextMode(t *testing.T) {
+func TestConnectionQuery_CreateConnection_PlaintextMode(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
@@ -168,7 +168,7 @@ func TestConnectionService_CreateConnection_PlaintextMode(t *testing.T) {
 	encryptor, err := crypto.NewEncryptor("")
 	require.NoError(t, err)
 
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
@@ -177,7 +177,7 @@ func TestConnectionService_CreateConnection_PlaintextMode(t *testing.T) {
 		"token": "sensitive_data",
 	}
 
-	conn, err := service.CreateConnection(ctx, "plaintext-conn", "s3", config)
+	conn, err := query.CreateConnection(ctx, "plaintext-conn", "s3", config)
 	require.NoError(t, err)
 
 	// In plaintext mode, config should still be retrievable
@@ -186,18 +186,18 @@ func TestConnectionService_CreateConnection_PlaintextMode(t *testing.T) {
 	assert.Equal(t, "sensitive_data", decryptedConfig["token"])
 }
 
-// T023: 单元测试：ConnectionService.ListConnections
-func TestConnectionService_ListConnections(t *testing.T) {
+// T023: 单元测试：ConnectionQuery.ListConnections
+func TestConnectionQuery_ListConnections(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
 	// Initially empty
-	connections, err := service.ListConnections(ctx)
+	connections, err := query.ListConnections(ctx)
 	require.NoError(t, err)
 	assert.Empty(t, connections)
 
@@ -206,17 +206,17 @@ func TestConnectionService_ListConnections(t *testing.T) {
 	config2 := map[string]string{"type": "onedrive", "drive_type": "personal"}
 	config3 := map[string]string{"type": "dropbox"}
 
-	conn1, err := service.CreateConnection(ctx, "my-s3", "s3", config1)
+	conn1, err := query.CreateConnection(ctx, "my-s3", "s3", config1)
 	require.NoError(t, err)
 
-	conn2, err := service.CreateConnection(ctx, "my-onedrive", "onedrive", config2)
+	conn2, err := query.CreateConnection(ctx, "my-onedrive", "onedrive", config2)
 	require.NoError(t, err)
 
-	conn3, err := service.CreateConnection(ctx, "my-dropbox", "dropbox", config3)
+	conn3, err := query.CreateConnection(ctx, "my-dropbox", "dropbox", config3)
 	require.NoError(t, err)
 
 	// List all connections
-	connections, err = service.ListConnections(ctx)
+	connections, err = query.ListConnections(ctx)
 	require.NoError(t, err)
 	assert.Len(t, connections, 3)
 
@@ -243,18 +243,18 @@ func TestConnectionService_ListConnections(t *testing.T) {
 	assert.Contains(t, []string{conn1.ID.String(), conn2.ID.String(), conn3.ID.String()}, connections[0].ID.String())
 }
 
-// 单元测试：ConnectionService.ListConnectionNames (优化查询)
-func TestConnectionService_ListConnectionNames(t *testing.T) {
+// 单元测试：ConnectionQuery.ListConnectionNames (优化查询)
+func TestConnectionQuery_ListConnectionNames(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
 	// Initially empty
-	names, err := service.ListConnectionNames(ctx)
+	names, err := query.ListConnectionNames(ctx)
 	require.NoError(t, err)
 	assert.Empty(t, names)
 
@@ -263,17 +263,17 @@ func TestConnectionService_ListConnectionNames(t *testing.T) {
 	config2 := map[string]string{"type": "onedrive", "drive_type": "personal"}
 	config3 := map[string]string{"type": "dropbox"}
 
-	_, err = service.CreateConnection(ctx, "my-s3", "s3", config1)
+	_, err = query.CreateConnection(ctx, "my-s3", "s3", config1)
 	require.NoError(t, err)
 
-	_, err = service.CreateConnection(ctx, "my-onedrive", "onedrive", config2)
+	_, err = query.CreateConnection(ctx, "my-onedrive", "onedrive", config2)
 	require.NoError(t, err)
 
-	_, err = service.CreateConnection(ctx, "my-dropbox", "dropbox", config3)
+	_, err = query.CreateConnection(ctx, "my-dropbox", "dropbox", config3)
 	require.NoError(t, err)
 
 	// List connection names
-	names, err = service.ListConnectionNames(ctx)
+	names, err = query.ListConnectionNames(ctx)
 	require.NoError(t, err)
 	assert.Len(t, names, 3)
 
@@ -281,13 +281,13 @@ func TestConnectionService_ListConnectionNames(t *testing.T) {
 	assert.Equal(t, []string{"my-dropbox", "my-onedrive", "my-s3"}, names)
 }
 
-// T024: 单元测试：ConnectionService.GetConnectionByName
-func TestConnectionService_GetConnectionByName(t *testing.T) {
+// T024: 单元测试：ConnectionQuery.GetConnectionByName
+func TestConnectionQuery_GetConnectionByName(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
@@ -298,11 +298,11 @@ func TestConnectionService_GetConnectionByName(t *testing.T) {
 		"drive_type": "personal",
 	}
 
-	created, err := service.CreateConnection(ctx, "test-connection", "onedrive", config)
+	created, err := query.CreateConnection(ctx, "test-connection", "onedrive", config)
 	require.NoError(t, err)
 
 	// Get by name
-	conn, err := service.GetConnectionByName(ctx, "test-connection")
+	conn, err := query.GetConnectionByName(ctx, "test-connection")
 	require.NoError(t, err)
 	assert.NotNil(t, conn)
 	assert.Equal(t, created.ID, conn.ID)
@@ -316,45 +316,45 @@ func TestConnectionService_GetConnectionByName(t *testing.T) {
 	assert.NotContains(t, string(conn.EncryptedConfig), "test_token")
 
 	// Get non-existent connection
-	_, err = service.GetConnectionByName(ctx, "non-existent")
+	_, err = query.GetConnectionByName(ctx, "non-existent")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
 }
 
-func TestConnectionService_GetConnectionByName_CaseSensitive(t *testing.T) {
+func TestConnectionQuery_GetConnectionByName_CaseSensitive(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
 	// Create connection with specific case
 	config := map[string]string{"type": "s3"}
-	_, err := service.CreateConnection(ctx, "MyConnection", "s3", config)
+	_, err := query.CreateConnection(ctx, "MyConnection", "s3", config)
 	require.NoError(t, err)
 
 	// Should find exact match
-	conn, err := service.GetConnectionByName(ctx, "MyConnection")
+	conn, err := query.GetConnectionByName(ctx, "MyConnection")
 	require.NoError(t, err)
 	assert.Equal(t, "MyConnection", conn.Name)
 
 	// Should not find different case
-	_, err = service.GetConnectionByName(ctx, "myconnection")
+	_, err = query.GetConnectionByName(ctx, "myconnection")
 	assert.Error(t, err)
 
-	_, err = service.GetConnectionByName(ctx, "MYCONNECTION")
+	_, err = query.GetConnectionByName(ctx, "MYCONNECTION")
 	assert.Error(t, err)
 }
 
-// T033: 单元测试：ConnectionService.UpdateConnection
-func TestConnectionService_UpdateConnection(t *testing.T) {
+// T033: 单元测试：ConnectionQuery.UpdateConnection
+func TestConnectionQuery_UpdateConnection(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
@@ -366,7 +366,7 @@ func TestConnectionService_UpdateConnection(t *testing.T) {
 		"secret_key": "old_secret_key",
 	}
 
-	conn, err := service.CreateConnection(ctx, "my-s3", "s3", initialConfig)
+	conn, err := query.CreateConnection(ctx, "my-s3", "s3", initialConfig)
 	require.NoError(t, err)
 	initialUpdatedAt := conn.UpdatedAt
 
@@ -379,11 +379,11 @@ func TestConnectionService_UpdateConnection(t *testing.T) {
 		"bucket":     "my-bucket",      // Added new field
 	}
 
-	err = service.UpdateConnection(ctx, conn.ID, nil, nil, updatedConfig)
+	err = query.UpdateConnection(ctx, conn.ID, nil, nil, updatedConfig)
 	require.NoError(t, err)
 
 	// Retrieve updated connection to verify
-	updated, err := service.GetConnectionByName(ctx, "my-s3")
+	updated, err := query.GetConnectionByName(ctx, "my-s3")
 	require.NoError(t, err)
 	assert.NotNil(t, updated)
 	assert.Equal(t, conn.ID, updated.ID)
@@ -407,7 +407,7 @@ func TestConnectionService_UpdateConnection(t *testing.T) {
 	assert.NotEqual(t, "old_access_key", decryptedConfig["access_key"])
 
 	// Retrieve and verify persistence
-	retrieved, err := service.GetConnectionByName(ctx, "my-s3")
+	retrieved, err := query.GetConnectionByName(ctx, "my-s3")
 	require.NoError(t, err)
 
 	retrievedConfig, err := encryptor.DecryptConfig(retrieved.EncryptedConfig)
@@ -417,29 +417,29 @@ func TestConnectionService_UpdateConnection(t *testing.T) {
 	assert.Equal(t, "my-bucket", retrievedConfig["bucket"])
 }
 
-func TestConnectionService_UpdateConnection_NonExistent(t *testing.T) {
+func TestConnectionQuery_UpdateConnection_NonExistent(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
 	// Try to update non-existent connection with random UUID
 	config := map[string]string{"type": "s3"}
 	fakeID := uuid.New()
-	err := service.UpdateConnection(ctx, fakeID, nil, nil, config)
+	err := query.UpdateConnection(ctx, fakeID, nil, nil, config)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
 }
 
-func TestConnectionService_UpdateConnection_EmptyConfig(t *testing.T) {
+func TestConnectionQuery_UpdateConnection_EmptyConfig(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
@@ -449,16 +449,16 @@ func TestConnectionService_UpdateConnection_EmptyConfig(t *testing.T) {
 		"path": "/data",
 	}
 
-	conn, err := service.CreateConnection(ctx, "my-local", "local", initialConfig)
+	conn, err := query.CreateConnection(ctx, "my-local", "local", initialConfig)
 	require.NoError(t, err)
 
 	// Update with empty config (should be allowed for some providers)
 	emptyConfig := map[string]string{}
-	err = service.UpdateConnection(ctx, conn.ID, nil, nil, emptyConfig)
+	err = query.UpdateConnection(ctx, conn.ID, nil, nil, emptyConfig)
 	require.NoError(t, err)
 
 	// Retrieve and verify config is empty
-	updated, err := service.GetConnectionByName(ctx, "my-local")
+	updated, err := query.GetConnectionByName(ctx, "my-local")
 	require.NoError(t, err)
 	decryptedConfig, err := encryptor.DecryptConfig(updated.EncryptedConfig)
 	require.NoError(t, err)
@@ -466,12 +466,12 @@ func TestConnectionService_UpdateConnection_EmptyConfig(t *testing.T) {
 	assert.Empty(t, decryptedConfig)
 }
 
-func TestConnectionService_UpdateConnection_PartialUpdate(t *testing.T) {
+func TestConnectionQuery_UpdateConnection_PartialUpdate(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
@@ -483,7 +483,7 @@ func TestConnectionService_UpdateConnection_PartialUpdate(t *testing.T) {
 		"drive_type": "personal",
 	}
 
-	conn, err := service.CreateConnection(ctx, "my-onedrive", "onedrive", initialConfig)
+	conn, err := query.CreateConnection(ctx, "my-onedrive", "onedrive", initialConfig)
 	require.NoError(t, err)
 
 	// Update only token field (note: this is a full config replacement, not partial merge)
@@ -492,11 +492,11 @@ func TestConnectionService_UpdateConnection_PartialUpdate(t *testing.T) {
 		"token": `{"access_token":"token2"}`,
 	}
 
-	err = service.UpdateConnection(ctx, conn.ID, nil, nil, updatedConfig)
+	err = query.UpdateConnection(ctx, conn.ID, nil, nil, updatedConfig)
 	require.NoError(t, err)
 
 	// Retrieve and verify new config completely replaces old config
-	updated, err := service.GetConnectionByName(ctx, "my-onedrive")
+	updated, err := query.GetConnectionByName(ctx, "my-onedrive")
 	require.NoError(t, err)
 	decryptedConfig, err := encryptor.DecryptConfig(updated.EncryptedConfig)
 	require.NoError(t, err)
@@ -507,7 +507,7 @@ func TestConnectionService_UpdateConnection_PartialUpdate(t *testing.T) {
 	assert.NotContains(t, decryptedConfig, "drive_type")
 }
 
-func TestConnectionService_UpdateConnection_PlaintextMode(t *testing.T) {
+func TestConnectionQuery_UpdateConnection_PlaintextMode(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
@@ -515,7 +515,7 @@ func TestConnectionService_UpdateConnection_PlaintextMode(t *testing.T) {
 	encryptor, err := crypto.NewEncryptor("")
 	require.NoError(t, err)
 
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
@@ -525,7 +525,7 @@ func TestConnectionService_UpdateConnection_PlaintextMode(t *testing.T) {
 		"token": "old_token",
 	}
 
-	conn, err := service.CreateConnection(ctx, "plaintext-s3", "s3", initialConfig)
+	conn, err := query.CreateConnection(ctx, "plaintext-s3", "s3", initialConfig)
 	require.NoError(t, err)
 
 	updatedConfig := map[string]string{
@@ -533,24 +533,24 @@ func TestConnectionService_UpdateConnection_PlaintextMode(t *testing.T) {
 		"token": "new_token",
 	}
 
-	err = service.UpdateConnection(ctx, conn.ID, nil, nil, updatedConfig)
+	err = query.UpdateConnection(ctx, conn.ID, nil, nil, updatedConfig)
 	require.NoError(t, err)
 
 	// Retrieve and verify update worked in plaintext mode
-	updated, err := service.GetConnectionByName(ctx, "plaintext-s3")
+	updated, err := query.GetConnectionByName(ctx, "plaintext-s3")
 	require.NoError(t, err)
 	decryptedConfig, err := encryptor.DecryptConfig(updated.EncryptedConfig)
 	require.NoError(t, err)
 	assert.Equal(t, "new_token", decryptedConfig["token"])
 }
 
-// T038: 单元测试：ConnectionService.DeleteConnectionByName
-func TestConnectionService_DeleteConnectionByName(t *testing.T) {
+// T038: 单元测试：ConnectionQuery.DeleteConnectionByName
+func TestConnectionQuery_DeleteConnectionByName(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
@@ -560,52 +560,52 @@ func TestConnectionService_DeleteConnectionByName(t *testing.T) {
 		"token": "test_token",
 	}
 
-	conn, err := service.CreateConnection(ctx, "test-delete", "s3", config)
+	conn, err := query.CreateConnection(ctx, "test-delete", "s3", config)
 	require.NoError(t, err)
 
 	// Verify connection exists
-	retrieved, err := service.GetConnectionByName(ctx, "test-delete")
+	retrieved, err := query.GetConnectionByName(ctx, "test-delete")
 	require.NoError(t, err)
 	assert.Equal(t, conn.ID, retrieved.ID)
 
 	// Delete the connection
-	err = service.DeleteConnectionByName(ctx, "test-delete")
+	err = query.DeleteConnectionByName(ctx, "test-delete")
 	require.NoError(t, err)
 
 	// Verify connection no longer exists
-	_, err = service.GetConnectionByName(ctx, "test-delete")
+	_, err = query.GetConnectionByName(ctx, "test-delete")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
 
 	// List connections should be empty
-	connections, err := service.ListConnections(ctx)
+	connections, err := query.ListConnections(ctx)
 	require.NoError(t, err)
 	assert.Empty(t, connections)
 }
 
-func TestConnectionService_DeleteConnectionByName_NonExistent(t *testing.T) {
+func TestConnectionQuery_DeleteConnectionByName_NonExistent(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
 	// Try to delete non-existent connection
-	err := service.DeleteConnectionByName(ctx, "non-existent")
+	err := query.DeleteConnectionByName(ctx, "non-existent")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
 }
 
 // T039: 单元测试：级联删除关联 Task
-func TestConnectionService_DeleteConnection_CascadeDeleteTasks(t *testing.T) {
+func TestConnectionQuery_DeleteConnection_CascadeDeleteTasks(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	connService := NewConnectionService(client, encryptor)
-	taskService := NewTaskService(client)
+	connQuery := NewConnectionQuery(client, encryptor)
+	taskQuery := NewTaskQuery(client)
 
 	ctx := context.Background()
 
@@ -614,131 +614,131 @@ func TestConnectionService_DeleteConnection_CascadeDeleteTasks(t *testing.T) {
 		"type": "s3",
 	}
 
-	conn, err := connService.CreateConnection(ctx, "test-cascade", "s3", config)
+	conn, err := connQuery.CreateConnection(ctx, "test-cascade", "s3", config)
 	require.NoError(t, err)
 
 	// Create multiple tasks associated with this connection
-	task1, err := taskService.CreateTask(ctx, "task1", "/source1", conn.ID, "/dest1", string(model.SyncDirectionBidirectional), "0 0 * * *", false, nil)
+	task1, err := taskQuery.CreateTask(ctx, "task1", "/source1", conn.ID, "/dest1", string(model.SyncDirectionBidirectional), "0 0 * * *", false, nil)
 	require.NoError(t, err)
 
-	task2, err := taskService.CreateTask(ctx, "task2", "/source2", conn.ID, "/dest2", string(model.SyncDirectionUpload), "0 1 * * *", false, nil)
+	task2, err := taskQuery.CreateTask(ctx, "task2", "/source2", conn.ID, "/dest2", string(model.SyncDirectionUpload), "0 1 * * *", false, nil)
 	require.NoError(t, err)
 
-	task3, err := taskService.CreateTask(ctx, "task3", "/source3", conn.ID, "/dest3", string(model.SyncDirectionDownload), "0 2 * * *", false, nil)
+	task3, err := taskQuery.CreateTask(ctx, "task3", "/source3", conn.ID, "/dest3", string(model.SyncDirectionDownload), "0 2 * * *", false, nil)
 	require.NoError(t, err)
 
 	// Verify tasks exist
-	tasks, err := taskService.ListAllTasks(ctx)
+	tasks, err := taskQuery.ListAllTasks(ctx)
 	require.NoError(t, err)
 	assert.Len(t, tasks, 3)
 
 	// Delete the connection (should cascade delete all tasks)
-	err = connService.DeleteConnectionByName(ctx, "test-cascade")
+	err = connQuery.DeleteConnectionByName(ctx, "test-cascade")
 	require.NoError(t, err)
 
 	// Verify connection is deleted
-	_, err = connService.GetConnectionByName(ctx, "test-cascade")
+	_, err = connQuery.GetConnectionByName(ctx, "test-cascade")
 	assert.Error(t, err)
 
 	// Verify all associated tasks are deleted
-	tasks, err = taskService.ListAllTasks(ctx)
+	tasks, err = taskQuery.ListAllTasks(ctx)
 	require.NoError(t, err)
 	assert.Empty(t, tasks)
 
 	// Verify specific tasks no longer exist
-	_, err = taskService.GetTask(ctx, task1.ID)
+	_, err = taskQuery.GetTask(ctx, task1.ID)
 	assert.Error(t, err)
 
-	_, err = taskService.GetTask(ctx, task2.ID)
+	_, err = taskQuery.GetTask(ctx, task2.ID)
 	assert.Error(t, err)
 
-	_, err = taskService.GetTask(ctx, task3.ID)
+	_, err = taskQuery.GetTask(ctx, task3.ID)
 	assert.Error(t, err)
 }
 
-func TestConnectionService_HasAssociatedTasks(t *testing.T) {
+func TestConnectionQuery_HasAssociatedTasks(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	connService := NewConnectionService(client, encryptor)
-	taskService := NewTaskService(client)
+	connQuery := NewConnectionQuery(client, encryptor)
+	taskQuery := NewTaskQuery(client)
 
 	ctx := context.Background()
 
 	// Create a connection
 	config := map[string]string{"type": "s3"}
-	conn, err := connService.CreateConnection(ctx, "test-has-tasks", "s3", config)
+	conn, err := connQuery.CreateConnection(ctx, "test-has-tasks", "s3", config)
 	require.NoError(t, err)
 
 	// Initially should have no tasks
-	hasTasks, err := connService.HasAssociatedTasks(ctx, conn.ID)
+	hasTasks, err := connQuery.HasAssociatedTasks(ctx, conn.ID)
 	require.NoError(t, err)
 	assert.False(t, hasTasks)
 
 	// Create a task
-	_, err = taskService.CreateTask(ctx, "task1", "/source", conn.ID, "/dest", string(model.SyncDirectionBidirectional), "0 0 * * *", false, nil)
+	_, err = taskQuery.CreateTask(ctx, "task1", "/source", conn.ID, "/dest", string(model.SyncDirectionBidirectional), "0 0 * * *", false, nil)
 	require.NoError(t, err)
 
 	// Now should have tasks
-	hasTasks, err = connService.HasAssociatedTasks(ctx, conn.ID)
+	hasTasks, err = connQuery.HasAssociatedTasks(ctx, conn.ID)
 	require.NoError(t, err)
 	assert.True(t, hasTasks)
 }
 
-func TestConnectionService_DeleteConnection_MultipleConnections(t *testing.T) {
+func TestConnectionQuery_DeleteConnection_MultipleConnections(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	connService := NewConnectionService(client, encryptor)
-	taskService := NewTaskService(client)
+	connQuery := NewConnectionQuery(client, encryptor)
+	taskQuery := NewTaskQuery(client)
 
 	ctx := context.Background()
 
 	// Create multiple connections
 	config := map[string]string{"type": "s3"}
-	conn1, err := connService.CreateConnection(ctx, "conn1", "s3", config)
+	conn1, err := connQuery.CreateConnection(ctx, "conn1", "s3", config)
 	require.NoError(t, err)
 
-	conn2, err := connService.CreateConnection(ctx, "conn2", "s3", config)
+	conn2, err := connQuery.CreateConnection(ctx, "conn2", "s3", config)
 	require.NoError(t, err)
 
 	// Create tasks for each connection
-	task1, err := taskService.CreateTask(ctx, "task1", "/s1", conn1.ID, "/d1", string(model.SyncDirectionBidirectional), "0 0 * * *", false, nil)
+	task1, err := taskQuery.CreateTask(ctx, "task1", "/s1", conn1.ID, "/d1", string(model.SyncDirectionBidirectional), "0 0 * * *", false, nil)
 	require.NoError(t, err)
 
-	task2, err := taskService.CreateTask(ctx, "task2", "/s2", conn2.ID, "/d2", string(model.SyncDirectionBidirectional), "0 0 * * *", false, nil)
+	task2, err := taskQuery.CreateTask(ctx, "task2", "/s2", conn2.ID, "/d2", string(model.SyncDirectionBidirectional), "0 0 * * *", false, nil)
 	require.NoError(t, err)
 
 	// Delete conn1
-	err = connService.DeleteConnectionByName(ctx, "conn1")
+	err = connQuery.DeleteConnectionByName(ctx, "conn1")
 	require.NoError(t, err)
 
 	// Verify conn1 and task1 are deleted
-	_, err = connService.GetConnectionByName(ctx, "conn1")
+	_, err = connQuery.GetConnectionByName(ctx, "conn1")
 	assert.Error(t, err)
 
-	_, err = taskService.GetTask(ctx, task1.ID)
+	_, err = taskQuery.GetTask(ctx, task1.ID)
 	assert.Error(t, err)
 
 	// Verify conn2 and task2 still exist
-	conn2Retrieved, err := connService.GetConnectionByName(ctx, "conn2")
+	conn2Retrieved, err := connQuery.GetConnectionByName(ctx, "conn2")
 	require.NoError(t, err)
 	assert.Equal(t, conn2.ID, conn2Retrieved.ID)
 
-	task2Retrieved, err := taskService.GetTask(ctx, task2.ID)
+	task2Retrieved, err := taskQuery.GetTask(ctx, task2.ID)
 	require.NoError(t, err)
 	assert.Equal(t, task2.ID, task2Retrieved.ID)
 }
 
 // Additional tests for GetConnectionByID
-func TestConnectionService_GetConnectionByID(t *testing.T) {
+func TestConnectionQuery_GetConnectionByID(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
@@ -748,11 +748,11 @@ func TestConnectionService_GetConnectionByID(t *testing.T) {
 		"token": "test_token",
 	}
 
-	created, err := service.CreateConnection(ctx, "test-by-id", "s3", config)
+	created, err := query.CreateConnection(ctx, "test-by-id", "s3", config)
 	require.NoError(t, err)
 
 	t.Run("Success", func(t *testing.T) {
-		conn, err := service.GetConnectionByID(ctx, created.ID)
+		conn, err := query.GetConnectionByID(ctx, created.ID)
 		require.NoError(t, err)
 		assert.NotNil(t, conn)
 		assert.Equal(t, created.ID, conn.ID)
@@ -762,19 +762,19 @@ func TestConnectionService_GetConnectionByID(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
-		_, err := service.GetConnectionByID(ctx, uuid.New())
+		_, err := query.GetConnectionByID(ctx, uuid.New())
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 	})
 }
 
 // Tests for GetConnectionConfig
-func TestConnectionService_GetConnectionConfig(t *testing.T) {
+func TestConnectionQuery_GetConnectionConfig(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
@@ -785,11 +785,11 @@ func TestConnectionService_GetConnectionConfig(t *testing.T) {
 		"drive_type": "personal",
 	}
 
-	_, err := service.CreateConnection(ctx, "test-get-config", "onedrive", config)
+	_, err := query.CreateConnection(ctx, "test-get-config", "onedrive", config)
 	require.NoError(t, err)
 
 	t.Run("Success", func(t *testing.T) {
-		decrypted, err := service.GetConnectionConfig(ctx, "test-get-config")
+		decrypted, err := query.GetConnectionConfig(ctx, "test-get-config")
 		require.NoError(t, err)
 		assert.Equal(t, "onedrive", decrypted["type"])
 		assert.Contains(t, decrypted["token"], "secret_token")
@@ -797,19 +797,19 @@ func TestConnectionService_GetConnectionConfig(t *testing.T) {
 	})
 
 	t.Run("ConnectionNotFound", func(t *testing.T) {
-		_, err := service.GetConnectionConfig(ctx, "non-existent")
+		_, err := query.GetConnectionConfig(ctx, "non-existent")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 	})
 }
 
 // Tests for GetConnectionConfigByID
-func TestConnectionService_GetConnectionConfigByID(t *testing.T) {
+func TestConnectionQuery_GetConnectionConfigByID(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
@@ -820,11 +820,11 @@ func TestConnectionService_GetConnectionConfigByID(t *testing.T) {
 		"folder": "/sync",
 	}
 
-	created, err := service.CreateConnection(ctx, "test-get-config-by-id", "dropbox", config)
+	created, err := query.CreateConnection(ctx, "test-get-config-by-id", "dropbox", config)
 	require.NoError(t, err)
 
 	t.Run("Success", func(t *testing.T) {
-		decrypted, err := service.GetConnectionConfigByID(ctx, created.ID)
+		decrypted, err := query.GetConnectionConfigByID(ctx, created.ID)
 		require.NoError(t, err)
 		assert.Equal(t, "dropbox", decrypted["type"])
 		assert.Equal(t, "secret_dropbox_token", decrypted["token"])
@@ -832,59 +832,59 @@ func TestConnectionService_GetConnectionConfigByID(t *testing.T) {
 	})
 
 	t.Run("ConnectionNotFound", func(t *testing.T) {
-		_, err := service.GetConnectionConfigByID(ctx, uuid.New())
+		_, err := query.GetConnectionConfigByID(ctx, uuid.New())
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 	})
 }
 
 // Tests for DeleteConnectionByID
-func TestConnectionService_DeleteConnectionByID(t *testing.T) {
+func TestConnectionQuery_DeleteConnectionByID(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
 	// Create a connection
 	config := map[string]string{"type": "local"}
 
-	conn, err := service.CreateConnection(ctx, "test-delete-by-id", "local", config)
+	conn, err := query.CreateConnection(ctx, "test-delete-by-id", "local", config)
 	require.NoError(t, err)
 
 	t.Run("Success", func(t *testing.T) {
 		// Verify connection exists
-		retrieved, err := service.GetConnectionByID(ctx, conn.ID)
+		retrieved, err := query.GetConnectionByID(ctx, conn.ID)
 		require.NoError(t, err)
 		assert.Equal(t, conn.ID, retrieved.ID)
 
 		// Delete the connection
-		err = service.DeleteConnectionByID(ctx, conn.ID)
+		err = query.DeleteConnectionByID(ctx, conn.ID)
 		require.NoError(t, err)
 
 		// Verify connection no longer exists
-		_, err = service.GetConnectionByID(ctx, conn.ID)
+		_, err = query.GetConnectionByID(ctx, conn.ID)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
 		// Try to delete non-existent connection
-		err := service.DeleteConnectionByID(ctx, uuid.New())
+		err := query.DeleteConnectionByID(ctx, uuid.New())
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 	})
 }
 
 // Tests for UpdateConnection with name and type changes
-func TestConnectionService_UpdateConnection_NameChange(t *testing.T) {
+func TestConnectionQuery_UpdateConnection_NameChange(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
@@ -894,7 +894,7 @@ func TestConnectionService_UpdateConnection_NameChange(t *testing.T) {
 		"region": "us-east-1",
 	}
 
-	conn, err := service.CreateConnection(ctx, "old-name", "s3", initialConfig)
+	conn, err := query.CreateConnection(ctx, "old-name", "s3", initialConfig)
 	require.NoError(t, err)
 
 	t.Run("SuccessfulNameChange", func(t *testing.T) {
@@ -904,20 +904,20 @@ func TestConnectionService_UpdateConnection_NameChange(t *testing.T) {
 			"region": "us-east-1",
 		}
 
-		err = service.UpdateConnection(ctx, conn.ID, &newName, nil, updatedConfig)
+		err = query.UpdateConnection(ctx, conn.ID, &newName, nil, updatedConfig)
 		require.NoError(t, err)
 
 		// Verify name changed
-		updated, err := service.GetConnectionByID(ctx, conn.ID)
+		updated, err := query.GetConnectionByID(ctx, conn.ID)
 		require.NoError(t, err)
 		assert.Equal(t, "new-name", updated.Name)
 
 		// Old name should not exist
-		_, err = service.GetConnectionByName(ctx, "old-name")
+		_, err = query.GetConnectionByName(ctx, "old-name")
 		assert.Error(t, err)
 
 		// New name should exist
-		byName, err := service.GetConnectionByName(ctx, "new-name")
+		byName, err := query.GetConnectionByName(ctx, "new-name")
 		require.NoError(t, err)
 		assert.Equal(t, conn.ID, byName.ID)
 	})
@@ -925,27 +925,27 @@ func TestConnectionService_UpdateConnection_NameChange(t *testing.T) {
 	t.Run("NameConflict", func(t *testing.T) {
 		// Create another connection
 		config2 := map[string]string{"type": "local"}
-		conn2, err := service.CreateConnection(ctx, "existing-name", "local", config2)
+		conn2, err := query.CreateConnection(ctx, "existing-name", "local", config2)
 		require.NoError(t, err)
 
 		// Try to rename to existing name
 		existingName := "existing-name"
-		err = service.UpdateConnection(ctx, conn.ID, &existingName, nil, initialConfig)
+		err = query.UpdateConnection(ctx, conn.ID, &existingName, nil, initialConfig)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "already exists")
 
 		// Verify conn2 still exists
-		_, err = service.GetConnectionByID(ctx, conn2.ID)
+		_, err = query.GetConnectionByID(ctx, conn2.ID)
 		require.NoError(t, err)
 	})
 }
 
-func TestConnectionService_UpdateConnection_TypeChange(t *testing.T) {
+func TestConnectionQuery_UpdateConnection_TypeChange(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
@@ -954,7 +954,7 @@ func TestConnectionService_UpdateConnection_TypeChange(t *testing.T) {
 		"type": "s3",
 	}
 
-	conn, err := service.CreateConnection(ctx, "type-change-test", "s3", initialConfig)
+	conn, err := query.CreateConnection(ctx, "type-change-test", "s3", initialConfig)
 	require.NoError(t, err)
 
 	// Update type
@@ -963,11 +963,11 @@ func TestConnectionService_UpdateConnection_TypeChange(t *testing.T) {
 		"type": "onedrive",
 	}
 
-	err = service.UpdateConnection(ctx, conn.ID, nil, &newType, updatedConfig)
+	err = query.UpdateConnection(ctx, conn.ID, nil, &newType, updatedConfig)
 	require.NoError(t, err)
 
 	// Verify type changed
-	updated, err := service.GetConnectionByID(ctx, conn.ID)
+	updated, err := query.GetConnectionByID(ctx, conn.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "onedrive", updated.Type)
 }
@@ -1003,33 +1003,33 @@ func TestValidateConnectionName(t *testing.T) {
 }
 
 // Test HasAssociatedTasks with non-existent connection
-func TestConnectionService_HasAssociatedTasks_NotFound(t *testing.T) {
+func TestConnectionQuery_HasAssociatedTasks_NotFound(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
 	// Try to check tasks for non-existent connection
-	_, err := service.HasAssociatedTasks(ctx, uuid.New())
+	_, err := query.HasAssociatedTasks(ctx, uuid.New())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
 }
 
 // Tests for ListConnectionsPaginated
-func TestConnectionService_ListConnectionsPaginated(t *testing.T) {
+func TestConnectionQuery_ListConnectionsPaginated(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
 	// Initially empty
-	conns, total, err := service.ListConnectionsPaginated(ctx, 10, 0)
+	conns, total, err := query.ListConnectionsPaginated(ctx, 10, 0)
 	require.NoError(t, err)
 	assert.Empty(t, conns)
 	assert.Equal(t, 0, total)
@@ -1037,40 +1037,40 @@ func TestConnectionService_ListConnectionsPaginated(t *testing.T) {
 	// Create multiple connections
 	for i := 0; i < 5; i++ {
 		config := map[string]string{"type": "local"}
-		_, err := service.CreateConnection(ctx, "conn-paginated-"+uuid.NewString()[:8], "local", config)
+		_, err := query.CreateConnection(ctx, "conn-paginated-"+uuid.NewString()[:8], "local", config)
 		require.NoError(t, err)
 	}
 
 	t.Run("FirstPage", func(t *testing.T) {
-		conns, total, err := service.ListConnectionsPaginated(ctx, 2, 0)
+		conns, total, err := query.ListConnectionsPaginated(ctx, 2, 0)
 		require.NoError(t, err)
 		assert.Len(t, conns, 2)
 		assert.Equal(t, 5, total)
 	})
 
 	t.Run("SecondPage", func(t *testing.T) {
-		conns, total, err := service.ListConnectionsPaginated(ctx, 2, 2)
+		conns, total, err := query.ListConnectionsPaginated(ctx, 2, 2)
 		require.NoError(t, err)
 		assert.Len(t, conns, 2)
 		assert.Equal(t, 5, total)
 	})
 
 	t.Run("LastPage", func(t *testing.T) {
-		conns, total, err := service.ListConnectionsPaginated(ctx, 2, 4)
+		conns, total, err := query.ListConnectionsPaginated(ctx, 2, 4)
 		require.NoError(t, err)
 		assert.Len(t, conns, 1)
 		assert.Equal(t, 5, total)
 	})
 
 	t.Run("OffsetBeyondTotal", func(t *testing.T) {
-		conns, total, err := service.ListConnectionsPaginated(ctx, 10, 100)
+		conns, total, err := query.ListConnectionsPaginated(ctx, 10, 100)
 		require.NoError(t, err)
 		assert.Empty(t, conns)
 		assert.Equal(t, 5, total)
 	})
 
 	t.Run("LargeLimit", func(t *testing.T) {
-		conns, total, err := service.ListConnectionsPaginated(ctx, 100, 0)
+		conns, total, err := query.ListConnectionsPaginated(ctx, 100, 0)
 		require.NoError(t, err)
 		assert.Len(t, conns, 5)
 		assert.Equal(t, 5, total)
@@ -1078,68 +1078,68 @@ func TestConnectionService_ListConnectionsPaginated(t *testing.T) {
 }
 
 // Tests for CountAssociatedTasks
-func TestConnectionService_CountAssociatedTasks(t *testing.T) {
+func TestConnectionQuery_CountAssociatedTasks(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	connService := NewConnectionService(client, encryptor)
-	taskService := NewTaskService(client)
+	connQuery := NewConnectionQuery(client, encryptor)
+	taskQuery := NewTaskQuery(client)
 
 	ctx := context.Background()
 
 	// Create a connection
 	config := map[string]string{"type": "local"}
-	conn, err := connService.CreateConnection(ctx, "count-tasks-conn", "local", config)
+	conn, err := connQuery.CreateConnection(ctx, "count-tasks-conn", "local", config)
 	require.NoError(t, err)
 
 	t.Run("ZeroTasks", func(t *testing.T) {
-		count, err := connService.CountAssociatedTasks(ctx, conn.ID)
+		count, err := connQuery.CountAssociatedTasks(ctx, conn.ID)
 		require.NoError(t, err)
 		assert.Equal(t, 0, count)
 	})
 
 	t.Run("OneTasks", func(t *testing.T) {
 		// Create one task
-		_, err := taskService.CreateTask(ctx, "task1", "/src", conn.ID, "/dst", string(model.SyncDirectionBidirectional), "", false, nil)
+		_, err := taskQuery.CreateTask(ctx, "task1", "/src", conn.ID, "/dst", string(model.SyncDirectionBidirectional), "", false, nil)
 		require.NoError(t, err)
 
-		count, err := connService.CountAssociatedTasks(ctx, conn.ID)
+		count, err := connQuery.CountAssociatedTasks(ctx, conn.ID)
 		require.NoError(t, err)
 		assert.Equal(t, 1, count)
 	})
 
 	t.Run("MultipleTasks", func(t *testing.T) {
 		// Create more tasks
-		_, err := taskService.CreateTask(ctx, "task2", "/src2", conn.ID, "/dst2", string(model.SyncDirectionUpload), "", false, nil)
+		_, err := taskQuery.CreateTask(ctx, "task2", "/src2", conn.ID, "/dst2", string(model.SyncDirectionUpload), "", false, nil)
 		require.NoError(t, err)
-		_, err = taskService.CreateTask(ctx, "task3", "/src3", conn.ID, "/dst3", string(model.SyncDirectionDownload), "", false, nil)
+		_, err = taskQuery.CreateTask(ctx, "task3", "/src3", conn.ID, "/dst3", string(model.SyncDirectionDownload), "", false, nil)
 		require.NoError(t, err)
 
-		count, err := connService.CountAssociatedTasks(ctx, conn.ID)
+		count, err := connQuery.CountAssociatedTasks(ctx, conn.ID)
 		require.NoError(t, err)
 		assert.Equal(t, 3, count)
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
-		_, err := connService.CountAssociatedTasks(ctx, uuid.New())
+		_, err := connQuery.CountAssociatedTasks(ctx, uuid.New())
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 	})
 }
 
 // Test CreateConnection with empty type
-func TestConnectionService_CreateConnection_EmptyType(t *testing.T) {
+func TestConnectionQuery_CreateConnection_EmptyType(t *testing.T) {
 	client := setupTestDB(t)
 	defer client.Close()
 
 	encryptor := setupTestEncryptor(t)
-	service := NewConnectionService(client, encryptor)
+	query := NewConnectionQuery(client, encryptor)
 
 	ctx := context.Background()
 
 	config := map[string]string{"key": "value"}
-	_, err := service.CreateConnection(ctx, "valid-name", "", config)
+	_, err := query.CreateConnection(ctx, "valid-name", "", config)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "type cannot be empty")
 }

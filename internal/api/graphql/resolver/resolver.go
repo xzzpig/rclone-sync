@@ -8,8 +8,8 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/generated"
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/subscription"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
+	"github.com/xzzpig/rclone-sync/internal/core/db/query"
 	"github.com/xzzpig/rclone-sync/internal/core/ports"
-	"github.com/xzzpig/rclone-sync/internal/core/services"
 	"github.com/xzzpig/rclone-sync/internal/rclone"
 )
 
@@ -26,9 +26,9 @@ type Dependencies struct {
 	Encryptor           *crypto.Encryptor
 	JobProgressBus      *subscription.JobProgressBus
 	TransferProgressBus *subscription.TransferProgressBus
-	ConnectionService   *services.ConnectionService
-	TaskService         *services.TaskService
-	JobService          *services.JobService
+	ConnectionQuery     *query.ConnectionQuery
+	TaskQuery           *query.TaskQuery
+	JobQuery            *query.JobQuery
 }
 
 // Resolver is the root resolver that holds all dependencies.

@@ -42,8 +42,8 @@ func (r *jobResolver) Logs(ctx context.Context, obj *model.Job, pagination *mode
 		}
 	}
 
-	// Use JobService to list logs for this job
-	entLogs, totalCount, err := r.deps.JobService.ListJobLogsByJobPaginated(ctx, obj.ID, limit, offset)
+	// Use JobQuery to list logs for this job
+	entLogs, totalCount, err := r.deps.JobQuery.ListJobLogsByJobPaginated(ctx, obj.ID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -103,13 +103,13 @@ func (r *jobQueryResolver) List(ctx context.Context, obj *model.JobQuery, taskID
 	}
 
 	// Get total count
-	totalCount, err := r.deps.JobService.CountJobs(ctx, taskID, connectionID)
+	totalCount, err := r.deps.JobQuery.CountJobs(ctx, taskID, connectionID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Fetch jobs
-	entJobs, err := r.deps.JobService.ListJobs(ctx, taskID, connectionID, limit, offset)
+	entJobs, err := r.deps.JobQuery.ListJobs(ctx, taskID, connectionID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -163,13 +163,13 @@ func (r *logQueryResolver) List(ctx context.Context, obj *model.LogQuery, connec
 	}
 
 	// Get total count
-	totalCount, err := r.deps.JobService.CountJobLogs(ctx, &connectionID, taskID, jobID, levelStr)
+	totalCount, err := r.deps.JobQuery.CountJobLogs(ctx, &connectionID, taskID, jobID, levelStr)
 	if err != nil {
 		return nil, err
 	}
 
 	// Fetch logs
-	entLogs, err := r.deps.JobService.ListJobLogs(ctx, &connectionID, taskID, jobID, levelStr, limit, offset)
+	entLogs, err := r.deps.JobQuery.ListJobLogs(ctx, &connectionID, taskID, jobID, levelStr, limit, offset)
 	if err != nil {
 		return nil, err
 	}

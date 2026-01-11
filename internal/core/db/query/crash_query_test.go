@@ -39,7 +39,7 @@ func TestCrashRecovery_ResetStuckJobs(t *testing.T) {
 	connSvc := query.NewConnectionQuery(client, encryptor)
 	testConn, err := connSvc.CreateConnection(ctx, "test-local", "local", map[string]string{
 		"type": "local",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	// 2. Setup Prerequisites: Create a Task

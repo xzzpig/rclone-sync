@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/text-field';
 import type { ProviderOption } from '@/lib/types';
 import * as m from '@/paraglide/messages.js';
-import { createEffect, createMemo, createSignal, For, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, Show, type JSX } from 'solid-js';
 import { createStore, unwrap } from 'solid-js/store';
 import IconAlertCircle from '~icons/lucide/alert-circle';
 import IconChevronDown from '~icons/lucide/chevron-down';
@@ -102,6 +102,7 @@ export const DynamicConfigForm = (props: {
   hideName?: boolean;
   /** Custom text for save button */
   saveButtonText?: string;
+  children?: JSX.Element;
 }) => {
   const [formState, setFormState] = createStore<Record<string, string | undefined>>(
     props.initialValues ?? {}
@@ -255,6 +256,8 @@ export const DynamicConfigForm = (props: {
             </CollapsibleContent>
           </Collapsible>
         </Show>
+
+        {props.children}
 
         <div class="flex items-center justify-between pt-4">
           <Show when={props.showBack !== false}>

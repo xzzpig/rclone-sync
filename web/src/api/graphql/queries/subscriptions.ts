@@ -1,13 +1,5 @@
 import { graphql } from '../graphql';
 
-// ============================================================================
-// Subscriptions
-// ============================================================================
-
-/**
- * Subscribe to job progress events
- * Can optionally filter by taskId and/or connectionId
- */
 export const JOB_PROGRESS_SUBSCRIPTION = graphql(`
   subscription JobProgress($taskId: ID, $connectionId: ID) {
     jobProgress(taskId: $taskId, connectionId: $connectionId) {
@@ -27,10 +19,6 @@ export const JOB_PROGRESS_SUBSCRIPTION = graphql(`
   }
 `);
 
-/**
- * Subscribe to transfer progress events (individual file transfers)
- * Can optionally filter by connectionId, taskId, and/or jobId
- */
 export const TRANSFER_PROGRESS_SUBSCRIPTION = graphql(`
   subscription TransferProgress($connectionId: ID, $taskId: ID, $jobId: ID) {
     transferProgress(connectionId: $connectionId, taskId: $taskId, jobId: $jobId) {
@@ -42,6 +30,19 @@ export const TRANSFER_PROGRESS_SUBSCRIPTION = graphql(`
         size
         bytes
       }
+    }
+  }
+`);
+
+export const CACHE_STATUS_SUBSCRIPTION = graphql(`
+  subscription CacheStatus($connectionId: ID!) {
+    cacheStatus(connectionId: $connectionId) {
+      connectionId
+      running
+      changeNotifySupported
+      entriesCount
+      dbSizeBytes
+      lastNotifyTime
     }
   }
 `);

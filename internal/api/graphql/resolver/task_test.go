@@ -1584,3 +1584,62 @@ func (s *TaskResolverTestSuite) TestTaskMutation_UpdateInvalidConnection() {
 	// Should fail because the connection doesn't exist
 	require.NotEmpty(s.T(), resp.Errors)
 }
+
+func (s *TaskResolverTestSuite) TestTask_OptionsErrorPath() {
+	connID := s.Env.CreateTestConnection(s.T(), "test-conn")
+	task := s.Env.CreateTestTask(s.T(), "task-opts-error", connID)
+
+	ctx := context.Background()
+	err := s.Env.TaskQuery.DeleteTask(ctx, task.ID)
+	require.NoError(s.T(), err)
+
+	query := `
+		query($id: ID!) {
+			task {
+				get(id: $id) {
+					id
+					options {
+						conflictResolution
+					}
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
+		"id": task.ID.String(),
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	result := gjson.Get(data, "task.get")
+	assert.True(s.T(), result.Type == gjson.Null || !result.Exists())
+}
+
+func (s *TaskResolverTestSuite) TestTask_LatestJobNil() {
+	connID := s.Env.CreateTestConnection(s.T(), "test-conn")
+	task := s.Env.CreateTestTask(s.T(), "task-no-latest-job", connID)
+
+	query := `
+		query($id: ID!) {
+			task {
+				get(id: $id) {
+					id
+					latestJob {
+						id
+						status
+					}
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
+		"id": task.ID.String(),
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	latestJob := gjson.Get(data, "task.get.latestJob")
+	assert.True(s.T(), latestJob.Type == gjson.Null || !latestJob.Exists())
+}

@@ -46,7 +46,7 @@ func TestConnectionQuery_CreateConnection(t *testing.T) {
 	}
 
 	// Create connection
-	conn, err := query.CreateConnection(ctx, "my-onedrive", "onedrive", config)
+	conn, err := query.CreateConnection(ctx, "my-onedrive", "onedrive", config, nil)
 	require.NoError(t, err)
 	assert.NotNil(t, conn)
 	assert.Equal(t, "my-onedrive", conn.Name)
@@ -85,11 +85,11 @@ func TestConnectionQuery_CreateConnection_DuplicateName(t *testing.T) {
 	}
 
 	// Create first connection
-	_, err := query.CreateConnection(ctx, "duplicate-test", "s3", config)
+	_, err := query.CreateConnection(ctx, "duplicate-test", "s3", config, nil)
 	require.NoError(t, err)
 
 	// Try to create second connection with same name
-	_, err = query.CreateConnection(ctx, "duplicate-test", "s3", config)
+	_, err = query.CreateConnection(ctx, "duplicate-test", "s3", config, nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "already exists")
 }
@@ -135,7 +135,7 @@ func TestConnectionQuery_CreateConnection_InvalidName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := query.CreateConnection(ctx, tt.connName, "s3", config)
+			_, err := query.CreateConnection(ctx, tt.connName, "s3", config, nil)
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -155,7 +155,7 @@ func TestConnectionQuery_CreateConnection_EmptyConfig(t *testing.T) {
 	ctx := context.Background()
 
 	// Empty config should be allowed (some providers have minimal config)
-	conn, err := query.CreateConnection(ctx, "minimal-conn", "local", map[string]string{})
+	conn, err := query.CreateConnection(ctx, "minimal-conn", "local", map[string]string{}, nil)
 	require.NoError(t, err)
 	assert.NotNil(t, conn)
 }
@@ -177,7 +177,7 @@ func TestConnectionQuery_CreateConnection_PlaintextMode(t *testing.T) {
 		"token": "sensitive_data",
 	}
 
-	conn, err := query.CreateConnection(ctx, "plaintext-conn", "s3", config)
+	conn, err := query.CreateConnection(ctx, "plaintext-conn", "s3", config, nil)
 	require.NoError(t, err)
 
 	// In plaintext mode, config should still be retrievable
@@ -206,13 +206,13 @@ func TestConnectionQuery_ListConnections(t *testing.T) {
 	config2 := map[string]string{"type": "onedrive", "drive_type": "personal"}
 	config3 := map[string]string{"type": "dropbox"}
 
-	conn1, err := query.CreateConnection(ctx, "my-s3", "s3", config1)
+	conn1, err := query.CreateConnection(ctx, "my-s3", "s3", config1, nil)
 	require.NoError(t, err)
 
-	conn2, err := query.CreateConnection(ctx, "my-onedrive", "onedrive", config2)
+	conn2, err := query.CreateConnection(ctx, "my-onedrive", "onedrive", config2, nil)
 	require.NoError(t, err)
 
-	conn3, err := query.CreateConnection(ctx, "my-dropbox", "dropbox", config3)
+	conn3, err := query.CreateConnection(ctx, "my-dropbox", "dropbox", config3, nil)
 	require.NoError(t, err)
 
 	// List all connections
@@ -263,13 +263,13 @@ func TestConnectionQuery_ListConnectionNames(t *testing.T) {
 	config2 := map[string]string{"type": "onedrive", "drive_type": "personal"}
 	config3 := map[string]string{"type": "dropbox"}
 
-	_, err = query.CreateConnection(ctx, "my-s3", "s3", config1)
+	_, err = query.CreateConnection(ctx, "my-s3", "s3", config1, nil)
 	require.NoError(t, err)
 
-	_, err = query.CreateConnection(ctx, "my-onedrive", "onedrive", config2)
+	_, err = query.CreateConnection(ctx, "my-onedrive", "onedrive", config2, nil)
 	require.NoError(t, err)
 
-	_, err = query.CreateConnection(ctx, "my-dropbox", "dropbox", config3)
+	_, err = query.CreateConnection(ctx, "my-dropbox", "dropbox", config3, nil)
 	require.NoError(t, err)
 
 	// List connection names
@@ -298,7 +298,7 @@ func TestConnectionQuery_GetConnectionByName(t *testing.T) {
 		"drive_type": "personal",
 	}
 
-	created, err := query.CreateConnection(ctx, "test-connection", "onedrive", config)
+	created, err := query.CreateConnection(ctx, "test-connection", "onedrive", config, nil)
 	require.NoError(t, err)
 
 	// Get by name
@@ -332,7 +332,7 @@ func TestConnectionQuery_GetConnectionByName_CaseSensitive(t *testing.T) {
 
 	// Create connection with specific case
 	config := map[string]string{"type": "s3"}
-	_, err := query.CreateConnection(ctx, "MyConnection", "s3", config)
+	_, err := query.CreateConnection(ctx, "MyConnection", "s3", config, nil)
 	require.NoError(t, err)
 
 	// Should find exact match
@@ -366,7 +366,7 @@ func TestConnectionQuery_UpdateConnection(t *testing.T) {
 		"secret_key": "old_secret_key",
 	}
 
-	conn, err := query.CreateConnection(ctx, "my-s3", "s3", initialConfig)
+	conn, err := query.CreateConnection(ctx, "my-s3", "s3", initialConfig, nil)
 	require.NoError(t, err)
 	initialUpdatedAt := conn.UpdatedAt
 
@@ -379,7 +379,7 @@ func TestConnectionQuery_UpdateConnection(t *testing.T) {
 		"bucket":     "my-bucket",      // Added new field
 	}
 
-	err = query.UpdateConnection(ctx, conn.ID, nil, nil, updatedConfig)
+	err = query.UpdateConnection(ctx, conn.ID, nil, nil, updatedConfig, nil)
 	require.NoError(t, err)
 
 	// Retrieve updated connection to verify
@@ -429,7 +429,7 @@ func TestConnectionQuery_UpdateConnection_NonExistent(t *testing.T) {
 	// Try to update non-existent connection with random UUID
 	config := map[string]string{"type": "s3"}
 	fakeID := uuid.New()
-	err := query.UpdateConnection(ctx, fakeID, nil, nil, config)
+	err := query.UpdateConnection(ctx, fakeID, nil, nil, config, nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
 }
@@ -449,12 +449,12 @@ func TestConnectionQuery_UpdateConnection_EmptyConfig(t *testing.T) {
 		"path": "/data",
 	}
 
-	conn, err := query.CreateConnection(ctx, "my-local", "local", initialConfig)
+	conn, err := query.CreateConnection(ctx, "my-local", "local", initialConfig, nil)
 	require.NoError(t, err)
 
 	// Update with empty config (should be allowed for some providers)
 	emptyConfig := map[string]string{}
-	err = query.UpdateConnection(ctx, conn.ID, nil, nil, emptyConfig)
+	err = query.UpdateConnection(ctx, conn.ID, nil, nil, emptyConfig, nil)
 	require.NoError(t, err)
 
 	// Retrieve and verify config is empty
@@ -483,7 +483,7 @@ func TestConnectionQuery_UpdateConnection_PartialUpdate(t *testing.T) {
 		"drive_type": "personal",
 	}
 
-	conn, err := query.CreateConnection(ctx, "my-onedrive", "onedrive", initialConfig)
+	conn, err := query.CreateConnection(ctx, "my-onedrive", "onedrive", initialConfig, nil)
 	require.NoError(t, err)
 
 	// Update only token field (note: this is a full config replacement, not partial merge)
@@ -492,7 +492,7 @@ func TestConnectionQuery_UpdateConnection_PartialUpdate(t *testing.T) {
 		"token": `{"access_token":"token2"}`,
 	}
 
-	err = query.UpdateConnection(ctx, conn.ID, nil, nil, updatedConfig)
+	err = query.UpdateConnection(ctx, conn.ID, nil, nil, updatedConfig, nil)
 	require.NoError(t, err)
 
 	// Retrieve and verify new config completely replaces old config
@@ -525,7 +525,7 @@ func TestConnectionQuery_UpdateConnection_PlaintextMode(t *testing.T) {
 		"token": "old_token",
 	}
 
-	conn, err := query.CreateConnection(ctx, "plaintext-s3", "s3", initialConfig)
+	conn, err := query.CreateConnection(ctx, "plaintext-s3", "s3", initialConfig, nil)
 	require.NoError(t, err)
 
 	updatedConfig := map[string]string{
@@ -533,7 +533,7 @@ func TestConnectionQuery_UpdateConnection_PlaintextMode(t *testing.T) {
 		"token": "new_token",
 	}
 
-	err = query.UpdateConnection(ctx, conn.ID, nil, nil, updatedConfig)
+	err = query.UpdateConnection(ctx, conn.ID, nil, nil, updatedConfig, nil)
 	require.NoError(t, err)
 
 	// Retrieve and verify update worked in plaintext mode
@@ -560,7 +560,7 @@ func TestConnectionQuery_DeleteConnectionByName(t *testing.T) {
 		"token": "test_token",
 	}
 
-	conn, err := query.CreateConnection(ctx, "test-delete", "s3", config)
+	conn, err := query.CreateConnection(ctx, "test-delete", "s3", config, nil)
 	require.NoError(t, err)
 
 	// Verify connection exists
@@ -614,7 +614,7 @@ func TestConnectionQuery_DeleteConnection_CascadeDeleteTasks(t *testing.T) {
 		"type": "s3",
 	}
 
-	conn, err := connQuery.CreateConnection(ctx, "test-cascade", "s3", config)
+	conn, err := connQuery.CreateConnection(ctx, "test-cascade", "s3", config, nil)
 	require.NoError(t, err)
 
 	// Create multiple tasks associated with this connection
@@ -668,7 +668,7 @@ func TestConnectionQuery_HasAssociatedTasks(t *testing.T) {
 
 	// Create a connection
 	config := map[string]string{"type": "s3"}
-	conn, err := connQuery.CreateConnection(ctx, "test-has-tasks", "s3", config)
+	conn, err := connQuery.CreateConnection(ctx, "test-has-tasks", "s3", config, nil)
 	require.NoError(t, err)
 
 	// Initially should have no tasks
@@ -698,10 +698,10 @@ func TestConnectionQuery_DeleteConnection_MultipleConnections(t *testing.T) {
 
 	// Create multiple connections
 	config := map[string]string{"type": "s3"}
-	conn1, err := connQuery.CreateConnection(ctx, "conn1", "s3", config)
+	conn1, err := connQuery.CreateConnection(ctx, "conn1", "s3", config, nil)
 	require.NoError(t, err)
 
-	conn2, err := connQuery.CreateConnection(ctx, "conn2", "s3", config)
+	conn2, err := connQuery.CreateConnection(ctx, "conn2", "s3", config, nil)
 	require.NoError(t, err)
 
 	// Create tasks for each connection
@@ -748,7 +748,7 @@ func TestConnectionQuery_GetConnectionByID(t *testing.T) {
 		"token": "test_token",
 	}
 
-	created, err := query.CreateConnection(ctx, "test-by-id", "s3", config)
+	created, err := query.CreateConnection(ctx, "test-by-id", "s3", config, nil)
 	require.NoError(t, err)
 
 	t.Run("Success", func(t *testing.T) {
@@ -785,7 +785,7 @@ func TestConnectionQuery_GetConnectionConfig(t *testing.T) {
 		"drive_type": "personal",
 	}
 
-	_, err := query.CreateConnection(ctx, "test-get-config", "onedrive", config)
+	_, err := query.CreateConnection(ctx, "test-get-config", "onedrive", config, nil)
 	require.NoError(t, err)
 
 	t.Run("Success", func(t *testing.T) {
@@ -820,7 +820,7 @@ func TestConnectionQuery_GetConnectionConfigByID(t *testing.T) {
 		"folder": "/sync",
 	}
 
-	created, err := query.CreateConnection(ctx, "test-get-config-by-id", "dropbox", config)
+	created, err := query.CreateConnection(ctx, "test-get-config-by-id", "dropbox", config, nil)
 	require.NoError(t, err)
 
 	t.Run("Success", func(t *testing.T) {
@@ -851,7 +851,7 @@ func TestConnectionQuery_DeleteConnectionByID(t *testing.T) {
 	// Create a connection
 	config := map[string]string{"type": "local"}
 
-	conn, err := query.CreateConnection(ctx, "test-delete-by-id", "local", config)
+	conn, err := query.CreateConnection(ctx, "test-delete-by-id", "local", config, nil)
 	require.NoError(t, err)
 
 	t.Run("Success", func(t *testing.T) {
@@ -894,7 +894,7 @@ func TestConnectionQuery_UpdateConnection_NameChange(t *testing.T) {
 		"region": "us-east-1",
 	}
 
-	conn, err := query.CreateConnection(ctx, "old-name", "s3", initialConfig)
+	conn, err := query.CreateConnection(ctx, "old-name", "s3", initialConfig, nil)
 	require.NoError(t, err)
 
 	t.Run("SuccessfulNameChange", func(t *testing.T) {
@@ -904,7 +904,7 @@ func TestConnectionQuery_UpdateConnection_NameChange(t *testing.T) {
 			"region": "us-east-1",
 		}
 
-		err = query.UpdateConnection(ctx, conn.ID, &newName, nil, updatedConfig)
+		err = query.UpdateConnection(ctx, conn.ID, &newName, nil, updatedConfig, nil)
 		require.NoError(t, err)
 
 		// Verify name changed
@@ -925,12 +925,12 @@ func TestConnectionQuery_UpdateConnection_NameChange(t *testing.T) {
 	t.Run("NameConflict", func(t *testing.T) {
 		// Create another connection
 		config2 := map[string]string{"type": "local"}
-		conn2, err := query.CreateConnection(ctx, "existing-name", "local", config2)
+		conn2, err := query.CreateConnection(ctx, "existing-name", "local", config2, nil)
 		require.NoError(t, err)
 
 		// Try to rename to existing name
 		existingName := "existing-name"
-		err = query.UpdateConnection(ctx, conn.ID, &existingName, nil, initialConfig)
+		err = query.UpdateConnection(ctx, conn.ID, &existingName, nil, initialConfig, nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "already exists")
 
@@ -954,7 +954,7 @@ func TestConnectionQuery_UpdateConnection_TypeChange(t *testing.T) {
 		"type": "s3",
 	}
 
-	conn, err := query.CreateConnection(ctx, "type-change-test", "s3", initialConfig)
+	conn, err := query.CreateConnection(ctx, "type-change-test", "s3", initialConfig, nil)
 	require.NoError(t, err)
 
 	// Update type
@@ -963,7 +963,7 @@ func TestConnectionQuery_UpdateConnection_TypeChange(t *testing.T) {
 		"type": "onedrive",
 	}
 
-	err = query.UpdateConnection(ctx, conn.ID, nil, &newType, updatedConfig)
+	err = query.UpdateConnection(ctx, conn.ID, nil, &newType, updatedConfig, nil)
 	require.NoError(t, err)
 
 	// Verify type changed
@@ -1037,7 +1037,7 @@ func TestConnectionQuery_ListConnectionsPaginated(t *testing.T) {
 	// Create multiple connections
 	for i := 0; i < 5; i++ {
 		config := map[string]string{"type": "local"}
-		_, err := query.CreateConnection(ctx, "conn-paginated-"+uuid.NewString()[:8], "local", config)
+		_, err := query.CreateConnection(ctx, "conn-paginated-"+uuid.NewString()[:8], "local", config, nil)
 		require.NoError(t, err)
 	}
 
@@ -1090,7 +1090,7 @@ func TestConnectionQuery_CountAssociatedTasks(t *testing.T) {
 
 	// Create a connection
 	config := map[string]string{"type": "local"}
-	conn, err := connQuery.CreateConnection(ctx, "count-tasks-conn", "local", config)
+	conn, err := connQuery.CreateConnection(ctx, "count-tasks-conn", "local", config, nil)
 	require.NoError(t, err)
 
 	t.Run("ZeroTasks", func(t *testing.T) {
@@ -1139,7 +1139,7 @@ func TestConnectionQuery_CreateConnection_EmptyType(t *testing.T) {
 	ctx := context.Background()
 
 	config := map[string]string{"key": "value"}
-	_, err := query.CreateConnection(ctx, "valid-name", "", config)
+	_, err := query.CreateConnection(ctx, "valid-name", "", config, nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "type cannot be empty")
 }

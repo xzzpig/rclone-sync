@@ -161,7 +161,7 @@ type ConnectionService interface {
     GetConnectionByName(ctx context.Context, name string) (*ent.Connection, error)
 
     // CreateConnection 创建新连接
-    CreateConnection(ctx context.Context, name, connType string, config map[string]string) (*ent.Connection, error)
+    CreateConnection(ctx context.Context, name, connType string, config map[string]string, options *model.ConnectionOptions) (*ent.Connection, error)
 
     // UpdateConnection 更新连接
     UpdateConnection(ctx context.Context, id uuid.UUID, name, connType string, config map[string]string) error
@@ -218,16 +218,19 @@ func (s *connectionService) GetConnectionByName(ctx context.Context, name string
     return conn, nil
 }
 
-func (s *connectionService) CreateConnection(ctx context.Context, name, connType string, config map[string]string) (*ent.Connection, error) {
+func (s *connectionService) CreateConnection(ctx context.Context, name, connType string, config map[string]string, options *model.ConnectionOptions) (*ent.Connection, error) {
     encrypted, err := s.encryptor.EncryptConfig(config)
     if err != nil {
         return nil, err
     }
-    return s.db.Connection.Create().
+    create := s.db.Connection.Create().
         SetName(name).
         SetType(connType).
-        SetEncryptedConfig(encrypted).
-        Save(ctx)
+        SetEncryptedConfig(encrypted)
+    if options != nil {
+        create = create.SetOptions(options)
+    }
+    return create.Save(ctx)
 }
 ```
 
@@ -328,7 +331,7 @@ func (s *DBStorage) SetValue(section, key, value string) {
         if key == "type" {
             connType = value
         }
-        _ = s.svc.CreateConnection(ctx, section, connType, config)
+        _ = s.svc.CreateConnection(ctx, section, connType, config, nil)
         return
     }
 

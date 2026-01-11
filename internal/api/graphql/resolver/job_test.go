@@ -969,3 +969,87 @@ func (s *JobResolverTestSuite) TestJob_ErrorsFieldForFailedJob() {
 	assert.Equal(s.T(), "FAILED", items[0].Get("status").String())
 	assert.Equal(s.T(), "Connection timeout", items[0].Get("errors").String())
 }
+
+func (s *JobResolverTestSuite) TestJob_TaskLoadError() {
+	connID := s.Env.CreateTestConnection(s.T(), "test-conn")
+	task := s.Env.CreateTestTask(s.T(), "test-task", connID)
+	s.createTestJob(task.ID)
+
+	query := `
+		query($taskId: ID) {
+			job {
+				list(taskId: $taskId) {
+					items {
+						id
+						task {
+							id
+							name
+							connection {
+								id
+								name
+							}
+						}
+					}
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
+		"taskId": task.ID.String(),
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	items := gjson.Get(data, "job.list.items").Array()
+	require.Len(s.T(), items, 1)
+	assert.Equal(s.T(), task.ID.String(), items[0].Get("task.id").String())
+	assert.Equal(s.T(), connID.String(), items[0].Get("task.connection.id").String())
+}
+
+func (s *JobResolverTestSuite) TestJobQuery_ListEmpty() {
+	query := `
+		query {
+			job {
+				list {
+					items {
+						id
+					}
+					totalCount
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQL(s.T(), GraphQLRequest{Query: query})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	assert.Equal(s.T(), 0, int(gjson.Get(data, "job.list.totalCount").Int()))
+	assert.Equal(s.T(), 0, len(gjson.Get(data, "job.list.items").Array()))
+}
+
+func (s *JobResolverTestSuite) TestLogQuery_ListEmpty() {
+	connID := s.Env.CreateTestConnection(s.T(), "test-conn")
+
+	query := `
+		query($connectionId: ID!) {
+			log {
+				list(connectionId: $connectionId) {
+					items {
+						id
+					}
+					totalCount
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
+		"connectionId": connID.String(),
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	assert.Equal(s.T(), 0, int(gjson.Get(data, "log.list.totalCount").Int()))
+}

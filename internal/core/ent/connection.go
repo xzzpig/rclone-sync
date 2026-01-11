@@ -3,6 +3,7 @@
 package ent
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/connection"
 )
 
@@ -24,6 +26,8 @@ type Connection struct {
 	Type string `json:"type,omitempty"`
 	// AES-GCM encrypted configuration JSON
 	EncryptedConfig []byte `json:"encrypted_config,omitempty"`
+	// Connection extended options (includes cache configuration)
+	Options *model.ConnectionOptions `json:"options,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -57,7 +61,7 @@ func (*Connection) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case connection.FieldEncryptedConfig:
+		case connection.FieldEncryptedConfig, connection.FieldOptions:
 			values[i] = new([]byte)
 		case connection.FieldName, connection.FieldType:
 			values[i] = new(sql.NullString)
@@ -103,6 +107,14 @@ func (_m *Connection) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field encrypted_config", values[i])
 			} else if value != nil {
 				_m.EncryptedConfig = *value
+			}
+		case connection.FieldOptions:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field options", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.Options); err != nil {
+					return fmt.Errorf("unmarshal field options: %w", err)
+				}
 			}
 		case connection.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -165,6 +177,9 @@ func (_m *Connection) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("encrypted_config=")
 	builder.WriteString(fmt.Sprintf("%v", _m.EncryptedConfig))
+	builder.WriteString(", ")
+	builder.WriteString("options=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Options))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(_m.CreatedAt.Format(time.ANSIC))

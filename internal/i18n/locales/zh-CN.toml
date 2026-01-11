@@ -91,6 +91,15 @@ other = "过滤器规则 #{{.Index}} \"{{.Rule}}\" 无效: {{.Reason}}"
 [error_transfers_out_of_range]
 other = "并行传输数量必须在 1-64 之间，当前值为 {{.Value}}"
 
+[error_invalid_info_age]
+other = "无效的 infoAge 格式: {{.Error}}"
+
+[error_invalid_change_notify_poll]
+other = "无效的 changeNotifyPoll 格式: {{.Error}}"
+
+[error_change_notify_poll_too_short]
+other = "changeNotifyPoll 必须至少为 10 秒"
+
 # Status messages
 [status_syncing]
 other = "同步中"
@@ -122,3 +131,15 @@ other = "删除成功"
 
 [success_sync_started]
 other = "同步已开始"
+
+[cache_clear_success]
+other = "缓存清理成功"
+
+[cache_clear_success_empty]
+other = "缓存清理成功（无缓存数据）"
+
+[cache_clear_failed]
+other = "缓存清理失败: {{.Error}}"
+
+[cache_not_enabled]
+other = "此连接未启用缓存"

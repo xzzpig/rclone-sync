@@ -36,7 +36,7 @@ func setupConnectionTestDB(t *testing.T) (*ent.Client, *query.ConnectionQuery) {
 	connectionQuery := query.NewConnectionQuery(client, encryptor)
 
 	// Install DBStorage for rclone configuration
-	storage := rclone.NewDBStorage(connectionQuery)
+	storage := rclone.NewDBStorage(connectionQuery, t.TempDir())
 	storage.Install()
 
 	t.Cleanup(func() {
@@ -53,7 +53,7 @@ func TestConnectionLoader_Load_ExistingConnection(t *testing.T) {
 	// Create a test connection
 	conn, err := connectionQuery.CreateConnection(ctx, "test-connection", "local", map[string]string{
 		"type": "local",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	// Create loader
@@ -90,17 +90,17 @@ func TestConnectionLoader_LoadAll_MultipleConnections(t *testing.T) {
 	// Create multiple test connections
 	conn1, err := connectionQuery.CreateConnection(ctx, "connection-1", "local", map[string]string{
 		"type": "local",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	conn2, err := connectionQuery.CreateConnection(ctx, "connection-2", "local", map[string]string{
 		"type": "local",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	conn3, err := connectionQuery.CreateConnection(ctx, "connection-3", "local", map[string]string{
 		"type": "local",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	// Create loader
@@ -126,7 +126,7 @@ func TestConnectionLoader_LoadAll_MixedExistingAndNonExistent(t *testing.T) {
 	// Create one test connection
 	conn1, err := connectionQuery.CreateConnection(ctx, "connection-1", "local", map[string]string{
 		"type": "local",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	nonExistentID := uuid.New()
@@ -159,7 +159,7 @@ func TestConnectionLoader_LoadAll_PreservesOrder(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		conn, err := connectionQuery.CreateConnection(ctx, "connection-"+string(rune('A'+i)), "local", map[string]string{
 			"type": "local",
-		})
+		}, nil)
 		require.NoError(t, err)
 		connections = append(connections, conn)
 	}
@@ -210,7 +210,7 @@ func TestConnectionLoader_LoadAll_DuplicateIDs(t *testing.T) {
 	// Create a test connection
 	conn, err := connectionQuery.CreateConnection(ctx, "test-connection", "local", map[string]string{
 		"type": "local",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	// Create loader

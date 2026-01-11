@@ -68,12 +68,12 @@ type JobQuery interface {
 
 // ConnectionQuery defines the interface for connection management operations.
 type ConnectionQuery interface {
-	CreateConnection(ctx context.Context, name, providerType string, config map[string]string) (*ent.Connection, error)
+	CreateConnection(ctx context.Context, name, providerType string, config map[string]string, options *model.ConnectionOptions) (*ent.Connection, error)
 	ListConnections(ctx context.Context) ([]*ent.Connection, error)
 	ListConnectionNames(ctx context.Context) ([]string, error)
 	GetConnectionByName(ctx context.Context, name string) (*ent.Connection, error)
 	GetConnectionConfig(ctx context.Context, name string) (map[string]string, error)
-	UpdateConnection(ctx context.Context, id uuid.UUID, name, connType *string, config map[string]string) error
+	UpdateConnection(ctx context.Context, id uuid.UUID, name, connType *string, config map[string]string, options *model.ConnectionOptions) error
 	DeleteConnectionByName(ctx context.Context, name string) error
 	HasAssociatedTasks(ctx context.Context, connectionID uuid.UUID) (bool, error)
 }

@@ -22,6 +22,10 @@ A cloud sync management tool based on `rclone` development, designed to provide 
 - **Smart Trigger Mechanism**:
   - **Real-time Sync**: Listen for file system changes and trigger sync immediately with debounce protection.
   - **Scheduled Tasks**: Support custom schedules (Cron) for automatic execution.
+- **Performance Acceleration**:
+  - **Metadata Cache**: Caches directory listings to speed up sync for large directories (100k+ files), reducing overhead significantly.
+  - **ChangeNotify Support**: Automatically updates cache via real-time change events (supports OneDrive, Google Drive, Dropbox, Box).
+  - **Flexible Config**: Enable per-connection in UI with customizable cache expiry and polling intervals.
 - **Visual Monitoring**:
   - **Real-time Progress**: View current transfer files, speed, and progress for each file with live updates.
   - **Quota Monitoring**: View cloud storage usage, remaining space, trashed space, and object count.

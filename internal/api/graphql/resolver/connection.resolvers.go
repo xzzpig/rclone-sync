@@ -11,9 +11,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/generated"
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/subscription"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 	"github.com/xzzpig/rclone-sync/internal/i18n"
 	"github.com/xzzpig/rclone-sync/internal/rclone"
+	"github.com/xzzpig/rclone-sync/internal/rclone/backend/metacache"
 	"go.uber.org/zap"
 )
 
@@ -106,44 +108,83 @@ func (r *connectionResolver) Quota(ctx context.Context, obj *model.Connection) (
 	}, nil
 }
 
+// CacheStatus is the resolver for the cacheStatus field.
+func (r *connectionResolver) CacheStatus(ctx context.Context, obj *model.Connection) (*model.ConnectionCacheStatus, error) {
+	if !model.IsCacheEnabled(obj.Options) || r.deps.PinManager == nil {
+		return nil, nil
+	}
+	return r.deps.PinManager.GetCacheStatus(obj.ID), nil
+}
+
 // Create is the resolver for the create field.
 func (r *connectionMutationResolver) Create(ctx context.Context, obj *model.ConnectionMutation, input model.CreateConnectionInput) (*model.Connection, error) {
-	entConn, err := r.deps.ConnectionQuery.CreateConnection(ctx, input.Name, input.Type, input.Config)
+	if input.Options != nil {
+		if err := model.ValidateConnectionOptions(input.Options); err != nil {
+			return nil, err
+		}
+	}
+
+	options := model.ConnectionOptionsInputToModel(input.Options)
+	entConn, err := r.deps.ConnectionQuery.CreateConnection(ctx, input.Name, input.Type, input.Config, options)
 	if err != nil {
 		return nil, err
 	}
+
+	if model.IsCacheEnabled(options) && r.deps.PinManager != nil {
+		if err := r.deps.PinManager.PinConnection(entConn); err != nil {
+			logger.Named("api.graphql.resolver.connection").Warn("Failed to pin connection after create",
+				zap.String("connection_id", entConn.ID.String()),
+				zap.Error(err))
+		}
+	}
+
 	return entConnectionToModel(entConn), nil
 }
 
 // Update is the resolver for the update field.
 func (r *connectionMutationResolver) Update(ctx context.Context, obj *model.ConnectionMutation, id uuid.UUID, input model.UpdateConnectionInput) (*model.Connection, error) {
-	// Get old connection name before update for cache invalidation
+	if input.Options != nil {
+		if err := model.ValidateConnectionOptions(input.Options); err != nil {
+			return nil, err
+		}
+	}
+
 	oldConn, err := r.deps.ConnectionQuery.GetConnectionByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	oldName := oldConn.Name
+	oldCacheEnabled := model.IsCacheEnabled(oldConn.Options)
 
-	err = r.deps.ConnectionQuery.UpdateConnection(ctx, id, input.Name, nil, input.Config)
+	options := model.ConnectionOptionsInputToModel(input.Options)
+	err = r.deps.ConnectionQuery.UpdateConnection(ctx, id, input.Name, nil, input.Config, options)
 	if err != nil {
 		return nil, err
 	}
 
-	// Clear Fs cache for the old connection name to ensure stale cached Fs is removed.
-	// This is necessary because UpdateConnection may not go through storage.go's SetValue/DeleteSection
-	// which already calls cache.ClearConfig internally.
 	rclone.ClearFsCache(oldName)
-
-	// If name changed, also clear new name cache (defensive, though it shouldn't exist yet)
 	if input.Name != nil && *input.Name != oldName {
 		rclone.ClearFsCache(*input.Name)
 	}
 
-	// Fetch updated connection
 	entConn, err := r.deps.ConnectionQuery.GetConnectionByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
+
+	if r.deps.PinManager != nil {
+		newCacheEnabled := model.IsCacheEnabled(entConn.Options)
+		if !oldCacheEnabled && newCacheEnabled {
+			if err := r.deps.PinManager.PinConnection(entConn); err != nil {
+				logger.Named("api.graphql.resolver.connection").Warn("Failed to pin connection after update",
+					zap.String("connection_id", id.String()),
+					zap.Error(err))
+			}
+		} else if oldCacheEnabled && !newCacheEnabled {
+			r.deps.PinManager.UnpinConnection(id.String())
+		}
+	}
+
 	return entConnectionToModel(entConn), nil
 }
 
@@ -164,6 +205,10 @@ func (r *connectionMutationResolver) Delete(ctx context.Context, obj *model.Conn
 	}
 	if taskCount > 0 {
 		return nil, i18n.ErrBadRequestI18n(i18n.ErrConnectionHasDependentTasks)
+	}
+
+	if r.deps.PinManager != nil {
+		r.deps.PinManager.UnpinConnection(id.String())
 	}
 
 	err = r.deps.ConnectionQuery.DeleteConnectionByID(ctx, id)
@@ -218,6 +263,60 @@ func (r *connectionMutationResolver) TestUnsaved(ctx context.Context, obj *model
 
 	return &model.ConnectionTestSuccess{
 		Message: "Connection test successful",
+	}, nil
+}
+
+// ClearCache is the resolver for the clearCache field.
+func (r *connectionMutationResolver) ClearCache(ctx context.Context, obj *model.ConnectionMutation, id uuid.UUID) (*model.ClearCacheResult, error) {
+	entConn, err := r.deps.ConnectionQuery.GetConnectionByID(ctx, id)
+	if err != nil {
+		return nil, i18n.ErrNotFoundI18n(i18n.ErrConnectionNotFound)
+	}
+
+	if !model.IsCacheEnabled(entConn.Options) {
+		return &model.ClearCacheResult{
+			Success:      false,
+			ClearedCount: 0,
+			Message:      i18n.Ctx(ctx, i18n.CacheNotEnabled),
+		}, nil
+	}
+
+	connID := id.String()
+	cacheName := rclone.GetCacheRemoteName(entConn.Name)
+
+	store := metacache.GetCacheStoreIfExists(cacheName)
+	if store == nil {
+		return &model.ClearCacheResult{
+			Success:      true,
+			ClearedCount: 0,
+			Message:      i18n.Ctx(ctx, i18n.CacheClearSuccessEmpty),
+		}, nil
+	}
+
+	clearedCount, err := store.Clear()
+	if err != nil {
+		logger.Named("api.graphql.resolver.connection").Error("Failed to clear cache",
+			zap.String("connection_id", connID),
+			zap.Error(err))
+		return &model.ClearCacheResult{
+			Success:      false,
+			ClearedCount: 0,
+			Message:      i18n.CtxWithData(ctx, i18n.CacheClearFailed, map[string]interface{}{"Error": err.Error()}),
+		}, nil
+	}
+
+	if r.deps.PinManager != nil {
+		r.deps.PinManager.PublishCacheStatus(id)
+	}
+
+	logger.Named("api.graphql.resolver.connection").Info("Cache cleared successfully",
+		zap.String("connection_id", connID),
+		zap.Int64("cleared_count", clearedCount))
+
+	return &model.ClearCacheResult{
+		Success:      true,
+		ClearedCount: int(clearedCount),
+		Message:      i18n.Ctx(ctx, i18n.CacheClearSuccess),
 	}, nil
 }
 
@@ -281,6 +380,40 @@ func (r *mutationResolver) Connection(ctx context.Context) (*model.ConnectionMut
 // Connection is the resolver for the connection field.
 func (r *queryResolver) Connection(ctx context.Context) (*model.ConnectionQuery, error) {
 	return &model.ConnectionQuery{}, nil
+}
+
+// CacheStatus is the resolver for the cacheStatus field.
+func (r *subscriptionResolver) CacheStatus(ctx context.Context, connectionID uuid.UUID) (<-chan *model.ConnectionCacheStatus, error) {
+	if r.deps.CacheStatusBus == nil {
+		return nil, ErrCacheStatusBusNotAvailable
+	}
+
+	out := make(chan *model.ConnectionCacheStatus)
+	filter := subscription.CacheStatusFilter(connectionID)
+	sub := r.deps.CacheStatusBus.Subscribe(filter)
+
+	go func() {
+		defer r.deps.CacheStatusBus.Unsubscribe(sub.ID)
+		defer close(out)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case event, ok := <-sub.Events:
+				if !ok {
+					return
+				}
+				select {
+				case out <- event:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+
+	return out, nil
 }
 
 // Connection returns generated.ConnectionResolver implementation.

@@ -1303,7 +1303,204 @@ func (s *SubscriptionResolverTestSuite) TestJobProgressBus_ZeroFilesDeletedAndEr
 	}
 }
 
-// TestJobProgressBus_TaskAndConnectionFilter tests filtering by both taskID and connectionID.
+func (s *SubscriptionResolverTestSuite) TestSubscription_CacheStatus_NilBus() {
+	deps := &resolver.Dependencies{
+		CacheStatusBus: nil,
+	}
+	res := resolver.New(deps)
+
+	ctx := context.Background()
+	_, err := res.Subscription().CacheStatus(ctx, uuid.New())
+
+	assert.Error(s.T(), err)
+	assert.Equal(s.T(), resolver.ErrCacheStatusBusNotAvailable, err)
+}
+
+func (s *SubscriptionResolverTestSuite) TestSubscription_CacheStatus_ReceivesEvents() {
+	cacheStatusBus := subscription.NewCacheStatusBus()
+	s.Env.Deps.CacheStatusBus = cacheStatusBus
+
+	res := NewResolverForTest(s.Env.Deps)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	connectionID := uuid.New()
+	ch, err := res.Subscription().CacheStatus(ctx, connectionID)
+	assert.NoError(s.T(), err)
+	assert.NotNil(s.T(), ch)
+
+	event := &model.ConnectionCacheStatus{
+		ConnectionID:          connectionID,
+		Running:               true,
+		EntriesCount:          100,
+		ChangeNotifySupported: true,
+	}
+
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cacheStatusBus.Publish(event)
+	}()
+
+	select {
+	case received := <-ch:
+		assert.Equal(s.T(), connectionID, received.ConnectionID)
+		assert.True(s.T(), received.Running)
+		assert.Equal(s.T(), 100, received.EntriesCount)
+		assert.True(s.T(), received.ChangeNotifySupported)
+	case <-time.After(time.Second):
+		s.T().Error("Timeout waiting for event from CacheStatus resolver")
+	}
+}
+
+func (s *SubscriptionResolverTestSuite) TestSubscription_CacheStatus_ContextCancellation() {
+	cacheStatusBus := subscription.NewCacheStatusBus()
+	s.Env.Deps.CacheStatusBus = cacheStatusBus
+
+	res := NewResolverForTest(s.Env.Deps)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	initialCount := cacheStatusBus.SubscriberCount()
+
+	connectionID := uuid.New()
+	ch, err := res.Subscription().CacheStatus(ctx, connectionID)
+	assert.NoError(s.T(), err)
+	assert.NotNil(s.T(), ch)
+
+	time.Sleep(50 * time.Millisecond)
+	assert.Equal(s.T(), initialCount+1, cacheStatusBus.SubscriberCount())
+
+	cancel()
+
+	time.Sleep(100 * time.Millisecond)
+
+	assert.Equal(s.T(), initialCount, cacheStatusBus.SubscriberCount())
+
+	select {
+	case _, ok := <-ch:
+		assert.False(s.T(), ok, "Channel should be closed after context cancellation")
+	case <-time.After(100 * time.Millisecond):
+		s.T().Error("Channel should be closed after context cancellation")
+	}
+}
+
+func (s *SubscriptionResolverTestSuite) TestSubscription_CacheStatus_FiltersByConnectionID() {
+	cacheStatusBus := subscription.NewCacheStatusBus()
+	s.Env.Deps.CacheStatusBus = cacheStatusBus
+
+	res := NewResolverForTest(s.Env.Deps)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	targetConnectionID := uuid.New()
+	ch, err := res.Subscription().CacheStatus(ctx, targetConnectionID)
+	assert.NoError(s.T(), err)
+
+	matchingEvent := &model.ConnectionCacheStatus{
+		ConnectionID: targetConnectionID,
+		Running:      true,
+		EntriesCount: 50,
+	}
+
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cacheStatusBus.Publish(matchingEvent)
+	}()
+
+	select {
+	case received := <-ch:
+		assert.Equal(s.T(), targetConnectionID, received.ConnectionID)
+	case <-time.After(time.Second):
+		s.T().Error("Timeout waiting for filtered event")
+	}
+
+	otherEvent := &model.ConnectionCacheStatus{
+		ConnectionID: uuid.New(),
+		Running:      false,
+		EntriesCount: 200,
+	}
+
+	cacheStatusBus.Publish(otherEvent)
+
+	select {
+	case <-ch:
+		s.T().Error("Should not receive events for different connectionID")
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+func (s *SubscriptionResolverTestSuite) TestCacheStatusBus_Publish() {
+	bus := subscription.NewCacheStatusBus()
+
+	connectionID := uuid.New()
+	sub := bus.Subscribe(nil)
+	defer bus.Unsubscribe(sub.ID)
+
+	event := &model.ConnectionCacheStatus{
+		ConnectionID:          connectionID,
+		Running:               true,
+		EntriesCount:          150,
+		ChangeNotifySupported: false,
+	}
+
+	go func() {
+		bus.Publish(event)
+	}()
+
+	select {
+	case received := <-sub.Events:
+		assert.Equal(s.T(), connectionID, received.ConnectionID)
+		assert.True(s.T(), received.Running)
+		assert.Equal(s.T(), 150, received.EntriesCount)
+		assert.False(s.T(), received.ChangeNotifySupported)
+	case <-time.After(time.Second):
+		s.T().Error("Timeout waiting for cache status event")
+	}
+}
+
+func (s *SubscriptionResolverTestSuite) TestCacheStatusBus_FilterByConnectionID() {
+	bus := subscription.NewCacheStatusBus()
+
+	connectionID := uuid.New()
+	otherConnectionID := uuid.New()
+
+	sub := bus.Subscribe(subscription.CacheStatusFilter(connectionID))
+	defer bus.Unsubscribe(sub.ID)
+
+	matchingEvent := &model.ConnectionCacheStatus{
+		ConnectionID: connectionID,
+		Running:      true,
+		EntriesCount: 100,
+	}
+
+	go func() {
+		bus.Publish(matchingEvent)
+	}()
+
+	select {
+	case received := <-sub.Events:
+		assert.Equal(s.T(), connectionID, received.ConnectionID)
+	case <-time.After(time.Second):
+		s.T().Error("Timeout waiting for event")
+	}
+
+	otherEvent := &model.ConnectionCacheStatus{
+		ConnectionID: otherConnectionID,
+		Running:      false,
+		EntriesCount: 200,
+	}
+
+	bus.Publish(otherEvent)
+
+	select {
+	case <-sub.Events:
+		s.T().Error("Should not receive events for different connection")
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
 func (s *SubscriptionResolverTestSuite) TestJobProgressBus_TaskAndConnectionFilter() {
 	bus := s.Env.Deps.JobProgressBus
 

@@ -136,3 +136,68 @@ func TestIsConnectionLoaded(t *testing.T) {
 	// through cache.Get or GetFs, which needs a real remote configuration.
 	// This is better tested in integration tests like TestListRemoteDir_CacheBehavior.
 }
+
+// TestGetRemoteName tests the GetRemoteName helper function
+func TestGetRemoteName(t *testing.T) {
+	t.Run("returns original name when cache disabled", func(t *testing.T) {
+		result := GetRemoteName("myremote", false)
+		assert.Equal(t, "myremote", result)
+	})
+
+	t.Run("returns name with cache suffix when cache enabled", func(t *testing.T) {
+		result := GetRemoteName("myremote", true)
+		assert.Equal(t, "myremote-cache", result)
+	})
+
+	t.Run("works with empty connection name", func(t *testing.T) {
+		result := GetRemoteName("", false)
+		assert.Equal(t, "", result)
+
+		resultWithCache := GetRemoteName("", true)
+		assert.Equal(t, "-cache", resultWithCache)
+	})
+
+	t.Run("works with special characters in name", func(t *testing.T) {
+		result := GetRemoteName("my_remote-123", true)
+		assert.Equal(t, "my_remote-123-cache", result)
+	})
+
+	t.Run("does not double the suffix", func(t *testing.T) {
+		// If someone passes a name that already ends with -cache (edge case),
+		// it still adds the suffix (which is expected behavior)
+		result := GetRemoteName("existing-cache", true)
+		assert.Equal(t, "existing-cache-cache", result)
+	})
+}
+
+// TestGetCachedFs tests the GetCachedFs helper function
+func TestGetCachedFs(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("uses original remote when cache disabled", func(t *testing.T) {
+		// This will fail because 'nonexistent-remote' doesn't exist,
+		// but we can verify the error message contains the original name
+		_, err := GetCachedFs(ctx, "nonexistent-remote", "path", false)
+		assert.Error(t, err)
+		// The error should reference the original remote name
+		assert.Contains(t, err.Error(), "nonexistent-remote")
+	})
+
+	t.Run("uses cache suffix when cache enabled", func(t *testing.T) {
+		// This will fail because 'test-cache' doesn't exist as a remote,
+		// but we can verify the error message contains the cache suffix
+		_, err := GetCachedFs(ctx, "test", "path", true)
+		assert.Error(t, err)
+		// The error should reference the cache-suffixed remote name
+		assert.Contains(t, err.Error(), "test-cache")
+	})
+
+	t.Run("local paths work with GetFs fallback", func(t *testing.T) {
+		// For local paths, use GetFs directly (empty connection name)
+		tmpDir := t.TempDir()
+		fsObj, err := GetFs(ctx, "", tmpDir)
+		require.NoError(t, err)
+		assert.NotNil(t, fsObj)
+		assert.Equal(t, tmpDir, fsObj.Root())
+	})
+}

@@ -895,3 +895,441 @@ func (s *ConnectionResolverTestSuite) TestConnectionMutation_CreateDuplicateName
 	})
 	require.NotEmpty(s.T(), resp.Errors, "Should fail with duplicate name")
 }
+
+func (s *ConnectionResolverTestSuite) TestConnectionMutation_CreateWithOptions() {
+	mutation := `
+		mutation($input: CreateConnectionInput!) {
+			connection {
+				create(input: $input) {
+					id
+					name
+					options {
+						cache {
+							enabled
+							infoAge
+							changeNotifyPoll
+						}
+					}
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), mutation, map[string]interface{}{
+		"input": map[string]interface{}{
+			"name":   "conn-with-options",
+			"type":   "local",
+			"config": map[string]interface{}{"type": "local"},
+			"options": map[string]interface{}{
+				"cache": map[string]interface{}{
+					"enabled":          true,
+					"infoAge":          "12h",
+					"changeNotifyPoll": "2m",
+				},
+			},
+		},
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	assert.NotEmpty(s.T(), gjson.Get(data, "connection.create.id").String())
+	assert.True(s.T(), gjson.Get(data, "connection.create.options.cache.enabled").Bool())
+	assert.Equal(s.T(), "12h", gjson.Get(data, "connection.create.options.cache.infoAge").String())
+	assert.Equal(s.T(), "2m", gjson.Get(data, "connection.create.options.cache.changeNotifyPoll").String())
+}
+
+func (s *ConnectionResolverTestSuite) TestConnectionMutation_UpdateWithOptions() {
+	connID := s.Env.CreateTestConnection(s.T(), "conn-update-options")
+
+	mutation := `
+		mutation($id: ID!, $input: UpdateConnectionInput!) {
+			connection {
+				update(id: $id, input: $input) {
+					id
+					options {
+						cache {
+							enabled
+							infoAge
+						}
+					}
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), mutation, map[string]interface{}{
+		"id": connID.String(),
+		"input": map[string]interface{}{
+			"options": map[string]interface{}{
+				"cache": map[string]interface{}{
+					"enabled": true,
+					"infoAge": "24h",
+				},
+			},
+		},
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	assert.True(s.T(), gjson.Get(data, "connection.update.options.cache.enabled").Bool())
+	assert.Equal(s.T(), "24h", gjson.Get(data, "connection.update.options.cache.infoAge").String())
+}
+
+func (s *ConnectionResolverTestSuite) TestConnection_CacheStatusNoCacheEnabled() {
+	connID := s.Env.CreateTestConnection(s.T(), "conn-no-cache")
+
+	query := `
+		query($id: ID!) {
+			connection {
+				get(id: $id) {
+					id
+					cacheStatus {
+						running
+						changeNotifySupported
+						entriesCount
+					}
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), query, map[string]interface{}{
+		"id": connID.String(),
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	cacheStatus := gjson.Get(data, "connection.get.cacheStatus")
+	assert.True(s.T(), cacheStatus.Type == gjson.Null || !cacheStatus.Exists())
+}
+
+func (s *ConnectionResolverTestSuite) TestConnectionMutation_CreateWithInvalidInfoAge() {
+	mutation := `
+		mutation($input: CreateConnectionInput!) {
+			connection {
+				create(input: $input) {
+					id
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), mutation, map[string]interface{}{
+		"input": map[string]interface{}{
+			"name":   "conn-invalid-infoage",
+			"type":   "local",
+			"config": map[string]interface{}{"type": "local"},
+			"options": map[string]interface{}{
+				"cache": map[string]interface{}{
+					"enabled": true,
+					"infoAge": "invalid-duration",
+				},
+			},
+		},
+	})
+	require.NotEmpty(s.T(), resp.Errors, "Should fail with invalid infoAge format")
+}
+
+func (s *ConnectionResolverTestSuite) TestConnectionMutation_CreateWithTooShortChangeNotifyPoll() {
+	mutation := `
+		mutation($input: CreateConnectionInput!) {
+			connection {
+				create(input: $input) {
+					id
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), mutation, map[string]interface{}{
+		"input": map[string]interface{}{
+			"name":   "conn-short-poll",
+			"type":   "local",
+			"config": map[string]interface{}{"type": "local"},
+			"options": map[string]interface{}{
+				"cache": map[string]interface{}{
+					"enabled":          true,
+					"changeNotifyPoll": "5s",
+				},
+			},
+		},
+	})
+	require.NotEmpty(s.T(), resp.Errors, "Should fail with changeNotifyPoll < 10s")
+}
+
+func (s *ConnectionResolverTestSuite) TestConnectionMutation_ClearCache_NotEnabled() {
+	connID := s.Env.CreateTestConnection(s.T(), "conn-clear-cache-disabled")
+
+	mutation := `
+		mutation($id: ID!) {
+			connection {
+				clearCache(id: $id) {
+					success
+					clearedCount
+					message
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), mutation, map[string]interface{}{
+		"id": connID.String(),
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	assert.False(s.T(), gjson.Get(data, "connection.clearCache.success").Bool())
+	assert.Equal(s.T(), 0, int(gjson.Get(data, "connection.clearCache.clearedCount").Int()))
+	assert.Contains(s.T(), gjson.Get(data, "connection.clearCache.message").String(), "not enabled")
+}
+
+func (s *ConnectionResolverTestSuite) TestConnectionMutation_ClearCache_NotFound() {
+	mutation := `
+		mutation($id: ID!) {
+			connection {
+				clearCache(id: $id) {
+					success
+					clearedCount
+					message
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), mutation, map[string]interface{}{
+		"id": uuid.New().String(),
+	})
+	require.NotEmpty(s.T(), resp.Errors, "Should fail with non-existent connection")
+}
+
+// TestConnectionMutation_ClearCache_CacheEnabledNoStore tests clearCache when cache is enabled but no store exists yet.
+func (s *ConnectionResolverTestSuite) TestConnectionMutation_ClearCache_CacheEnabledNoStore() {
+	// Create connection with cache enabled
+	createMutation := `
+		mutation($input: CreateConnectionInput!) {
+			connection {
+				create(input: $input) {
+					id
+				}
+			}
+		}
+	`
+
+	createResp := s.Env.ExecuteGraphQLWithVars(s.T(), createMutation, map[string]interface{}{
+		"input": map[string]interface{}{
+			"name":   "conn-clear-cache-no-store",
+			"type":   "local",
+			"config": map[string]interface{}{"type": "local"},
+			"options": map[string]interface{}{
+				"cache": map[string]interface{}{
+					"enabled": true,
+					"infoAge": "1h",
+				},
+			},
+		},
+	})
+	require.Empty(s.T(), createResp.Errors)
+	connID := gjson.Get(string(createResp.Data), "connection.create.id").String()
+
+	// Clear cache - should succeed with 0 cleared count (no store exists yet)
+	clearMutation := `
+		mutation($id: ID!) {
+			connection {
+				clearCache(id: $id) {
+					success
+					clearedCount
+					message
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), clearMutation, map[string]interface{}{
+		"id": connID,
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	assert.True(s.T(), gjson.Get(data, "connection.clearCache.success").Bool())
+	assert.Equal(s.T(), 0, int(gjson.Get(data, "connection.clearCache.clearedCount").Int()))
+}
+
+// TestConnectionMutation_UpdateWithNameChange tests update with name change triggers cache clearing.
+func (s *ConnectionResolverTestSuite) TestConnectionMutation_UpdateWithNameChange() {
+	connID := s.Env.CreateTestConnection(s.T(), "original-conn-name")
+
+	mutation := `
+		mutation($id: ID!, $input: UpdateConnectionInput!) {
+			connection {
+				update(id: $id, input: $input) {
+					id
+					name
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), mutation, map[string]interface{}{
+		"id": connID.String(),
+		"input": map[string]interface{}{
+			"name": "new-conn-name",
+		},
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	assert.Equal(s.T(), connID.String(), gjson.Get(data, "connection.update.id").String())
+	assert.Equal(s.T(), "new-conn-name", gjson.Get(data, "connection.update.name").String())
+}
+
+// TestConnectionMutation_UpdateEnableCache tests update that enables cache option.
+func (s *ConnectionResolverTestSuite) TestConnectionMutation_UpdateEnableCache() {
+	// Create connection without cache first
+	connID := s.Env.CreateTestConnection(s.T(), "conn-enable-cache")
+
+	mutation := `
+		mutation($id: ID!, $input: UpdateConnectionInput!) {
+			connection {
+				update(id: $id, input: $input) {
+					id
+					options {
+						cache {
+							enabled
+							infoAge
+						}
+					}
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), mutation, map[string]interface{}{
+		"id": connID.String(),
+		"input": map[string]interface{}{
+			"options": map[string]interface{}{
+				"cache": map[string]interface{}{
+					"enabled": true,
+					"infoAge": "6h",
+				},
+			},
+		},
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	assert.True(s.T(), gjson.Get(data, "connection.update.options.cache.enabled").Bool())
+	assert.Equal(s.T(), "6h", gjson.Get(data, "connection.update.options.cache.infoAge").String())
+}
+
+// TestConnectionMutation_UpdateDisableCache tests update that disables cache option.
+func (s *ConnectionResolverTestSuite) TestConnectionMutation_UpdateDisableCache() {
+	// First create connection with cache enabled
+	createMutation := `
+		mutation($input: CreateConnectionInput!) {
+			connection {
+				create(input: $input) {
+					id
+				}
+			}
+		}
+	`
+
+	createResp := s.Env.ExecuteGraphQLWithVars(s.T(), createMutation, map[string]interface{}{
+		"input": map[string]interface{}{
+			"name":   "conn-disable-cache",
+			"type":   "local",
+			"config": map[string]interface{}{"type": "local"},
+			"options": map[string]interface{}{
+				"cache": map[string]interface{}{
+					"enabled": true,
+					"infoAge": "1h",
+				},
+			},
+		},
+	})
+	require.Empty(s.T(), createResp.Errors)
+	connID := gjson.Get(string(createResp.Data), "connection.create.id").String()
+
+	// Now update to disable cache
+	updateMutation := `
+		mutation($id: ID!, $input: UpdateConnectionInput!) {
+			connection {
+				update(id: $id, input: $input) {
+					id
+					options {
+						cache {
+							enabled
+						}
+					}
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), updateMutation, map[string]interface{}{
+		"id": connID,
+		"input": map[string]interface{}{
+			"options": map[string]interface{}{
+				"cache": map[string]interface{}{
+					"enabled": false,
+				},
+			},
+		},
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	assert.False(s.T(), gjson.Get(data, "connection.update.options.cache.enabled").Bool())
+}
+
+// TestConnectionMutation_UpdateOptionsValidation tests update with invalid options.
+func (s *ConnectionResolverTestSuite) TestConnectionMutation_UpdateOptionsValidation() {
+	connID := s.Env.CreateTestConnection(s.T(), "conn-update-validation")
+
+	mutation := `
+		mutation($id: ID!, $input: UpdateConnectionInput!) {
+			connection {
+				update(id: $id, input: $input) {
+					id
+				}
+			}
+		}
+	`
+
+	// Test with invalid infoAge duration
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), mutation, map[string]interface{}{
+		"id": connID.String(),
+		"input": map[string]interface{}{
+			"options": map[string]interface{}{
+				"cache": map[string]interface{}{
+					"enabled": true,
+					"infoAge": "not-a-duration",
+				},
+			},
+		},
+	})
+	require.NotEmpty(s.T(), resp.Errors, "Should fail with invalid infoAge format")
+}
+
+// TestConnectionMutation_TestNotFound tests test mutation with non-existent connection.
+func (s *ConnectionResolverTestSuite) TestConnectionMutation_TestNotFound() {
+	mutation := `
+		mutation($id: ID!) {
+			connection {
+				test(id: $id) {
+					... on ConnectionTestSuccess {
+						message
+					}
+					... on ConnectionTestFailure {
+						error
+					}
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), mutation, map[string]interface{}{
+		"id": uuid.New().String(),
+	})
+	require.NotEmpty(s.T(), resp.Errors, "Should fail with non-existent connection")
+}

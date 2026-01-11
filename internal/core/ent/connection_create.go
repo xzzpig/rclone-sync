@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/connection"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/task"
 )
@@ -37,6 +38,12 @@ func (_c *ConnectionCreate) SetType(v string) *ConnectionCreate {
 // SetEncryptedConfig sets the "encrypted_config" field.
 func (_c *ConnectionCreate) SetEncryptedConfig(v []byte) *ConnectionCreate {
 	_c.mutation.SetEncryptedConfig(v)
+	return _c
+}
+
+// SetOptions sets the "options" field.
+func (_c *ConnectionCreate) SetOptions(v *model.ConnectionOptions) *ConnectionCreate {
+	_c.mutation.SetOptions(v)
 	return _c
 }
 
@@ -219,6 +226,10 @@ func (_c *ConnectionCreate) createSpec() (*Connection, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.EncryptedConfig(); ok {
 		_spec.SetField(connection.FieldEncryptedConfig, field.TypeBytes, value)
 		_node.EncryptedConfig = value
+	}
+	if value, ok := _c.mutation.Options(); ok {
+		_spec.SetField(connection.FieldOptions, field.TypeJSON, value)
+		_node.Options = value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(connection.FieldCreatedAt, field.TypeTime, value)

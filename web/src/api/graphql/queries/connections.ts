@@ -46,6 +46,20 @@ export const ConnectionGetConfigQuery = graphql(`
         name
         type
         config
+        options {
+          cache {
+            enabled
+            infoAge
+            changeNotifyPoll
+          }
+        }
+        cacheStatus {
+          running
+          changeNotifySupported
+          entriesCount
+          dbSizeBytes
+          lastNotifyTime
+        }
       }
     }
   }
@@ -68,6 +82,13 @@ export const ConnectionGetQuotaQuery = graphql(`
           other
           objects
         }
+        cacheStatus {
+          running
+          changeNotifySupported
+          entriesCount
+          dbSizeBytes
+          lastNotifyTime
+        }
       }
     }
   }
@@ -83,6 +104,20 @@ export const ConnectionCreateMutation = graphql(`
         id
         name
         type
+        options {
+          cache {
+            enabled
+            infoAge
+            changeNotifyPoll
+          }
+        }
+        cacheStatus {
+          running
+          changeNotifySupported
+          entriesCount
+          dbSizeBytes
+          lastNotifyTime
+        }
         createdAt
         updatedAt
       }
@@ -101,6 +136,20 @@ export const ConnectionUpdateMutation = graphql(`
         name
         type
         config
+        options {
+          cache {
+            enabled
+            infoAge
+            changeNotifyPoll
+          }
+        }
+        cacheStatus {
+          running
+          changeNotifySupported
+          entriesCount
+          dbSizeBytes
+          lastNotifyTime
+        }
         createdAt
         updatedAt
       }
@@ -155,6 +204,21 @@ export const ConnectionTestUnsavedMutation = graphql(`
         ... on ConnectionTestFailure {
           error
         }
+      }
+    }
+  }
+`);
+
+/**
+ * Mutation to clear cache for a connection
+ */
+export const ConnectionClearCacheMutation = graphql(`
+  mutation ConnectionClearCache($id: ID!) {
+    connection {
+      clearCache(id: $id) {
+        success
+        clearedCount
+        message
       }
     }
   }

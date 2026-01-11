@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -62,7 +63,14 @@ var serveCmd = &cobra.Command{
 		}
 		log.Info("i18n initialized successfully")
 
-		// 4. Initialize database with configured options
+		// 4. Create cache directory
+		cacheDir := filepath.Join(cfg.App.DataDir, "cache")
+		if err := os.MkdirAll(cacheDir, 0750); err != nil {
+			log.Fatal("Failed to create cache directory", zap.String("path", cacheDir), zap.Error(err))
+		}
+		log.Info("Cache directory ready", zap.String("path", cacheDir))
+
+		// 5. Initialize database with configured options
 		dbClient, err := db.InitDB(db.InitDBOptions{
 			DSN:           db.FileSDN(cfg.Database.Path),
 			MigrationMode: db.ParseMigrationMode(cfg.Database.MigrationMode),
@@ -82,9 +90,22 @@ var serveCmd = &cobra.Command{
 
 		// 6. Initialize connection query and DBStorage
 		connSvc := query.NewConnectionQuery(dbClient, encryptor)
-		dbStorage := rclone.NewDBStorage(connSvc)
+		dbStorage := rclone.NewDBStorage(connSvc, cfg.App.DataDir)
 		dbStorage.Install()
 		log.Info("DBStorage installed - rclone will use database for configuration")
+
+		// 6a. Initialize PinManager for metacache connections
+		cacheStatusBus := subscription.NewCacheStatusBus()
+		pinManager := rclone.NewPinManager(cacheStatusBus)
+		connections, err := connSvc.ListConnections(context.Background())
+		if err != nil {
+			log.Warn("Failed to list connections for pin initialization", zap.Error(err))
+		} else {
+			if err := pinManager.InitPinnedConnections(context.Background(), connections); err != nil {
+				log.Error("Failed to initialize pinned connections", zap.Error(err))
+			}
+		}
+		defer pinManager.ShutdownAll()
 
 		// Note: rclone.InitConfig is no longer needed as DBStorage replaces it
 
@@ -134,6 +155,8 @@ var serveCmd = &cobra.Command{
 			Scheduler:           sched,
 			JobProgressBus:      jobProgressBus,
 			TransferProgressBus: transferProgressBus,
+			CacheStatusBus:      cacheStatusBus,
+			PinManager:          pinManager,
 		}
 		r := api.SetupRouter(routerDeps)
 

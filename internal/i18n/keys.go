@@ -32,6 +32,9 @@ const (
 	ErrConnectionHasDependentTasks = "error_connection_has_dependent_tasks"
 	ErrFilterRuleInvalid           = "error_filter_rule_invalid"
 	ErrTransfersOutOfRange         = "error_transfers_out_of_range"
+	ErrInvalidInfoAge              = "error_invalid_info_age"
+	ErrInvalidChangeNotifyPoll     = "error_invalid_change_notify_poll"
+	ErrChangeNotifyPollTooShort    = "error_change_notify_poll_too_short"
 )
 
 // Status message keys
@@ -50,4 +53,12 @@ const (
 	SuccessUpdated   = "success_updated"
 	SuccessDeleted   = "success_deleted"
 	SuccessSyncStart = "success_sync_started"
+)
+
+// Cache message keys
+const (
+	CacheClearSuccess      = "cache_clear_success"
+	CacheClearSuccessEmpty = "cache_clear_success_empty"
+	CacheClearFailed       = "cache_clear_failed"
+	CacheNotEnabled        = "cache_not_enabled"
 )

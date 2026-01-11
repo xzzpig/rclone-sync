@@ -37,7 +37,7 @@ func setupTaskTestDB(t *testing.T) (*ent.Client, *query.TaskQuery, *query.Connec
 	taskQuery := query.NewTaskQuery(client)
 
 	// Install DBStorage for rclone configuration
-	storage := rclone.NewDBStorage(connectionQuery)
+	storage := rclone.NewDBStorage(connectionQuery, t.TempDir())
 	storage.Install()
 
 	t.Cleanup(func() {
@@ -53,7 +53,7 @@ func createTestConnectionForTask(t *testing.T, connectionQuery *query.Connection
 	ctx := context.Background()
 	conn, err := connectionQuery.CreateConnection(ctx, "test-connection", "local", map[string]string{
 		"type": "local",
-	})
+	}, nil)
 	require.NoError(t, err)
 	return conn.ID
 }

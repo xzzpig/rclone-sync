@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/rclone/rclone/fs/fspath"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/connection"
@@ -47,8 +48,8 @@ func ValidateConnectionName(name string) error {
 	return nil
 }
 
-// CreateConnection 创建新的云存储连接
-func (s *ConnectionQuery) CreateConnection(ctx context.Context, name, connType string, config map[string]string) (*ent.Connection, error) {
+// CreateConnection 创建新的云存储连接（包含扩展选项）
+func (s *ConnectionQuery) CreateConnection(ctx context.Context, name, connType string, config map[string]string, options *model.ConnectionOptions) (*ent.Connection, error) {
 	// 验证名称
 	if err := ValidateConnectionName(name); err != nil {
 		return nil, err
@@ -83,12 +84,17 @@ func (s *ConnectionQuery) CreateConnection(ctx context.Context, name, connType s
 	}
 
 	// 创建连接
-	conn, err := s.client.Connection.
+	create := s.client.Connection.
 		Create().
 		SetName(name).
 		SetType(connType).
-		SetEncryptedConfig(encryptedConfig).
-		Save(ctx)
+		SetEncryptedConfig(encryptedConfig)
+
+	if options != nil {
+		create = create.SetOptions(options)
+	}
+
+	conn, err := create.Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection: %w", err)
 	}
@@ -227,8 +233,8 @@ func (s *ConnectionQuery) GetConnectionConfigByID(ctx context.Context, id uuid.U
 	return config, nil
 }
 
-// UpdateConnection 更新连接配置（基于 ID）
-func (s *ConnectionQuery) UpdateConnection(ctx context.Context, id uuid.UUID, name, connType *string, config map[string]string) error {
+// UpdateConnection 更新连接配置（基于 ID）包含扩展选项
+func (s *ConnectionQuery) UpdateConnection(ctx context.Context, id uuid.UUID, name, connType *string, config map[string]string, options *model.ConnectionOptions) error {
 	// 根据 ID 查询连接
 	conn, err := s.client.Connection.Get(ctx, id)
 	if err != nil {
@@ -276,6 +282,10 @@ func (s *ConnectionQuery) UpdateConnection(ctx context.Context, id uuid.UUID, na
 		return fmt.Errorf("failed to encrypt config: %w", err)
 	}
 	update = update.SetEncryptedConfig(encryptedConfig)
+
+	if options != nil {
+		update = update.SetOptions(options)
+	}
 
 	// 保存更新
 	_, err = update.Save(ctx)

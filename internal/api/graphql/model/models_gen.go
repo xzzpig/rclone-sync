@@ -22,6 +22,16 @@ type TestConnectionResult interface {
 	IsTestConnectionResult()
 }
 
+// 清理缓存结果
+type ClearCacheResult struct {
+	// 是否成功
+	Success bool `json:"success"`
+	// 清理的条目数量
+	ClearedCount int `json:"clearedCount"`
+	// 消息（已本地化）
+	Message string `json:"message"`
+}
+
 // 远程存储连接
 type Connection struct {
 	// UUID 主键
@@ -44,6 +54,53 @@ type Connection struct {
 	Tasks *TaskConnection `json:"tasks"`
 	// 配额信息（调用 rclone about API）
 	Quota *ConnectionQuota `json:"quota,omitempty"`
+	// 连接扩展选项（包含缓存配置）
+	Options *ConnectionOptions `json:"options,omitempty"`
+	// 缓存运行时状态（仅当 options.cache.enabled 为 true 时有值）
+	// 这是一个计算字段，不持久化
+	CacheStatus *ConnectionCacheStatus `json:"cacheStatus,omitempty"`
+}
+
+// 元数据缓存配置（持久化配置）
+type ConnectionCacheOptions struct {
+	// 是否启用元数据缓存
+	Enabled bool `json:"enabled"`
+	// 缓存过期时间（Go duration 格式，如 "6h", "24h"）
+	// 空值表示使用默认值（6小时）
+	// "0" 或负值表示永不过期（不推荐）
+	InfoAge *string `json:"infoAge,omitempty"`
+	// ChangeNotify 轮询间隔（Go duration 格式，如 "1m", "5m"）
+	// 空值表示使用默认值（1分钟）
+	// 最小值为 10s
+	ChangeNotifyPoll *string `json:"changeNotifyPoll,omitempty"`
+}
+
+// 元数据缓存配置输入
+type ConnectionCacheOptionsInput struct {
+	// 是否启用元数据缓存
+	Enabled bool `json:"enabled"`
+	// 缓存过期时间（Go duration 格式，如 "6h", "24h"）
+	// 空值或空字符串表示使用默认值（6小时）
+	InfoAge *string `json:"infoAge,omitempty"`
+	// ChangeNotify 轮询间隔（Go duration 格式，如 "1m", "5m"）
+	// 空值或空字符串表示使用默认值（1分钟）
+	ChangeNotifyPoll *string `json:"changeNotifyPoll,omitempty"`
+}
+
+// 元数据缓存运行时状态（计算字段）
+type ConnectionCacheStatus struct {
+	// 连接 ID
+	ConnectionID uuid.UUID `json:"connectionId"`
+	// 缓存是否正在运行（Fs 已 Pin 且 ChangeNotify 已订阅）
+	Running bool `json:"running"`
+	// ChangeNotify 是否可用（后端是否支持）
+	ChangeNotifySupported bool `json:"changeNotifySupported"`
+	// 缓存条目数量
+	EntriesCount int `json:"entriesCount"`
+	// 缓存数据库文件大小（字节）
+	DbSizeBytes *int64 `json:"dbSizeBytes,omitempty"`
+	// 最后一次收到变更通知的时间（用于监控）
+	LastNotifyTime *time.Time `json:"lastNotifyTime,omitempty"`
 }
 
 // 连接分页连接
@@ -68,6 +125,22 @@ type ConnectionMutation struct {
 	Test TestConnectionResult `json:"test"`
 	// 测试未保存的连接配置（测试失败是预期业务结果，用 union 表示）
 	TestUnsaved TestConnectionResult `json:"testUnsaved"`
+	// 清理指定连接的缓存数据
+	// - id: 连接 ID
+	// 返回清理结果
+	ClearCache *ClearCacheResult `json:"clearCache"`
+}
+
+// 连接扩展选项
+type ConnectionOptions struct {
+	// 元数据缓存配置
+	Cache *ConnectionCacheOptions `json:"cache,omitempty"`
+}
+
+// 连接扩展选项输入
+type ConnectionOptionsInput struct {
+	// 元数据缓存配置
+	Cache *ConnectionCacheOptionsInput `json:"cache,omitempty"`
 }
 
 // 连接查询命名空间
@@ -118,6 +191,8 @@ type CreateConnectionInput struct {
 	Type string `json:"type"`
 	// 配置参数
 	Config map[string]string `json:"config"`
+	// 连接扩展选项（包含缓存配置）
+	Options *ConnectionOptionsInput `json:"options,omitempty"`
 }
 
 // 创建任务输入
@@ -548,6 +623,9 @@ type UpdateConnectionInput struct {
 	Name *string `json:"name,omitempty"`
 	// 配置参数
 	Config map[string]string `json:"config,omitempty"`
+	// 连接扩展选项（包含缓存配置）
+	// 设置为 null 时保持不变
+	Options *ConnectionOptionsInput `json:"options,omitempty"`
 }
 
 // 更新任务输入

@@ -10,6 +10,7 @@ import Tasks from '@/modules/connections/views/Tasks';
 import WelcomeView from '@/modules/core/views/WelcomeView';
 import { HistoryProvider } from '@/store/history';
 import { JobProgressProvider } from '@/store/jobProgress';
+import { CacheStatusProvider } from '@/store/cacheStatus';
 import { LocaleProvider } from '@/store/locale';
 import { TaskProvider } from '@/store/tasks';
 import { ColorModeProvider, ColorModeScript } from '@kobalte/core';
@@ -23,22 +24,24 @@ const App: Component = () => {
       <GraphQLProvider>
         <LocaleProvider>
           <JobProgressProvider>
-            <TaskProvider>
-              <HistoryProvider>
-                <Router root={AppShell}>
-                  <Route path="/" component={WelcomeView} />
-                  <Route path="/overview" component={WelcomeView} />
-                  <Route path="/connections/:connectionId" component={ConnectionLayout}>
-                    <Route path="/" component={Overview} />
-                    <Route path="/tasks" component={Tasks} />
-                    <Route path="/history" component={History} />
-                    <Route path="/log" component={Log} />
-                    <Route path="/settings" component={Settings} />
-                  </Route>
-                </Router>
-                <Toaster />
-              </HistoryProvider>
-            </TaskProvider>
+            <CacheStatusProvider>
+              <TaskProvider>
+                <HistoryProvider>
+                  <Router root={AppShell}>
+                    <Route path="/" component={WelcomeView} />
+                    <Route path="/overview" component={WelcomeView} />
+                    <Route path="/connections/:connectionId" component={ConnectionLayout}>
+                      <Route path="/" component={Overview} />
+                      <Route path="/tasks" component={Tasks} />
+                      <Route path="/history" component={History} />
+                      <Route path="/log" component={Log} />
+                      <Route path="/settings" component={Settings} />
+                    </Route>
+                  </Router>
+                  <Toaster />
+                </HistoryProvider>
+              </TaskProvider>
+            </CacheStatusProvider>
           </JobProgressProvider>
         </LocaleProvider>
       </GraphQLProvider>

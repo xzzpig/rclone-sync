@@ -63,17 +63,40 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
+	ClearCacheResult struct {
+		ClearedCount func(childComplexity int) int
+		Message      func(childComplexity int) int
+		Success      func(childComplexity int) int
+	}
+
 	Connection struct {
-		Config     func(childComplexity int) int
-		CreatedAt  func(childComplexity int) int
-		ID         func(childComplexity int) int
-		LoadError  func(childComplexity int) int
-		LoadStatus func(childComplexity int) int
-		Name       func(childComplexity int) int
-		Quota      func(childComplexity int) int
-		Tasks      func(childComplexity int, pagination *model.PaginationInput) int
-		Type       func(childComplexity int) int
-		UpdatedAt  func(childComplexity int) int
+		CacheStatus func(childComplexity int) int
+		Config      func(childComplexity int) int
+		CreatedAt   func(childComplexity int) int
+		ID          func(childComplexity int) int
+		LoadError   func(childComplexity int) int
+		LoadStatus  func(childComplexity int) int
+		Name        func(childComplexity int) int
+		Options     func(childComplexity int) int
+		Quota       func(childComplexity int) int
+		Tasks       func(childComplexity int, pagination *model.PaginationInput) int
+		Type        func(childComplexity int) int
+		UpdatedAt   func(childComplexity int) int
+	}
+
+	ConnectionCacheOptions struct {
+		ChangeNotifyPoll func(childComplexity int) int
+		Enabled          func(childComplexity int) int
+		InfoAge          func(childComplexity int) int
+	}
+
+	ConnectionCacheStatus struct {
+		ChangeNotifySupported func(childComplexity int) int
+		ConnectionID          func(childComplexity int) int
+		DbSizeBytes           func(childComplexity int) int
+		EntriesCount          func(childComplexity int) int
+		LastNotifyTime        func(childComplexity int) int
+		Running               func(childComplexity int) int
 	}
 
 	ConnectionConnection struct {
@@ -83,11 +106,16 @@ type ComplexityRoot struct {
 	}
 
 	ConnectionMutation struct {
+		ClearCache  func(childComplexity int, id uuid.UUID) int
 		Create      func(childComplexity int, input model.CreateConnectionInput) int
 		Delete      func(childComplexity int, id uuid.UUID) int
 		Test        func(childComplexity int, id uuid.UUID) int
 		TestUnsaved func(childComplexity int, input model.TestConnectionInput) int
 		Update      func(childComplexity int, id uuid.UUID, input model.UpdateConnectionInput) int
+	}
+
+	ConnectionOptions struct {
+		Cache func(childComplexity int) int
 	}
 
 	ConnectionQuery struct {
@@ -264,6 +292,7 @@ type ComplexityRoot struct {
 	}
 
 	Subscription struct {
+		CacheStatus      func(childComplexity int, connectionID uuid.UUID) int
 		JobProgress      func(childComplexity int, taskID *uuid.UUID, connectionID *uuid.UUID) int
 		TransferProgress func(childComplexity int, connectionID *uuid.UUID, taskID *uuid.UUID, jobID *uuid.UUID) int
 	}
@@ -330,6 +359,8 @@ type ConnectionResolver interface {
 
 	Tasks(ctx context.Context, obj *model.Connection, pagination *model.PaginationInput) (*model.TaskConnection, error)
 	Quota(ctx context.Context, obj *model.Connection) (*model.ConnectionQuota, error)
+
+	CacheStatus(ctx context.Context, obj *model.Connection) (*model.ConnectionCacheStatus, error)
 }
 type ConnectionMutationResolver interface {
 	Create(ctx context.Context, obj *model.ConnectionMutation, input model.CreateConnectionInput) (*model.Connection, error)
@@ -337,6 +368,7 @@ type ConnectionMutationResolver interface {
 	Delete(ctx context.Context, obj *model.ConnectionMutation, id uuid.UUID) (*model.Connection, error)
 	Test(ctx context.Context, obj *model.ConnectionMutation, id uuid.UUID) (model.TestConnectionResult, error)
 	TestUnsaved(ctx context.Context, obj *model.ConnectionMutation, input model.TestConnectionInput) (model.TestConnectionResult, error)
+	ClearCache(ctx context.Context, obj *model.ConnectionMutation, id uuid.UUID) (*model.ClearCacheResult, error)
 }
 type ConnectionQueryResolver interface {
 	List(ctx context.Context, obj *model.ConnectionQuery, pagination *model.PaginationInput) (*model.ConnectionConnection, error)
@@ -383,6 +415,7 @@ type QueryResolver interface {
 	Task(ctx context.Context) (*model.TaskQuery, error)
 }
 type SubscriptionResolver interface {
+	CacheStatus(ctx context.Context, connectionID uuid.UUID) (<-chan *model.ConnectionCacheStatus, error)
 	JobProgress(ctx context.Context, taskID *uuid.UUID, connectionID *uuid.UUID) (<-chan *model.JobProgressEvent, error)
 	TransferProgress(ctx context.Context, connectionID *uuid.UUID, taskID *uuid.UUID, jobID *uuid.UUID) (<-chan *model.TransferProgressEvent, error)
 }
@@ -423,6 +456,31 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 	_ = ec
 	switch typeName + "." + field {
 
+	case "ClearCacheResult.clearedCount":
+		if e.complexity.ClearCacheResult.ClearedCount == nil {
+			break
+		}
+
+		return e.complexity.ClearCacheResult.ClearedCount(childComplexity), true
+	case "ClearCacheResult.message":
+		if e.complexity.ClearCacheResult.Message == nil {
+			break
+		}
+
+		return e.complexity.ClearCacheResult.Message(childComplexity), true
+	case "ClearCacheResult.success":
+		if e.complexity.ClearCacheResult.Success == nil {
+			break
+		}
+
+		return e.complexity.ClearCacheResult.Success(childComplexity), true
+
+	case "Connection.cacheStatus":
+		if e.complexity.Connection.CacheStatus == nil {
+			break
+		}
+
+		return e.complexity.Connection.CacheStatus(childComplexity), true
 	case "Connection.config":
 		if e.complexity.Connection.Config == nil {
 			break
@@ -459,6 +517,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Connection.Name(childComplexity), true
+	case "Connection.options":
+		if e.complexity.Connection.Options == nil {
+			break
+		}
+
+		return e.complexity.Connection.Options(childComplexity), true
 	case "Connection.quota":
 		if e.complexity.Connection.Quota == nil {
 			break
@@ -489,6 +553,62 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Connection.UpdatedAt(childComplexity), true
 
+	case "ConnectionCacheOptions.changeNotifyPoll":
+		if e.complexity.ConnectionCacheOptions.ChangeNotifyPoll == nil {
+			break
+		}
+
+		return e.complexity.ConnectionCacheOptions.ChangeNotifyPoll(childComplexity), true
+	case "ConnectionCacheOptions.enabled":
+		if e.complexity.ConnectionCacheOptions.Enabled == nil {
+			break
+		}
+
+		return e.complexity.ConnectionCacheOptions.Enabled(childComplexity), true
+	case "ConnectionCacheOptions.infoAge":
+		if e.complexity.ConnectionCacheOptions.InfoAge == nil {
+			break
+		}
+
+		return e.complexity.ConnectionCacheOptions.InfoAge(childComplexity), true
+
+	case "ConnectionCacheStatus.changeNotifySupported":
+		if e.complexity.ConnectionCacheStatus.ChangeNotifySupported == nil {
+			break
+		}
+
+		return e.complexity.ConnectionCacheStatus.ChangeNotifySupported(childComplexity), true
+	case "ConnectionCacheStatus.connectionId":
+		if e.complexity.ConnectionCacheStatus.ConnectionID == nil {
+			break
+		}
+
+		return e.complexity.ConnectionCacheStatus.ConnectionID(childComplexity), true
+	case "ConnectionCacheStatus.dbSizeBytes":
+		if e.complexity.ConnectionCacheStatus.DbSizeBytes == nil {
+			break
+		}
+
+		return e.complexity.ConnectionCacheStatus.DbSizeBytes(childComplexity), true
+	case "ConnectionCacheStatus.entriesCount":
+		if e.complexity.ConnectionCacheStatus.EntriesCount == nil {
+			break
+		}
+
+		return e.complexity.ConnectionCacheStatus.EntriesCount(childComplexity), true
+	case "ConnectionCacheStatus.lastNotifyTime":
+		if e.complexity.ConnectionCacheStatus.LastNotifyTime == nil {
+			break
+		}
+
+		return e.complexity.ConnectionCacheStatus.LastNotifyTime(childComplexity), true
+	case "ConnectionCacheStatus.running":
+		if e.complexity.ConnectionCacheStatus.Running == nil {
+			break
+		}
+
+		return e.complexity.ConnectionCacheStatus.Running(childComplexity), true
+
 	case "ConnectionConnection.items":
 		if e.complexity.ConnectionConnection.Items == nil {
 			break
@@ -508,6 +628,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.ConnectionConnection.TotalCount(childComplexity), true
 
+	case "ConnectionMutation.clearCache":
+		if e.complexity.ConnectionMutation.ClearCache == nil {
+			break
+		}
+
+		args, err := ec.field_ConnectionMutation_clearCache_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.ConnectionMutation.ClearCache(childComplexity, args["id"].(uuid.UUID)), true
 	case "ConnectionMutation.create":
 		if e.complexity.ConnectionMutation.Create == nil {
 			break
@@ -563,6 +694,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.ConnectionMutation.Update(childComplexity, args["id"].(uuid.UUID), args["input"].(model.UpdateConnectionInput)), true
+
+	case "ConnectionOptions.cache":
+		if e.complexity.ConnectionOptions.Cache == nil {
+			break
+		}
+
+		return e.complexity.ConnectionOptions.Cache(childComplexity), true
 
 	case "ConnectionQuery.get":
 		if e.complexity.ConnectionQuery.Get == nil {
@@ -1232,6 +1370,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Query.Task(childComplexity), true
 
+	case "Subscription.cacheStatus":
+		if e.complexity.Subscription.CacheStatus == nil {
+			break
+		}
+
+		args, err := ec.field_Subscription_cacheStatus_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Subscription.CacheStatus(childComplexity, args["connectionId"].(uuid.UUID)), true
 	case "Subscription.jobProgress":
 		if e.complexity.Subscription.JobProgress == nil {
 			break
@@ -1503,6 +1652,8 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	opCtx := graphql.GetOperationContext(ctx)
 	ec := executionContext{opCtx, e, 0, 0, make(chan graphql.DeferredResult)}
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
+		ec.unmarshalInputConnectionCacheOptionsInput,
+		ec.unmarshalInputConnectionOptionsInput,
 		ec.unmarshalInputCreateConnectionInput,
 		ec.unmarshalInputCreateTaskInput,
 		ec.unmarshalInputImportConnectionInput,
@@ -1699,6 +1850,15 @@ type Connection {
 	配额信息（调用 rclone about API）
 	"""
 	quota: ConnectionQuota @goField(forceResolver: true)
+	"""
+	连接扩展选项（包含缓存配置）
+	"""
+	options: ConnectionOptions
+	"""
+	缓存运行时状态（仅当 options.cache.enabled 为 true 时有值）
+	这是一个计算字段，不持久化
+	"""
+	cacheStatus: ConnectionCacheStatus @goField(forceResolver: true)
 }
 
 """
@@ -1729,6 +1889,68 @@ type ConnectionQuota {
 	对象/文件数量，可能为 null 如果存储不支持
 	"""
 	objects: BigInt
+}
+
+"""
+连接扩展选项
+"""
+type ConnectionOptions {
+	"""
+	元数据缓存配置
+	"""
+	cache: ConnectionCacheOptions
+}
+
+"""
+元数据缓存配置（持久化配置）
+"""
+type ConnectionCacheOptions {
+	"""
+	是否启用元数据缓存
+	"""
+	enabled: Boolean!
+	"""
+	缓存过期时间（Go duration 格式，如 "6h", "24h"）
+	空值表示使用默认值（6小时）
+	"0" 或负值表示永不过期（不推荐）
+	"""
+	infoAge: String
+	"""
+	ChangeNotify 轮询间隔（Go duration 格式，如 "1m", "5m"）
+	空值表示使用默认值（1分钟）
+	最小值为 10s
+	"""
+	changeNotifyPoll: String
+}
+
+"""
+元数据缓存运行时状态（计算字段）
+"""
+type ConnectionCacheStatus {
+	"""
+	连接 ID
+	"""
+	connectionId: ID!
+	"""
+	缓存是否正在运行（Fs 已 Pin 且 ChangeNotify 已订阅）
+	"""
+	running: Boolean!
+	"""
+	ChangeNotify 是否可用（后端是否支持）
+	"""
+	changeNotifySupported: Boolean!
+	"""
+	缓存条目数量
+	"""
+	entriesCount: Int!
+	"""
+	缓存数据库文件大小（字节）
+	"""
+	dbSizeBytes: BigInt
+	"""
+	最后一次收到变更通知的时间（用于监控）
+	"""
+	lastNotifyTime: DateTime
 }
 
 """
@@ -1769,6 +1991,10 @@ input CreateConnectionInput {
 	配置参数
 	"""
 	config: StringMap!
+	"""
+	连接扩展选项（包含缓存配置）
+	"""
+	options: ConnectionOptionsInput
 }
 
 """
@@ -1783,6 +2009,11 @@ input UpdateConnectionInput {
 	配置参数
 	"""
 	config: StringMap
+	"""
+	连接扩展选项（包含缓存配置）
+	设置为 null 时保持不变
+	"""
+	options: ConnectionOptionsInput
 }
 
 """
@@ -1797,6 +2028,36 @@ input TestConnectionInput {
 	配置参数
 	"""
 	config: StringMap!
+}
+
+"""
+连接扩展选项输入
+"""
+input ConnectionOptionsInput {
+	"""
+	元数据缓存配置
+	"""
+	cache: ConnectionCacheOptionsInput
+}
+
+"""
+元数据缓存配置输入
+"""
+input ConnectionCacheOptionsInput {
+	"""
+	是否启用元数据缓存
+	"""
+	enabled: Boolean!
+	"""
+	缓存过期时间（Go duration 格式，如 "6h", "24h"）
+	空值或空字符串表示使用默认值（6小时）
+	"""
+	infoAge: String
+	"""
+	ChangeNotify 轮询间隔（Go duration 格式，如 "1m", "5m"）
+	空值或空字符串表示使用默认值（1分钟）
+	"""
+	changeNotifyPoll: String
 }
 
 # =============================================================================
@@ -1827,6 +2088,24 @@ type ConnectionTestFailure {
 测试连接结果
 """
 union TestConnectionResult = ConnectionTestSuccess | ConnectionTestFailure
+
+"""
+清理缓存结果
+"""
+type ClearCacheResult {
+	"""
+	是否成功
+	"""
+	success: Boolean!
+	"""
+	清理的条目数量
+	"""
+	clearedCount: Int!
+	"""
+	消息（已本地化）
+	"""
+	message: String!
+}
 
 # =============================================================================
 # NAMESPACED TYPES
@@ -1870,6 +2149,12 @@ type ConnectionMutation {
 	测试未保存的连接配置（测试失败是预期业务结果，用 union 表示）
 	"""
 	testUnsaved(input: TestConnectionInput!): TestConnectionResult! @goField(forceResolver: true)
+	"""
+	清理指定连接的缓存数据
+	- id: 连接 ID
+	返回清理结果
+	"""
+	clearCache(id: ID!): ClearCacheResult! @goField(forceResolver: true)
 }
 
 # =============================================================================
@@ -1888,6 +2173,15 @@ extend type Mutation {
 	连接相关变更（命名空间）
 	"""
 	connection: ConnectionMutation! @goField(forceResolver: true)
+}
+
+extend type Subscription {
+	"""
+	元数据缓存状态实时订阅
+	- connectionId: 连接 ID
+	返回该连接的实时缓存运行时状态
+	"""
+	cacheStatus(connectionId: ID!): ConnectionCacheStatus! @goField(forceResolver: true)
 }
 `, BuiltIn: false},
 	{Name: "../schema/file.graphql", Input: `# GraphQL Schema: File 相关类型定义
@@ -3112,6 +3406,17 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 
 // region    ***************************** args.gotpl *****************************
 
+func (ec *executionContext) field_ConnectionMutation_clearCache_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_ConnectionMutation_create_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -3365,6 +3670,17 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 	return args, nil
 }
 
+func (ec *executionContext) field_Subscription_cacheStatus_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "connectionId", ec.unmarshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID)
+	if err != nil {
+		return nil, err
+	}
+	args["connectionId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Subscription_jobProgress_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -3535,6 +3851,93 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 // endregion ************************** directives.gotpl **************************
 
 // region    **************************** field.gotpl *****************************
+
+func (ec *executionContext) _ClearCacheResult_success(ctx context.Context, field graphql.CollectedField, obj *model.ClearCacheResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ClearCacheResult_success,
+		func(ctx context.Context) (any, error) {
+			return obj.Success, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ClearCacheResult_success(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ClearCacheResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ClearCacheResult_clearedCount(ctx context.Context, field graphql.CollectedField, obj *model.ClearCacheResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ClearCacheResult_clearedCount,
+		func(ctx context.Context) (any, error) {
+			return obj.ClearedCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ClearCacheResult_clearedCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ClearCacheResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ClearCacheResult_message(ctx context.Context, field graphql.CollectedField, obj *model.ClearCacheResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ClearCacheResult_message,
+		func(ctx context.Context) (any, error) {
+			return obj.Message, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ClearCacheResult_message(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ClearCacheResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
 
 func (ec *executionContext) _Connection_id(ctx context.Context, field graphql.CollectedField, obj *model.Connection) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
@@ -3860,6 +4263,343 @@ func (ec *executionContext) fieldContext_Connection_quota(_ context.Context, fie
 	return fc, nil
 }
 
+func (ec *executionContext) _Connection_options(ctx context.Context, field graphql.CollectedField, obj *model.Connection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Connection_options,
+		func(ctx context.Context) (any, error) {
+			return obj.Options, nil
+		},
+		nil,
+		ec.marshalOConnectionOptions2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐConnectionOptions,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Connection_options(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Connection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "cache":
+				return ec.fieldContext_ConnectionOptions_cache(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ConnectionOptions", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Connection_cacheStatus(ctx context.Context, field graphql.CollectedField, obj *model.Connection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Connection_cacheStatus,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Connection().CacheStatus(ctx, obj)
+		},
+		nil,
+		ec.marshalOConnectionCacheStatus2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐConnectionCacheStatus,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Connection_cacheStatus(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Connection",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "connectionId":
+				return ec.fieldContext_ConnectionCacheStatus_connectionId(ctx, field)
+			case "running":
+				return ec.fieldContext_ConnectionCacheStatus_running(ctx, field)
+			case "changeNotifySupported":
+				return ec.fieldContext_ConnectionCacheStatus_changeNotifySupported(ctx, field)
+			case "entriesCount":
+				return ec.fieldContext_ConnectionCacheStatus_entriesCount(ctx, field)
+			case "dbSizeBytes":
+				return ec.fieldContext_ConnectionCacheStatus_dbSizeBytes(ctx, field)
+			case "lastNotifyTime":
+				return ec.fieldContext_ConnectionCacheStatus_lastNotifyTime(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ConnectionCacheStatus", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ConnectionCacheOptions_enabled(ctx context.Context, field graphql.CollectedField, obj *model.ConnectionCacheOptions) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ConnectionCacheOptions_enabled,
+		func(ctx context.Context) (any, error) {
+			return obj.Enabled, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ConnectionCacheOptions_enabled(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConnectionCacheOptions",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ConnectionCacheOptions_infoAge(ctx context.Context, field graphql.CollectedField, obj *model.ConnectionCacheOptions) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ConnectionCacheOptions_infoAge,
+		func(ctx context.Context) (any, error) {
+			return obj.InfoAge, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_ConnectionCacheOptions_infoAge(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConnectionCacheOptions",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ConnectionCacheOptions_changeNotifyPoll(ctx context.Context, field graphql.CollectedField, obj *model.ConnectionCacheOptions) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ConnectionCacheOptions_changeNotifyPoll,
+		func(ctx context.Context) (any, error) {
+			return obj.ChangeNotifyPoll, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_ConnectionCacheOptions_changeNotifyPoll(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConnectionCacheOptions",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ConnectionCacheStatus_connectionId(ctx context.Context, field graphql.CollectedField, obj *model.ConnectionCacheStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ConnectionCacheStatus_connectionId,
+		func(ctx context.Context) (any, error) {
+			return obj.ConnectionID, nil
+		},
+		nil,
+		ec.marshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ConnectionCacheStatus_connectionId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConnectionCacheStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ConnectionCacheStatus_running(ctx context.Context, field graphql.CollectedField, obj *model.ConnectionCacheStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ConnectionCacheStatus_running,
+		func(ctx context.Context) (any, error) {
+			return obj.Running, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ConnectionCacheStatus_running(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConnectionCacheStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ConnectionCacheStatus_changeNotifySupported(ctx context.Context, field graphql.CollectedField, obj *model.ConnectionCacheStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ConnectionCacheStatus_changeNotifySupported,
+		func(ctx context.Context) (any, error) {
+			return obj.ChangeNotifySupported, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ConnectionCacheStatus_changeNotifySupported(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConnectionCacheStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ConnectionCacheStatus_entriesCount(ctx context.Context, field graphql.CollectedField, obj *model.ConnectionCacheStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ConnectionCacheStatus_entriesCount,
+		func(ctx context.Context) (any, error) {
+			return obj.EntriesCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ConnectionCacheStatus_entriesCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConnectionCacheStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ConnectionCacheStatus_dbSizeBytes(ctx context.Context, field graphql.CollectedField, obj *model.ConnectionCacheStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ConnectionCacheStatus_dbSizeBytes,
+		func(ctx context.Context) (any, error) {
+			return obj.DbSizeBytes, nil
+		},
+		nil,
+		ec.marshalOBigInt2ᚖint64,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_ConnectionCacheStatus_dbSizeBytes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConnectionCacheStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type BigInt does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ConnectionCacheStatus_lastNotifyTime(ctx context.Context, field graphql.CollectedField, obj *model.ConnectionCacheStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ConnectionCacheStatus_lastNotifyTime,
+		func(ctx context.Context) (any, error) {
+			return obj.LastNotifyTime, nil
+		},
+		nil,
+		ec.marshalODateTime2ᚖtimeᚐTime,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_ConnectionCacheStatus_lastNotifyTime(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConnectionCacheStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ConnectionConnection_items(ctx context.Context, field graphql.CollectedField, obj *model.ConnectionConnection) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -3904,6 +4644,10 @@ func (ec *executionContext) fieldContext_ConnectionConnection_items(_ context.Co
 				return ec.fieldContext_Connection_tasks(ctx, field)
 			case "quota":
 				return ec.fieldContext_Connection_quota(ctx, field)
+			case "options":
+				return ec.fieldContext_Connection_options(ctx, field)
+			case "cacheStatus":
+				return ec.fieldContext_Connection_cacheStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Connection", field.Name)
 		},
@@ -4024,6 +4768,10 @@ func (ec *executionContext) fieldContext_ConnectionMutation_create(ctx context.C
 				return ec.fieldContext_Connection_tasks(ctx, field)
 			case "quota":
 				return ec.fieldContext_Connection_quota(ctx, field)
+			case "options":
+				return ec.fieldContext_Connection_options(ctx, field)
+			case "cacheStatus":
+				return ec.fieldContext_Connection_cacheStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Connection", field.Name)
 		},
@@ -4087,6 +4835,10 @@ func (ec *executionContext) fieldContext_ConnectionMutation_update(ctx context.C
 				return ec.fieldContext_Connection_tasks(ctx, field)
 			case "quota":
 				return ec.fieldContext_Connection_quota(ctx, field)
+			case "options":
+				return ec.fieldContext_Connection_options(ctx, field)
+			case "cacheStatus":
+				return ec.fieldContext_Connection_cacheStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Connection", field.Name)
 		},
@@ -4150,6 +4902,10 @@ func (ec *executionContext) fieldContext_ConnectionMutation_delete(ctx context.C
 				return ec.fieldContext_Connection_tasks(ctx, field)
 			case "quota":
 				return ec.fieldContext_Connection_quota(ctx, field)
+			case "options":
+				return ec.fieldContext_Connection_options(ctx, field)
+			case "cacheStatus":
+				return ec.fieldContext_Connection_cacheStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Connection", field.Name)
 		},
@@ -4250,6 +5006,92 @@ func (ec *executionContext) fieldContext_ConnectionMutation_testUnsaved(ctx cont
 	return fc, nil
 }
 
+func (ec *executionContext) _ConnectionMutation_clearCache(ctx context.Context, field graphql.CollectedField, obj *model.ConnectionMutation) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ConnectionMutation_clearCache,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.ConnectionMutation().ClearCache(ctx, obj, fc.Args["id"].(uuid.UUID))
+		},
+		nil,
+		ec.marshalNClearCacheResult2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐClearCacheResult,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ConnectionMutation_clearCache(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConnectionMutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "success":
+				return ec.fieldContext_ClearCacheResult_success(ctx, field)
+			case "clearedCount":
+				return ec.fieldContext_ClearCacheResult_clearedCount(ctx, field)
+			case "message":
+				return ec.fieldContext_ClearCacheResult_message(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ClearCacheResult", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_ConnectionMutation_clearCache_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ConnectionOptions_cache(ctx context.Context, field graphql.CollectedField, obj *model.ConnectionOptions) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ConnectionOptions_cache,
+		func(ctx context.Context) (any, error) {
+			return obj.Cache, nil
+		},
+		nil,
+		ec.marshalOConnectionCacheOptions2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐConnectionCacheOptions,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_ConnectionOptions_cache(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConnectionOptions",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "enabled":
+				return ec.fieldContext_ConnectionCacheOptions_enabled(ctx, field)
+			case "infoAge":
+				return ec.fieldContext_ConnectionCacheOptions_infoAge(ctx, field)
+			case "changeNotifyPoll":
+				return ec.fieldContext_ConnectionCacheOptions_changeNotifyPoll(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ConnectionCacheOptions", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ConnectionQuery_list(ctx context.Context, field graphql.CollectedField, obj *model.ConnectionQuery) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4344,6 +5186,10 @@ func (ec *executionContext) fieldContext_ConnectionQuery_get(ctx context.Context
 				return ec.fieldContext_Connection_tasks(ctx, field)
 			case "quota":
 				return ec.fieldContext_Connection_quota(ctx, field)
+			case "options":
+				return ec.fieldContext_Connection_options(ctx, field)
+			case "cacheStatus":
+				return ec.fieldContext_Connection_cacheStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Connection", field.Name)
 		},
@@ -4774,6 +5620,10 @@ func (ec *executionContext) fieldContext_ImportExecuteResult_connections(_ conte
 				return ec.fieldContext_Connection_tasks(ctx, field)
 			case "quota":
 				return ec.fieldContext_Connection_quota(ctx, field)
+			case "options":
+				return ec.fieldContext_Connection_options(ctx, field)
+			case "cacheStatus":
+				return ec.fieldContext_Connection_cacheStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Connection", field.Name)
 		},
@@ -6559,6 +7409,8 @@ func (ec *executionContext) fieldContext_Mutation_connection(_ context.Context, 
 				return ec.fieldContext_ConnectionMutation_test(ctx, field)
 			case "testUnsaved":
 				return ec.fieldContext_ConnectionMutation_testUnsaved(ctx, field)
+			case "clearCache":
+				return ec.fieldContext_ConnectionMutation_clearCache(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type ConnectionMutation", field.Name)
 		},
@@ -7741,6 +8593,61 @@ func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field
 	return fc, nil
 }
 
+func (ec *executionContext) _Subscription_cacheStatus(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Subscription_cacheStatus,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Subscription().CacheStatus(ctx, fc.Args["connectionId"].(uuid.UUID))
+		},
+		nil,
+		ec.marshalNConnectionCacheStatus2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐConnectionCacheStatus,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Subscription_cacheStatus(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "connectionId":
+				return ec.fieldContext_ConnectionCacheStatus_connectionId(ctx, field)
+			case "running":
+				return ec.fieldContext_ConnectionCacheStatus_running(ctx, field)
+			case "changeNotifySupported":
+				return ec.fieldContext_ConnectionCacheStatus_changeNotifySupported(ctx, field)
+			case "entriesCount":
+				return ec.fieldContext_ConnectionCacheStatus_entriesCount(ctx, field)
+			case "dbSizeBytes":
+				return ec.fieldContext_ConnectionCacheStatus_dbSizeBytes(ctx, field)
+			case "lastNotifyTime":
+				return ec.fieldContext_ConnectionCacheStatus_lastNotifyTime(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ConnectionCacheStatus", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Subscription_cacheStatus_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Subscription_jobProgress(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
 	return graphql.ResolveFieldStream(
 		ctx,
@@ -8203,6 +9110,10 @@ func (ec *executionContext) fieldContext_Task_connection(_ context.Context, fiel
 				return ec.fieldContext_Connection_tasks(ctx, field)
 			case "quota":
 				return ec.fieldContext_Connection_quota(ctx, field)
+			case "options":
+				return ec.fieldContext_Connection_options(ctx, field)
+			case "cacheStatus":
+				return ec.fieldContext_Connection_cacheStatus(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Connection", field.Name)
 		},
@@ -10608,6 +11519,74 @@ func (ec *executionContext) fieldContext___Type_isOneOf(_ context.Context, field
 
 // region    **************************** input.gotpl *****************************
 
+func (ec *executionContext) unmarshalInputConnectionCacheOptionsInput(ctx context.Context, obj any) (model.ConnectionCacheOptionsInput, error) {
+	var it model.ConnectionCacheOptionsInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"enabled", "infoAge", "changeNotifyPoll"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "enabled":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("enabled"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Enabled = data
+		case "infoAge":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("infoAge"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.InfoAge = data
+		case "changeNotifyPoll":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("changeNotifyPoll"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ChangeNotifyPoll = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputConnectionOptionsInput(ctx context.Context, obj any) (model.ConnectionOptionsInput, error) {
+	var it model.ConnectionOptionsInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"cache"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "cache":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("cache"))
+			data, err := ec.unmarshalOConnectionCacheOptionsInput2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐConnectionCacheOptionsInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Cache = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputCreateConnectionInput(ctx context.Context, obj any) (model.CreateConnectionInput, error) {
 	var it model.CreateConnectionInput
 	asMap := map[string]any{}
@@ -10615,7 +11594,7 @@ func (ec *executionContext) unmarshalInputCreateConnectionInput(ctx context.Cont
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"name", "type", "config"}
+	fieldsInOrder := [...]string{"name", "type", "config", "options"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -10643,6 +11622,13 @@ func (ec *executionContext) unmarshalInputCreateConnectionInput(ctx context.Cont
 				return it, err
 			}
 			it.Config = data
+		case "options":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("options"))
+			data, err := ec.unmarshalOConnectionOptionsInput2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐConnectionOptionsInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Options = data
 		}
 	}
 
@@ -10965,7 +11951,7 @@ func (ec *executionContext) unmarshalInputUpdateConnectionInput(ctx context.Cont
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"name", "config"}
+	fieldsInOrder := [...]string{"name", "config", "options"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -10986,6 +11972,13 @@ func (ec *executionContext) unmarshalInputUpdateConnectionInput(ctx context.Cont
 				return it, err
 			}
 			it.Config = data
+		case "options":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("options"))
+			data, err := ec.unmarshalOConnectionOptionsInput2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐConnectionOptionsInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Options = data
 		}
 	}
 
@@ -11129,6 +12122,55 @@ func (ec *executionContext) _TestConnectionResult(ctx context.Context, sel ast.S
 // endregion ************************** interface.gotpl ***************************
 
 // region    **************************** object.gotpl ****************************
+
+var clearCacheResultImplementors = []string{"ClearCacheResult"}
+
+func (ec *executionContext) _ClearCacheResult(ctx context.Context, sel ast.SelectionSet, obj *model.ClearCacheResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, clearCacheResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ClearCacheResult")
+		case "success":
+			out.Values[i] = ec._ClearCacheResult_success(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "clearedCount":
+			out.Values[i] = ec._ClearCacheResult_clearedCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "message":
+			out.Values[i] = ec._ClearCacheResult_message(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
 
 var connectionImplementors = []string{"Connection"}
 
@@ -11340,6 +12382,142 @@ func (ec *executionContext) _Connection(ctx context.Context, sel ast.SelectionSe
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "options":
+			out.Values[i] = ec._Connection_options(ctx, field, obj)
+		case "cacheStatus":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Connection_cacheStatus(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var connectionCacheOptionsImplementors = []string{"ConnectionCacheOptions"}
+
+func (ec *executionContext) _ConnectionCacheOptions(ctx context.Context, sel ast.SelectionSet, obj *model.ConnectionCacheOptions) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, connectionCacheOptionsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ConnectionCacheOptions")
+		case "enabled":
+			out.Values[i] = ec._ConnectionCacheOptions_enabled(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "infoAge":
+			out.Values[i] = ec._ConnectionCacheOptions_infoAge(ctx, field, obj)
+		case "changeNotifyPoll":
+			out.Values[i] = ec._ConnectionCacheOptions_changeNotifyPoll(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var connectionCacheStatusImplementors = []string{"ConnectionCacheStatus"}
+
+func (ec *executionContext) _ConnectionCacheStatus(ctx context.Context, sel ast.SelectionSet, obj *model.ConnectionCacheStatus) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, connectionCacheStatusImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ConnectionCacheStatus")
+		case "connectionId":
+			out.Values[i] = ec._ConnectionCacheStatus_connectionId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "running":
+			out.Values[i] = ec._ConnectionCacheStatus_running(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "changeNotifySupported":
+			out.Values[i] = ec._ConnectionCacheStatus_changeNotifySupported(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "entriesCount":
+			out.Values[i] = ec._ConnectionCacheStatus_entriesCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "dbSizeBytes":
+			out.Values[i] = ec._ConnectionCacheStatus_dbSizeBytes(ctx, field, obj)
+		case "lastNotifyTime":
+			out.Values[i] = ec._ConnectionCacheStatus_lastNotifyTime(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -11603,6 +12781,78 @@ func (ec *executionContext) _ConnectionMutation(ctx context.Context, sel ast.Sel
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "clearCache":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._ConnectionMutation_clearCache(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var connectionOptionsImplementors = []string{"ConnectionOptions"}
+
+func (ec *executionContext) _ConnectionOptions(ctx context.Context, sel ast.SelectionSet, obj *model.ConnectionOptions) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, connectionOptionsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ConnectionOptions")
+		case "cache":
+			out.Values[i] = ec._ConnectionOptions_cache(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -13488,6 +14738,8 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 	}
 
 	switch fields[0].Name {
+	case "cacheStatus":
+		return ec._Subscription_cacheStatus(ctx, fields[0])
 	case "jobProgress":
 		return ec._Subscription_jobProgress(ctx, fields[0])
 	case "transferProgress":
@@ -14553,6 +15805,20 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
+func (ec *executionContext) marshalNClearCacheResult2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐClearCacheResult(ctx context.Context, sel ast.SelectionSet, v model.ClearCacheResult) graphql.Marshaler {
+	return ec._ClearCacheResult(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNClearCacheResult2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐClearCacheResult(ctx context.Context, sel ast.SelectionSet, v *model.ClearCacheResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ClearCacheResult(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNConnection2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐConnection(ctx context.Context, sel ast.SelectionSet, v model.Connection) graphql.Marshaler {
 	return ec._Connection(ctx, sel, &v)
 }
@@ -14609,6 +15875,20 @@ func (ec *executionContext) marshalNConnection2ᚖgithubᚗcomᚋxzzpigᚋrclone
 		return graphql.Null
 	}
 	return ec._Connection(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNConnectionCacheStatus2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐConnectionCacheStatus(ctx context.Context, sel ast.SelectionSet, v model.ConnectionCacheStatus) graphql.Marshaler {
+	return ec._ConnectionCacheStatus(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNConnectionCacheStatus2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐConnectionCacheStatus(ctx context.Context, sel ast.SelectionSet, v *model.ConnectionCacheStatus) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ConnectionCacheStatus(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNConnectionConnection2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐConnectionConnection(ctx context.Context, sel ast.SelectionSet, v model.ConnectionConnection) graphql.Marshaler {
@@ -15838,6 +17118,43 @@ func (ec *executionContext) marshalOConnection2ᚖgithubᚗcomᚋxzzpigᚋrclone
 		return graphql.Null
 	}
 	return ec._Connection(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOConnectionCacheOptions2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐConnectionCacheOptions(ctx context.Context, sel ast.SelectionSet, v *model.ConnectionCacheOptions) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ConnectionCacheOptions(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOConnectionCacheOptionsInput2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐConnectionCacheOptionsInput(ctx context.Context, v any) (*model.ConnectionCacheOptionsInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputConnectionCacheOptionsInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOConnectionCacheStatus2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐConnectionCacheStatus(ctx context.Context, sel ast.SelectionSet, v *model.ConnectionCacheStatus) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ConnectionCacheStatus(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOConnectionOptions2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐConnectionOptions(ctx context.Context, sel ast.SelectionSet, v *model.ConnectionOptions) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ConnectionOptions(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOConnectionOptionsInput2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐConnectionOptionsInput(ctx context.Context, v any) (*model.ConnectionOptionsInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputConnectionOptionsInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalOConnectionQuota2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐConnectionQuota(ctx context.Context, sel ast.SelectionSet, v *model.ConnectionQuota) graphql.Marshaler {

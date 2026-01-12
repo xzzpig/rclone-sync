@@ -44,6 +44,7 @@ type ConnectionMutation struct {
 	name             *string
 	_type            *string
 	encrypted_config *[]byte
+	options          **model.ConnectionOptions
 	created_at       *time.Time
 	updated_at       *time.Time
 	clearedFields    map[string]struct{}
@@ -267,6 +268,55 @@ func (m *ConnectionMutation) ResetEncryptedConfig() {
 	m.encrypted_config = nil
 }
 
+// SetOptions sets the "options" field.
+func (m *ConnectionMutation) SetOptions(mo *model.ConnectionOptions) {
+	m.options = &mo
+}
+
+// Options returns the value of the "options" field in the mutation.
+func (m *ConnectionMutation) Options() (r *model.ConnectionOptions, exists bool) {
+	v := m.options
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOptions returns the old "options" field's value of the Connection entity.
+// If the Connection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ConnectionMutation) OldOptions(ctx context.Context) (v *model.ConnectionOptions, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOptions is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOptions requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOptions: %w", err)
+	}
+	return oldValue.Options, nil
+}
+
+// ClearOptions clears the value of the "options" field.
+func (m *ConnectionMutation) ClearOptions() {
+	m.options = nil
+	m.clearedFields[connection.FieldOptions] = struct{}{}
+}
+
+// OptionsCleared returns if the "options" field was cleared in this mutation.
+func (m *ConnectionMutation) OptionsCleared() bool {
+	_, ok := m.clearedFields[connection.FieldOptions]
+	return ok
+}
+
+// ResetOptions resets all changes to the "options" field.
+func (m *ConnectionMutation) ResetOptions() {
+	m.options = nil
+	delete(m.clearedFields, connection.FieldOptions)
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *ConnectionMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -427,7 +477,7 @@ func (m *ConnectionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ConnectionMutation) Fields() []string {
-	fields := make([]string, 0, 5)
+	fields := make([]string, 0, 6)
 	if m.name != nil {
 		fields = append(fields, connection.FieldName)
 	}
@@ -436,6 +486,9 @@ func (m *ConnectionMutation) Fields() []string {
 	}
 	if m.encrypted_config != nil {
 		fields = append(fields, connection.FieldEncryptedConfig)
+	}
+	if m.options != nil {
+		fields = append(fields, connection.FieldOptions)
 	}
 	if m.created_at != nil {
 		fields = append(fields, connection.FieldCreatedAt)
@@ -457,6 +510,8 @@ func (m *ConnectionMutation) Field(name string) (ent.Value, bool) {
 		return m.GetType()
 	case connection.FieldEncryptedConfig:
 		return m.EncryptedConfig()
+	case connection.FieldOptions:
+		return m.Options()
 	case connection.FieldCreatedAt:
 		return m.CreatedAt()
 	case connection.FieldUpdatedAt:
@@ -476,6 +531,8 @@ func (m *ConnectionMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldType(ctx)
 	case connection.FieldEncryptedConfig:
 		return m.OldEncryptedConfig(ctx)
+	case connection.FieldOptions:
+		return m.OldOptions(ctx)
 	case connection.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case connection.FieldUpdatedAt:
@@ -509,6 +566,13 @@ func (m *ConnectionMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetEncryptedConfig(v)
+		return nil
+	case connection.FieldOptions:
+		v, ok := value.(*model.ConnectionOptions)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOptions(v)
 		return nil
 	case connection.FieldCreatedAt:
 		v, ok := value.(time.Time)
@@ -553,7 +617,11 @@ func (m *ConnectionMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *ConnectionMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(connection.FieldOptions) {
+		fields = append(fields, connection.FieldOptions)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -566,6 +634,11 @@ func (m *ConnectionMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *ConnectionMutation) ClearField(name string) error {
+	switch name {
+	case connection.FieldOptions:
+		m.ClearOptions()
+		return nil
+	}
 	return fmt.Errorf("unknown Connection nullable field %s", name)
 }
 
@@ -581,6 +654,9 @@ func (m *ConnectionMutation) ResetField(name string) error {
 		return nil
 	case connection.FieldEncryptedConfig:
 		m.ResetEncryptedConfig()
+		return nil
+	case connection.FieldOptions:
+		m.ResetOptions()
 		return nil
 	case connection.FieldCreatedAt:
 		m.ResetCreatedAt()

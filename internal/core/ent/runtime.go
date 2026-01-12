@@ -28,11 +28,11 @@ func init() {
 	// connection.TypeValidator is a validator for the "type" field. It is called by the builders before save.
 	connection.TypeValidator = connectionDescType.Validators[0].(func(string) error)
 	// connectionDescCreatedAt is the schema descriptor for created_at field.
-	connectionDescCreatedAt := connectionFields[4].Descriptor()
+	connectionDescCreatedAt := connectionFields[5].Descriptor()
 	// connection.DefaultCreatedAt holds the default value on creation for the created_at field.
 	connection.DefaultCreatedAt = connectionDescCreatedAt.Default.(func() time.Time)
 	// connectionDescUpdatedAt is the schema descriptor for updated_at field.
-	connectionDescUpdatedAt := connectionFields[5].Descriptor()
+	connectionDescUpdatedAt := connectionFields[6].Descriptor()
 	// connection.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	connection.DefaultUpdatedAt = connectionDescUpdatedAt.Default.(func() time.Time)
 	// connection.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

@@ -48,7 +48,7 @@ func setupHandlerTest(t *testing.T) (*gin.Engine, *ent.Client, func()) {
 	require.NoError(t, err)
 	connectionQuery := query.NewConnectionQuery(client, encryptor)
 
-	storage := rclone.NewDBStorage(connectionQuery)
+	storage := rclone.NewDBStorage(connectionQuery, appDataDir)
 	storage.Install()
 
 	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, appDataDir, false, 0)
@@ -189,12 +189,12 @@ func TestHandler_ConnectionQuery(t *testing.T) {
 	// Create a test connection
 	encryptor, _ := crypto.NewEncryptor("test-encryption-key-32-bytes!!")
 	connectionQuery := query.NewConnectionQuery(client, encryptor)
-	storage := rclone.NewDBStorage(connectionQuery)
+	storage := rclone.NewDBStorage(connectionQuery, t.TempDir())
 	storage.Install()
 
 	_, err := connectionQuery.CreateConnection(context.Background(), "test-conn", "local", map[string]string{
 		"type": "local",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	resp := executeGraphQL(t, router, GraphQLRequest{

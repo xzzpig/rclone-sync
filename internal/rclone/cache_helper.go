@@ -63,6 +63,42 @@ func ClearFsCache(remoteName string) int {
 // cache.GetFn from creating a new Fs when checking if a remote is already loaded.
 var errNotLoaded = errors.New("not loaded")
 
+// GetRemoteName returns the remote name to use based on whether cache is enabled.
+// When cache is enabled for the connection, it returns the name with CacheSuffix
+// (e.g., "myremote-cache") which triggers the metacache backend via DBStorage.
+// When cache is not enabled, it returns the original remote name.
+//
+// Parameters:
+//   - connectionName: the name of the connection (e.g., "myremote")
+//   - cacheEnabled: whether cache is enabled for this connection
+//
+// Examples:
+//
+//	GetRemoteName("myremote", true)  // returns "myremote-cache"
+//	GetRemoteName("myremote", false) // returns "myremote"
+func GetRemoteName(connectionName string, cacheEnabled bool) string {
+	if cacheEnabled {
+		return connectionName + CacheSuffix
+	}
+	return connectionName
+}
+
+// GetCachedFs returns a Fs for the given connection, optionally using the metacache backend.
+// When cache is enabled for the connection, it transparently uses the metacache-wrapped Fs
+// via the "-cache" suffix naming convention.
+//
+// Parameters:
+//   - ctx: context for the operation
+//   - connectionName: the name of the connection (e.g., "myremote")
+//   - path: the path within the remote
+//   - cacheEnabled: whether cache is enabled for this connection
+//
+// Returns the Fs (potentially metacache-wrapped) and any error.
+func GetCachedFs(ctx context.Context, connectionName string, path string, cacheEnabled bool) (fs.Fs, error) {
+	remoteName := GetRemoteName(connectionName, cacheEnabled)
+	return GetFs(ctx, remoteName, path)
+}
+
 // IsConnectionLoaded checks if a connection (remote) with a specific path has been loaded into rclone's cache.
 // This is useful for determining if a remote path is currently cached and usable.
 //

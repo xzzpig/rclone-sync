@@ -36,7 +36,7 @@ func TestLogCleanupQuery(t *testing.T) {
 	// Create test connection with logs
 	testConn, err := connQuery.CreateConnection(ctx, "test-cleanup-conn-"+uuid.NewString(), "local", map[string]string{
 		"type": "local",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	task, err := taskQuery.CreateTask(ctx, "Cleanup Test Task "+uuid.NewString(), "/l", testConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
@@ -74,7 +74,7 @@ func TestLogCleanupQuery(t *testing.T) {
 		// Create another connection with logs
 		conn2, err := connQuery.CreateConnection(ctx, "cleanup-test-2-"+uuid.NewString(), "local", map[string]string{
 			"type": "local",
-		})
+		}, nil)
 		require.NoError(t, err)
 
 		task2, err := taskQuery.CreateTask(ctx, "Cleanup Test Task 2 "+uuid.NewString(), "/l", conn2.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
@@ -142,7 +142,7 @@ func TestLogCleanupQuery_Integration(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		conn, err := connQuery.CreateConnection(ctx, "integration-conn-"+uuid.NewString(), "local", map[string]string{
 			"type": "local",
-		})
+		}, nil)
 		require.NoError(t, err)
 		connectionIDs = append(connectionIDs, conn.ID)
 

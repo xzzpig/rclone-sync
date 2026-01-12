@@ -70,6 +70,15 @@ type Connection {
 	配额信息（调用 rclone about API）
 	"""
 	quota: ConnectionQuota @goField(forceResolver: true)
+	"""
+	连接扩展选项（包含缓存配置）
+	"""
+	options: ConnectionOptions
+	"""
+	缓存运行时状态（仅当 options.cache.enabled 为 true 时有值）
+	这是一个计算字段，不持久化
+	"""
+	cacheStatus: ConnectionCacheStatus @goField(forceResolver: true)
 }
 
 """
@@ -100,6 +109,68 @@ type ConnectionQuota {
 	对象/文件数量，可能为 null 如果存储不支持
 	"""
 	objects: BigInt
+}
+
+"""
+连接扩展选项
+"""
+type ConnectionOptions {
+	"""
+	元数据缓存配置
+	"""
+	cache: ConnectionCacheOptions
+}
+
+"""
+元数据缓存配置（持久化配置）
+"""
+type ConnectionCacheOptions {
+	"""
+	是否启用元数据缓存
+	"""
+	enabled: Boolean!
+	"""
+	缓存过期时间（Go duration 格式，如 "6h", "24h"）
+	空值表示使用默认值（6小时）
+	"0" 或负值表示永不过期（不推荐）
+	"""
+	infoAge: String
+	"""
+	ChangeNotify 轮询间隔（Go duration 格式，如 "1m", "5m"）
+	空值表示使用默认值（1分钟）
+	最小值为 10s
+	"""
+	changeNotifyPoll: String
+}
+
+"""
+元数据缓存运行时状态（计算字段）
+"""
+type ConnectionCacheStatus {
+	"""
+	连接 ID
+	"""
+	connectionId: ID!
+	"""
+	缓存是否正在运行（Fs 已 Pin 且 ChangeNotify 已订阅）
+	"""
+	running: Boolean!
+	"""
+	ChangeNotify 是否可用（后端是否支持）
+	"""
+	changeNotifySupported: Boolean!
+	"""
+	缓存条目数量
+	"""
+	entriesCount: Int!
+	"""
+	缓存数据库文件大小（字节）
+	"""
+	dbSizeBytes: BigInt
+	"""
+	最后一次收到变更通知的时间（用于监控）
+	"""
+	lastNotifyTime: DateTime
 }
 
 """
@@ -140,6 +211,10 @@ input CreateConnectionInput {
 	配置参数
 	"""
 	config: StringMap!
+	"""
+	连接扩展选项（包含缓存配置）
+	"""
+	options: ConnectionOptionsInput
 }
 
 """
@@ -154,6 +229,11 @@ input UpdateConnectionInput {
 	配置参数
 	"""
 	config: StringMap
+	"""
+	连接扩展选项（包含缓存配置）
+	设置为 null 时保持不变
+	"""
+	options: ConnectionOptionsInput
 }
 
 """
@@ -168,6 +248,36 @@ input TestConnectionInput {
 	配置参数
 	"""
 	config: StringMap!
+}
+
+"""
+连接扩展选项输入
+"""
+input ConnectionOptionsInput {
+	"""
+	元数据缓存配置
+	"""
+	cache: ConnectionCacheOptionsInput
+}
+
+"""
+元数据缓存配置输入
+"""
+input ConnectionCacheOptionsInput {
+	"""
+	是否启用元数据缓存
+	"""
+	enabled: Boolean!
+	"""
+	缓存过期时间（Go duration 格式，如 "6h", "24h"）
+	空值或空字符串表示使用默认值（6小时）
+	"""
+	infoAge: String
+	"""
+	ChangeNotify 轮询间隔（Go duration 格式，如 "1m", "5m"）
+	空值或空字符串表示使用默认值（1分钟）
+	"""
+	changeNotifyPoll: String
 }
 
 # =============================================================================
@@ -198,6 +308,24 @@ type ConnectionTestFailure {
 测试连接结果
 """
 union TestConnectionResult = ConnectionTestSuccess | ConnectionTestFailure
+
+"""
+清理缓存结果
+"""
+type ClearCacheResult {
+	"""
+	是否成功
+	"""
+	success: Boolean!
+	"""
+	清理的条目数量
+	"""
+	clearedCount: Int!
+	"""
+	消息（已本地化）
+	"""
+	message: String!
+}
 
 # =============================================================================
 # NAMESPACED TYPES
@@ -241,6 +369,12 @@ type ConnectionMutation {
 	测试未保存的连接配置（测试失败是预期业务结果，用 union 表示）
 	"""
 	testUnsaved(input: TestConnectionInput!): TestConnectionResult! @goField(forceResolver: true)
+	"""
+	清理指定连接的缓存数据
+	- id: 连接 ID
+	返回清理结果
+	"""
+	clearCache(id: ID!): ClearCacheResult! @goField(forceResolver: true)
 }
 
 # =============================================================================
@@ -259,4 +393,13 @@ extend type Mutation {
 	连接相关变更（命名空间）
 	"""
 	connection: ConnectionMutation! @goField(forceResolver: true)
+}
+
+extend type Subscription {
+	"""
+	元数据缓存状态实时订阅
+	- connectionId: 连接 ID
+	返回该连接的实时缓存运行时状态
+	"""
+	cacheStatus(connectionId: ID!): ConnectionCacheStatus! @goField(forceResolver: true)
 }

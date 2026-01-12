@@ -60,7 +60,7 @@ func (r *importMutationResolver) Execute(ctx context.Context, obj *model.ImportM
 			// Connection exists
 			if input.Overwrite {
 				// Update existing connection
-				err := r.deps.ConnectionQuery.UpdateConnection(ctx, existing.ID, nil, &connInput.Type, connInput.Config)
+				err := r.deps.ConnectionQuery.UpdateConnection(ctx, existing.ID, nil, &connInput.Type, connInput.Config, nil)
 				if err != nil {
 					return nil, err
 				}
@@ -82,7 +82,7 @@ func (r *importMutationResolver) Execute(ctx context.Context, obj *model.ImportM
 		}
 
 		// Create new connection
-		conn, err := r.deps.ConnectionQuery.CreateConnection(ctx, connInput.Name, connInput.Type, connInput.Config)
+		conn, err := r.deps.ConnectionQuery.CreateConnection(ctx, connInput.Name, connInput.Type, connInput.Config, nil)
 		if err != nil {
 			return nil, err
 		}

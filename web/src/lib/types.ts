@@ -5,10 +5,12 @@ import type { graphql, ResultOf, VariablesOf } from '@/api/graphql/graphql';
 
 // Import queries for type derivation
 import type {
+  ConnectionCreateMutation,
   ConnectionGetBasicQuery,
   ConnectionGetConfigQuery,
   ConnectionGetQuotaQuery,
   ConnectionsListQuery,
+  ConnectionUpdateMutation,
 } from '@/api/graphql/queries/connections';
 import type { FilesListQuery } from '@/api/graphql/queries/files';
 import type { IMPORT_PARSE, IMPORT_EXECUTE } from '@/api/graphql/queries/import';
@@ -51,6 +53,10 @@ export type ConnectionWithQuota = NonNullable<
 // Backward compatibility alias - use ConnectionWithConfig for full config access
 export type ConnectionDetail = ConnectionWithConfig;
 
+export type CacheOptions = NonNullable<NonNullable<ConnectionWithConfig['options']>['cache']>;
+
+export type CacheStatus = ConnectionWithConfig['cacheStatus'];
+
 export type LoadStatus = ReturnType<typeof graphql.scalar<'ConnectionLoadStatus'>>;
 
 // Task types (from TasksListQuery)
@@ -63,6 +69,9 @@ export type SyncDirection = TaskListItem['direction'];
 // Task mutation input types (from TaskCreateMutation and TaskUpdateMutation)
 export type CreateTaskInput = VariablesOf<typeof TaskCreateMutation>['input'];
 export type UpdateTaskInput = VariablesOf<typeof TaskUpdateMutation>['input'];
+
+export type CreateConnectionInput = VariablesOf<typeof ConnectionCreateMutation>['input'];
+export type UpdateConnectionInput = VariablesOf<typeof ConnectionUpdateMutation>['input'];
 
 // ConflictResolution enum (from CreateTaskInput.options.conflictResolution)
 export type ConflictResolution = NonNullable<

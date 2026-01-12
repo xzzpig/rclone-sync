@@ -194,7 +194,7 @@ func (s *DBStorage) SetValue(section, key, value string) {
         if key == "type" {
             connType = value
         }
-        _ = s.svc.CreateConnection(ctx, section, connType, config)
+        _ = s.svc.CreateConnection(ctx, section, connType, config, nil)
         return
     }
 

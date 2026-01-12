@@ -30,8 +30,8 @@ func setupTestConfig(t *testing.T) (*rclone.DBStorage, *query.ConnectionQuery) {
 	// Create connection query
 	connSvc := query.NewConnectionQuery(client, encryptor)
 
-	// Create DBStorage and install it
-	storage := rclone.NewDBStorage(connSvc)
+	// Create DBStorage and install it (use temp dir for cache)
+	storage := rclone.NewDBStorage(connSvc, t.TempDir())
 	storage.Install()
 
 	return storage, connSvc

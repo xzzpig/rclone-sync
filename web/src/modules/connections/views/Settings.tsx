@@ -23,6 +23,10 @@ import { createMutation, createQuery } from '@urql/solid';
 import { Component, Show, createMemo, createSignal } from 'solid-js';
 import IconLoader2 from '~icons/lucide/loader-2';
 import { DynamicConfigForm } from '../components/DynamicConfigForm';
+import { CacheSettingsForm } from '../components/CacheSettingsForm';
+import { createEffect } from 'solid-js';
+import type { CacheOptions } from '@/lib/types';
+import { Separator } from '@/components/ui/separator';
 
 const Settings: Component = () => {
   const params = useParams();
@@ -67,6 +71,22 @@ const Settings: Component = () => {
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = createSignal(false);
   const [isDeleting, setIsDeleting] = createSignal(false);
+  const [cacheOptions, setCacheOptions] = createSignal<CacheOptions>({
+    enabled: false,
+    infoAge: null,
+    changeNotifyPoll: null,
+  });
+
+  createEffect(() => {
+    const options = connection()?.options?.cache;
+    if (options) {
+      setCacheOptions({
+        enabled: options.enabled,
+        infoAge: options.infoAge ?? null,
+        changeNotifyPoll: options.changeNotifyPoll ?? null,
+      });
+    }
+  });
 
   const handleSave = async (_name: string | undefined, config: Record<string, string>) => {
     const id = connectionId();
@@ -76,7 +96,12 @@ const Settings: Component = () => {
 
     const result = await executeUpdateConnection({
       id,
-      input: { config },
+      input: {
+        config,
+        options: {
+          cache: cacheOptions(),
+        },
+      },
     });
 
     if (result.error) {
@@ -139,7 +164,10 @@ const Settings: Component = () => {
             showBack={false}
             onBack={() => navigate('..')}
             onSave={handleSave}
-          />
+          >
+            <Separator class="my-6" />
+            <CacheSettingsForm options={cacheOptions()} onChange={setCacheOptions} />
+          </DynamicConfigForm>
         </CardContent>
       </Card>
 

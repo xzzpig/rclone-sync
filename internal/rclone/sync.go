@@ -177,15 +177,20 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger model.
 
 	// 5. Create Fs objects
 	// For source (local paths), use GetFs with empty remote to skip caching (per FR-009).
-	// For destination (remote), use GetFs with remote name to leverage Fs cache.
+	// For destination (remote), use GetCachedFs which transparently uses metacache when enabled.
 	fSrc, err := GetFs(statsCtx, "", task.SourcePath)
 	if err != nil {
 		e.failJob(ctx, jobEntity.ID, err)
 		return err
 	}
 
-	// For remote destinations, use cached Fs to avoid repeated connection setup
-	fDst, err := GetFs(statsCtx, connectionName, task.RemotePath)
+	// Check if cache is enabled for this connection
+	cacheEnabled := task.Edges.Connection.Options != nil &&
+		task.Edges.Connection.Options.Cache != nil &&
+		task.Edges.Connection.Options.Cache.Enabled
+
+	// For remote destinations, use GetCachedFs which transparently uses metacache when cache is enabled
+	fDst, err := GetCachedFs(statsCtx, connectionName, task.RemotePath, cacheEnabled)
 	if err != nil {
 		e.failJob(ctx, jobEntity.ID, err)
 		return err

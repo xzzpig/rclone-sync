@@ -33,7 +33,7 @@ func TestSyncEngine_RunTask_Upload(t *testing.T) {
 	require.NoError(t, err)
 
 	// 2. Create Connection and Task via ConnectionQuery (this goes to database)
-	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"})
+	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"}, nil)
 	require.NoError(t, err)
 
 	testTask, err := taskQuery.CreateTask(ctx,
@@ -102,7 +102,7 @@ func TestSyncEngine_RunTask_Download(t *testing.T) {
 	require.NoError(t, err)
 
 	// 2. Create Connection and Task via ConnectionQuery (this goes to database)
-	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"})
+	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"}, nil)
 	require.NoError(t, err)
 
 	testTask, err := taskQuery.CreateTask(ctx,
@@ -165,7 +165,7 @@ func TestSyncEngine_RunTask_Bidirectional(t *testing.T) {
 	require.NoError(t, err)
 
 	// 2. Create Connection and Task via ConnectionQuery (this goes to database)
-	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"})
+	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"}, nil)
 	require.NoError(t, err)
 
 	testTask, err := taskQuery.CreateTask(ctx,

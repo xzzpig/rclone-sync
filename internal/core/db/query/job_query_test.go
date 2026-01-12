@@ -37,7 +37,7 @@ func TestJobQuery(t *testing.T) {
 	connQuery := NewConnectionQuery(client, encryptor)
 	testConn, err := connQuery.CreateConnection(ctx, "test-local", "local", map[string]string{
 		"type": "local",
-	})
+	}, nil)
 	require.NoError(t, err)
 	testConnID := testConn.ID
 
@@ -279,7 +279,7 @@ func TestJobQuery(t *testing.T) {
 			// Create a unique connection for this test
 			uniqueConn, err := connQuery.CreateConnection(ctx, "unique-conn-"+uuid.NewString(), "local", map[string]string{
 				"type": "local",
-			})
+			}, nil)
 			require.NoError(t, err)
 			uniqueTask, err := taskQuery.CreateTask(ctx, "Unique Connection Task", "/l", uniqueConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
 			require.NoError(t, err)
@@ -361,7 +361,7 @@ func TestJobQuery(t *testing.T) {
 		// Create a unique connection for this test
 		uniqueConn, err := connQuery.CreateConnection(ctx, "list-jobs-conn-"+uuid.NewString(), "local", map[string]string{
 			"type": "local",
-		})
+		}, nil)
 		require.NoError(t, err)
 
 		// Create a task for this connection
@@ -467,7 +467,7 @@ func TestJobQuery_UpdateJobStatus_Transitions(t *testing.T) {
 	connQuery := NewConnectionQuery(client, encryptor)
 	testConn, err := connQuery.CreateConnection(ctx, "test-transitions", "local", map[string]string{
 		"type": "local",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	// Create task
@@ -509,7 +509,7 @@ func TestJobQuery_ListJobLogsByJobPaginated(t *testing.T) {
 	connQuery := NewConnectionQuery(client, encryptor)
 	testConn, err := connQuery.CreateConnection(ctx, "test-paginated-logs", "local", map[string]string{
 		"type": "local",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	// Create task
@@ -601,7 +601,7 @@ func TestJobQuery_DeleteOldLogsForConnection(t *testing.T) {
 	connQuery := NewConnectionQuery(client, encryptor)
 	testConn, err := connQuery.CreateConnection(ctx, "test-cleanup-logs", "local", map[string]string{
 		"type": "local",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	// Create task
@@ -659,7 +659,7 @@ func TestJobQuery_DeleteOldLogsForConnection(t *testing.T) {
 		// Create a new connection with no logs
 		emptyConn, err := connQuery.CreateConnection(ctx, "empty-conn-"+uuid.NewString(), "local", map[string]string{
 			"type": "local",
-		})
+		}, nil)
 		require.NoError(t, err)
 
 		deleted, err := query.DeleteOldLogsForConnection(ctx, emptyConn.ID, 10)
@@ -671,7 +671,7 @@ func TestJobQuery_DeleteOldLogsForConnection(t *testing.T) {
 		// Create a new connection for this test
 		multiJobConn, err := connQuery.CreateConnection(ctx, "multi-job-conn-"+uuid.NewString(), "local", map[string]string{
 			"type": "local",
-		})
+		}, nil)
 		require.NoError(t, err)
 
 		multiTask, err := taskQuery.CreateTask(ctx, "Multi Job Task "+uuid.NewString(), "/l", multiJobConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
@@ -710,7 +710,7 @@ func TestJobQuery_DeleteOldLogsForConnection(t *testing.T) {
 		// Create a new connection for this test
 		verifyConn, err := connQuery.CreateConnection(ctx, "verify-newest-conn-"+uuid.NewString(), "local", map[string]string{
 			"type": "local",
-		})
+		}, nil)
 		require.NoError(t, err)
 
 		verifyTask, err := taskQuery.CreateTask(ctx, "Verify Newest Task "+uuid.NewString(), "/l", verifyConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
@@ -775,7 +775,7 @@ func TestJobQuery_DeleteOldLogsForConnection(t *testing.T) {
 		// Create a new connection for this test
 		partialConn, err := connQuery.CreateConnection(ctx, "partial-keep-conn-"+uuid.NewString(), "local", map[string]string{
 			"type": "local",
-		})
+		}, nil)
 		require.NoError(t, err)
 
 		partialTask, err := taskQuery.CreateTask(ctx, "Partial Keep Task "+uuid.NewString(), "/l", partialConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
@@ -839,7 +839,7 @@ func TestJobQuery_CountJobLogs_ComplexFilters(t *testing.T) {
 	connQuery := NewConnectionQuery(client, encryptor)
 	testConn, err := connQuery.CreateConnection(ctx, "test-count-logs", "local", map[string]string{
 		"type": "local",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	// Create task
@@ -893,7 +893,7 @@ func TestJobQuery_DeleteJob(t *testing.T) {
 	connQuery := NewConnectionQuery(client, encryptor)
 	testConn, err := connQuery.CreateConnection(ctx, "test-delete-job", "local", map[string]string{
 		"type": "local",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	// Create task

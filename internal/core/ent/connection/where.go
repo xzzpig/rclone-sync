@@ -251,6 +251,16 @@ func EncryptedConfigLTE(v []byte) predicate.Connection {
 	return predicate.Connection(sql.FieldLTE(FieldEncryptedConfig, v))
 }
 
+// OptionsIsNil applies the IsNil predicate on the "options" field.
+func OptionsIsNil() predicate.Connection {
+	return predicate.Connection(sql.FieldIsNull(FieldOptions))
+}
+
+// OptionsNotNil applies the NotNil predicate on the "options" field.
+func OptionsNotNil() predicate.Connection {
+	return predicate.Connection(sql.FieldNotNull(FieldOptions))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.Connection {
 	return predicate.Connection(sql.FieldEQ(FieldCreatedAt, v))

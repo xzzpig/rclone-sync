@@ -50,7 +50,7 @@ func NewTestEnv(t *testing.T) *TestEnv {
 	t.Helper()
 
 	// Init logger
-	logger.InitLogger(logger.EnvironmentDevelopment, logger.LogLevelDebug, nil)
+	logger.InitLogger(logger.EnvironmentDevelopment, logger.Error, nil)
 
 	// Init i18n (required for i18n error handling)
 	require.NoError(t, i18n.Init())
@@ -76,7 +76,7 @@ func NewTestEnv(t *testing.T) *TestEnv {
 	connectionQuery := query.NewConnectionQuery(client, encryptor)
 
 	// Install DBStorage for rclone configuration
-	storage := rclone.NewDBStorage(connectionQuery)
+	storage := rclone.NewDBStorage(connectionQuery, appDataDir)
 	storage.Install()
 
 	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, appDataDir, false, 0)
@@ -86,9 +86,12 @@ func NewTestEnv(t *testing.T) *TestEnv {
 	mockWatcher := &mockWatcher{}
 	mockScheduler := &mockScheduler{}
 
-	// Create job progress bus and transfer progress bus
+	// Create job progress bus, transfer progress bus and cache status bus
 	jobProgressBus := subscription.NewJobProgressBus()
 	transferProgressBus := subscription.NewTransferProgressBus()
+	cacheStatusBus := subscription.NewCacheStatusBus()
+
+	pinManager := rclone.NewPinManager(cacheStatusBus)
 
 	// Create dependencies
 	deps := &resolver.Dependencies{
@@ -102,6 +105,8 @@ func NewTestEnv(t *testing.T) *TestEnv {
 		Encryptor:           encryptor,
 		JobProgressBus:      jobProgressBus,
 		TransferProgressBus: transferProgressBus,
+		CacheStatusBus:      cacheStatusBus,
+		PinManager:          pinManager,
 	}
 
 	// Create GraphQL handler
@@ -188,7 +193,7 @@ func (e *TestEnv) CreateTestConnection(t *testing.T, name string) uuid.UUID {
 	t.Helper()
 	conn, err := e.ConnectionQuery.CreateConnection(context.Background(), name, "local", map[string]string{
 		"type": "local",
-	})
+	}, nil)
 	require.NoError(t, err)
 	return conn.ID
 }

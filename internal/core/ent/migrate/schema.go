@@ -14,6 +14,7 @@ var (
 		{Name: "name", Type: field.TypeString, Unique: true},
 		{Name: "type", Type: field.TypeString},
 		{Name: "encrypted_config", Type: field.TypeBytes},
+		{Name: "options", Type: field.TypeJSON, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 	}
@@ -36,7 +37,7 @@ var (
 			{
 				Name:    "connection_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{ConnectionsColumns[4]},
+				Columns: []*schema.Column{ConnectionsColumns[5]},
 			},
 		},
 	}

@@ -1,6 +1,7 @@
 import { ConnectionGetQuotaQuery } from '@/api/graphql/queries/connections';
 import ActiveTransfersCard from '@/modules/connections/components/ActiveTransfersCard';
 import RunningJobsCard from '@/modules/connections/components/RunningJobsCard';
+import { CacheStatusCard } from '@/modules/connections/components/CacheStatusCard';
 import StatusIcon from '@/components/common/StatusIcon';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -8,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatBytes } from '@/lib/utils';
 import * as m from '@/paraglide/messages.js';
 import { useTasks } from '@/store/tasks';
+import { useCacheStatus } from '@/store/cacheStatus';
 import { useParams } from '@solidjs/router';
 import { createQuery } from '@urql/solid';
 import { Component, createMemo, Show } from 'solid-js';
@@ -19,8 +21,12 @@ import IconTrash2 from '~icons/lucide/trash-2';
 const Overview: Component = () => {
   const params = useParams();
   const [, actions] = useTasks();
+  const cacheStatusActions = useCacheStatus();
 
   const connectionId = () => params.connectionId;
+
+  // Use real-time cache status from subscription
+  const realtimeCacheStatus = cacheStatusActions.useConnectionCacheStatus(connectionId);
 
   // Use GraphQL query to fetch connection with quota
   const [connectionResult] = createQuery({
@@ -181,6 +187,14 @@ const Overview: Component = () => {
             </Show>
           </CardContent>
         </Card>
+
+        <Show when={connectionResult.data?.connection?.get?.cacheStatus}>
+          <CacheStatusCard
+            status={realtimeCacheStatus() ?? connectionResult.data?.connection?.get?.cacheStatus}
+            connectionId={connectionId()}
+            class="col-span-1 md:col-span-2 lg:col-span-4"
+          />
+        </Show>
       </div>
 
       {/* Running Jobs Card - auto-hides when no running jobs */}

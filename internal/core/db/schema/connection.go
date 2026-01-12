@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 )
 
 // Connection holds the schema definition for the Connection entity.
@@ -31,6 +32,9 @@ func (Connection) Fields() []ent.Field {
 			Comment("Provider type, e.g., onedrive, s3, drive, local"),
 		field.Bytes("encrypted_config").
 			Comment("AES-GCM encrypted configuration JSON"),
+		field.JSON("options", &model.ConnectionOptions{}).
+			Optional().
+			Comment("Connection extended options (includes cache configuration)"),
 		field.Time("created_at").
 			Default(time.Now).
 			Immutable(),

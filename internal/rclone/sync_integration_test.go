@@ -22,6 +22,8 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/rclone/testutil"
 
 	_ "github.com/rclone/rclone/backend/local"
+	_ "github.com/xzzpig/rclone-sync/internal/rclone/backend/metacache"
+	_ "github.com/xzzpig/rclone-sync/internal/rclone/backend/notifylocal"
 )
 
 // setupIntegrationTest initializes a real database, queries and DBStorage for integration testing.
@@ -41,8 +43,8 @@ func setupIntegrationTest(t *testing.T) (*query.ConnectionQuery, *query.TaskQuer
 	taskQuery := query.NewTaskQuery(client)
 	jobQuery := query.NewJobQuery(client)
 
-	// Create DBStorage and install it
-	storage := rclone.NewDBStorage(connQuery)
+	// Create DBStorage and install it (use temp dir for cache)
+	storage := rclone.NewDBStorage(connQuery, t.TempDir())
 	storage.Install()
 
 	return connQuery, taskQuery, jobQuery, storage
@@ -62,7 +64,7 @@ func TestSyncEngine_RunTask_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	// 2. Create Connection and Task via ConnectionQuery (this goes to database)
-	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"})
+	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"}, nil)
 	require.NoError(t, err)
 
 	testTask, err := taskQuery.CreateTask(ctx,
@@ -171,7 +173,7 @@ func TestSyncEngine_RunTask_AutoDeleteEmptyJob(t *testing.T) {
 			}
 
 			// 2. Create Connection and Task via ConnectionQuery
-			testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"})
+			testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"}, nil)
 			require.NoError(t, err)
 
 			testTask, err := taskQuery.CreateTask(ctx,
@@ -224,7 +226,7 @@ func TestSyncEngine_RunTask_Failure(t *testing.T) {
 	destDir := t.TempDir()
 
 	// 2. Create Connection and Task via ConnectionQuery (this goes to database)
-	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"})
+	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"}, nil)
 	require.NoError(t, err)
 
 	testTask, err := taskQuery.CreateTask(ctx,
@@ -275,7 +277,7 @@ func TestSyncEngine_RunTask_Cancel(t *testing.T) {
 	require.NoError(t, err)
 
 	// 2. Create Connection and Task via ConnectionQuery (this goes to database)
-	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"})
+	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"}, nil)
 	require.NoError(t, err)
 
 	testTask, err := taskQuery.CreateTask(ctx,
@@ -339,7 +341,7 @@ func TestSyncEngine_RunTask_CancelDuringSync(t *testing.T) {
 	slowConn, err := connQuery.CreateConnection(ctx, "slowlocal", "slowfs", map[string]string{
 		"type":   "slowfs",
 		"remote": "/",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	// 4. Create task using slowfs - use upload direction to trigger Put on destination
@@ -462,7 +464,7 @@ func TestSyncEngine_RunTask_NoDelete(t *testing.T) {
 			require.NoError(t, err)
 
 			// 2. Create Connection and Task
-			testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"})
+			testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"}, nil)
 			require.NoError(t, err)
 
 			// Create options with noDelete setting
@@ -547,7 +549,7 @@ func TestSyncEngine_RunTask_ProgressEvents(t *testing.T) {
 	require.NoError(t, err)
 
 	// 2. Create Connection and Task
-	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"})
+	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"}, nil)
 	require.NoError(t, err)
 
 	testTask, err := taskQuery.CreateTask(ctx,
@@ -693,5 +695,101 @@ func TestSyncEngine_RunTask_ProgressEvents(t *testing.T) {
 			}
 		}
 		assert.True(t, foundCompleted, "Should find at least one completed transfer (bytes == size)")
+	}
+}
+
+// TestSyncEngine_RunTask_MetacacheIntegration tests the integration of metacache with ChangeNotify.
+// This test verifies that:
+// 1. metacache backend is correctly used when cache is enabled for a connection
+// 2. ChangeNotify from notifylocal triggers cache invalidation in metacache
+// 3. Out-of-band changes to files are detected and synced correctly
+func TestSyncEngine_RunTask_MetacacheIntegration(t *testing.T) {
+	connQuery, taskQuery, jobQuery, _ := setupIntegrationTest(t)
+	ctx := context.Background()
+
+	// 1. Setup directories
+	sourceDir := t.TempDir()
+	remoteDir := t.TempDir()
+
+	// 2. Create a notifylocal connection with cache enabled
+	cacheEnabled := true
+	infoAge := "1h"
+	testConn, err := connQuery.CreateConnection(ctx,
+		"metaremote",
+		"notifylocal",
+		map[string]string{"type": "notifylocal"},
+		&model.ConnectionOptions{
+			Cache: &model.ConnectionCacheOptions{
+				Enabled: cacheEnabled,
+				InfoAge: &infoAge,
+			},
+		},
+	)
+	require.NoError(t, err)
+
+	// 3. Create task with bidirectional sync
+	testTask, err := taskQuery.CreateTask(ctx,
+		"TestMetacacheSync",
+		sourceDir,
+		testConn.ID,
+		remoteDir,
+		string(model.SyncDirectionBidirectional),
+		"",
+		false,
+		nil,
+	)
+	require.NoError(t, err)
+
+	// 4. Setup SyncEngine
+	dataDir := t.TempDir()
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0)
+
+	// 5. Initial sync: create file in source and sync to remote
+	testFilePath := filepath.Join(sourceDir, "sync-test.txt")
+	err = os.WriteFile(testFilePath, []byte("version 1"), 0644)
+	require.NoError(t, err)
+
+	testTask, err = taskQuery.GetTaskWithConnection(ctx, testTask.ID)
+	require.NoError(t, err)
+
+	err = syncEngine.RunTask(ctx, testTask, model.JobTriggerManual)
+	require.NoError(t, err)
+
+	// Verify initial sync succeeded
+	remoteFilePath := filepath.Join(remoteDir, "sync-test.txt")
+	content, err := os.ReadFile(remoteFilePath)
+	require.NoError(t, err)
+	assert.Equal(t, "version 1", string(content), "Remote file should have version 1 after initial sync")
+
+	// 6. Simulate out-of-band change: directly modify remote file on disk
+	// Wait a moment for any pending file system events
+	time.Sleep(200 * time.Millisecond)
+
+	// Modify the remote file directly (simulating external change)
+	err = os.WriteFile(remoteFilePath, []byte("version 2"), 0644)
+	require.NoError(t, err)
+
+	// Give ChangeNotify time to propagate the change notification
+	time.Sleep(500 * time.Millisecond)
+
+	// 7. Run sync again - if metacache and ChangeNotify work correctly,
+	// the cache should be invalidated and the new content should be detected
+	err = syncEngine.RunTask(ctx, testTask, model.JobTriggerManual)
+	require.NoError(t, err)
+
+	// 8. Verify that source file was updated from remote
+	// This proves: notifylocal detected change -> ChangeNotify fired -> metacache invalidated -> bisync saw new content
+	sourceContent, err := os.ReadFile(testFilePath)
+	require.NoError(t, err)
+	assert.Equal(t, "version 2", string(sourceContent), "Source file should be updated from remote out-of-band change")
+
+	// 9. Verify job records
+	jobs, err := jobQuery.ListJobs(ctx, &testTask.ID, nil, 10, 0)
+	require.NoError(t, err)
+	assert.Len(t, jobs, 2, "Should have two jobs (initial sync + resync after change)")
+
+	// Both jobs should be successful
+	for _, job := range jobs {
+		assert.Equal(t, string(model.JobStatusSuccess), string(job.Status), "Job should be successful")
 	}
 }

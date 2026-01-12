@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/connection"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/predicate"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/task"
@@ -61,6 +62,18 @@ func (_u *ConnectionUpdate) SetNillableType(v *string) *ConnectionUpdate {
 // SetEncryptedConfig sets the "encrypted_config" field.
 func (_u *ConnectionUpdate) SetEncryptedConfig(v []byte) *ConnectionUpdate {
 	_u.mutation.SetEncryptedConfig(v)
+	return _u
+}
+
+// SetOptions sets the "options" field.
+func (_u *ConnectionUpdate) SetOptions(v *model.ConnectionOptions) *ConnectionUpdate {
+	_u.mutation.SetOptions(v)
+	return _u
+}
+
+// ClearOptions clears the value of the "options" field.
+func (_u *ConnectionUpdate) ClearOptions() *ConnectionUpdate {
+	_u.mutation.ClearOptions()
 	return _u
 }
 
@@ -183,6 +196,12 @@ func (_u *ConnectionUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	if value, ok := _u.mutation.EncryptedConfig(); ok {
 		_spec.SetField(connection.FieldEncryptedConfig, field.TypeBytes, value)
 	}
+	if value, ok := _u.mutation.Options(); ok {
+		_spec.SetField(connection.FieldOptions, field.TypeJSON, value)
+	}
+	if _u.mutation.OptionsCleared() {
+		_spec.ClearField(connection.FieldOptions, field.TypeJSON)
+	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(connection.FieldUpdatedAt, field.TypeTime, value)
 	}
@@ -282,6 +301,18 @@ func (_u *ConnectionUpdateOne) SetNillableType(v *string) *ConnectionUpdateOne {
 // SetEncryptedConfig sets the "encrypted_config" field.
 func (_u *ConnectionUpdateOne) SetEncryptedConfig(v []byte) *ConnectionUpdateOne {
 	_u.mutation.SetEncryptedConfig(v)
+	return _u
+}
+
+// SetOptions sets the "options" field.
+func (_u *ConnectionUpdateOne) SetOptions(v *model.ConnectionOptions) *ConnectionUpdateOne {
+	_u.mutation.SetOptions(v)
+	return _u
+}
+
+// ClearOptions clears the value of the "options" field.
+func (_u *ConnectionUpdateOne) ClearOptions() *ConnectionUpdateOne {
+	_u.mutation.ClearOptions()
 	return _u
 }
 
@@ -433,6 +464,12 @@ func (_u *ConnectionUpdateOne) sqlSave(ctx context.Context) (_node *Connection, 
 	}
 	if value, ok := _u.mutation.EncryptedConfig(); ok {
 		_spec.SetField(connection.FieldEncryptedConfig, field.TypeBytes, value)
+	}
+	if value, ok := _u.mutation.Options(); ok {
+		_spec.SetField(connection.FieldOptions, field.TypeJSON, value)
+	}
+	if _u.mutation.OptionsCleared() {
+		_spec.ClearField(connection.FieldOptions, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(connection.FieldUpdatedAt, field.TypeTime, value)

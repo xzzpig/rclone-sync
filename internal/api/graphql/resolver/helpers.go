@@ -17,6 +17,7 @@ func entConnectionToModel(c *ent.Connection) *model.Connection {
 		Type:      c.Type,
 		CreatedAt: c.CreatedAt,
 		UpdatedAt: c.UpdatedAt,
+		Options:   c.Options,
 	}
 }
 

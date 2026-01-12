@@ -1,0 +1,296 @@
+# ============================================================================
+# GraphQL Schema Changes: ChangeNotify 缓存加速同步
+# Feature Branch: 012-rclone-change-notify-cache
+# Date: 2026-01-08
+#
+# 此文件定义本功能新增/修改的 GraphQL schema
+# 实际实现时需合并到项目的主 schema 文件中
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# 新增类型
+# ----------------------------------------------------------------------------
+
+"""
+连接扩展选项
+"""
+type ConnectionOptions {
+  """
+  元数据缓存配置
+  """
+  cache: ConnectionCacheOptions
+}
+
+"""
+元数据缓存配置（持久化配置）
+"""
+type ConnectionCacheOptions {
+  """
+  是否启用元数据缓存
+  """
+  enabled: Boolean!
+  
+  """
+  缓存过期时间（Go duration 格式，如 "6h", "24h"）
+  空值表示使用默认值（6小时）
+  "0" 或负值表示永不过期（不推荐）
+  """
+  infoAge: String
+  
+  """
+  ChangeNotify 轮询间隔（Go duration 格式，如 "1m", "5m"）
+  空值表示使用默认值（1分钟）
+  最小值为 10s
+  """
+  changeNotifyPoll: String
+}
+
+"""
+元数据缓存运行时状态（计算字段）
+"""
+type ConnectionCacheStatus {
+  """
+  缓存是否正在运行（Fs 已 Pin 且 ChangeNotify 已订阅）
+  """
+  running: Boolean!
+  
+  """
+  ChangeNotify 是否可用（后端是否支持）
+  """
+  changeNotifySupported: Boolean!
+  
+  """
+  缓存条目数量
+  """
+  entriesCount: Int!
+  
+  """
+  缓存数据库文件大小（字节）
+  """
+  dbSizeBytes: BigInt
+  
+  """
+  最后一次收到变更通知的时间（用于监控）
+  """
+  lastNotifyTime: DateTime
+}
+
+"""
+连接扩展选项输入
+"""
+input ConnectionOptionsInput {
+  """
+  元数据缓存配置
+  """
+  cache: ConnectionCacheOptionsInput
+}
+
+"""
+元数据缓存配置输入
+"""
+input ConnectionCacheOptionsInput {
+  """
+  是否启用元数据缓存
+  """
+  enabled: Boolean!
+  
+  """
+  缓存过期时间（Go duration 格式，如 "6h", "24h"）
+  空值或空字符串表示使用默认值（6小时）
+  """
+  infoAge: String
+  
+  """
+  ChangeNotify 轮询间隔（Go duration 格式，如 "1m", "5m"）
+  空值或空字符串表示使用默认值（1分钟）
+  """
+  changeNotifyPoll: String
+}
+
+"""
+清理缓存结果
+"""
+type ClearCacheResult {
+  """
+  是否成功
+  """
+  success: Boolean!
+  
+  """
+  清理的条目数量
+  """
+  clearedCount: Int!
+  
+  """
+  消息（已本地化）
+  """
+  message: String!
+}
+
+# ----------------------------------------------------------------------------
+# 现有类型扩展
+# ----------------------------------------------------------------------------
+
+"""
+远程存储连接（扩展）
+"""
+extend type Connection {
+  """
+  连接扩展选项（包含缓存配置）
+  """
+  options: ConnectionOptions
+  
+  """
+  缓存运行时状态（仅当 options.cache.enabled 为 true 时有值）
+  这是一个计算字段，不持久化
+  """
+  cacheStatus: ConnectionCacheStatus
+}
+
+"""
+连接变更命名空间（扩展）
+"""
+extend type ConnectionMutation {
+  """
+  清理指定连接的缓存数据
+  - id: 连接 ID
+  返回清理结果
+  """
+  clearCache(id: ID!): ClearCacheResult!
+}
+
+"""
+创建连接输入（扩展）
+"""
+extend input CreateConnectionInput {
+  """
+  连接扩展选项（包含缓存配置）
+  """
+  options: ConnectionOptionsInput
+}
+
+"""
+更新连接输入（扩展）
+"""
+extend input UpdateConnectionInput {
+  """
+  连接扩展选项（包含缓存配置）
+  设置为 null 时保持不变
+  """
+  options: ConnectionOptionsInput
+}
+
+# ----------------------------------------------------------------------------
+# 查询示例
+# ----------------------------------------------------------------------------
+
+# 查询连接（含缓存配置和状态）
+#
+# query GetConnectionWithCache($id: ID!) {
+#   connection {
+#     get(id: $id) {
+#       id
+#       name
+#       type
+#       options {
+#         cache {
+#           enabled
+#           infoAge
+#           changeNotifyPoll
+#         }
+#       }
+#       cacheStatus {
+#         running
+#         changeNotifySupported
+#         entriesCount
+#         dbSizeBytes
+#         lastNotifyTime
+#       }
+#     }
+#   }
+# }
+
+# 启用连接缓存
+#
+# mutation EnableConnectionCache($id: ID!) {
+#   connection {
+#     update(id: $id, input: {
+#       options: {
+#         cache: {
+#           enabled: true
+#           infoAge: "6h"
+#           changeNotifyPoll: "1m"
+#         }
+#       }
+#     }) {
+#       id
+#       options {
+#         cache {
+#           enabled
+#         }
+#       }
+#     }
+#   }
+# }
+
+# 关闭连接缓存
+#
+# mutation DisableConnectionCache($id: ID!) {
+#   connection {
+#     update(id: $id, input: {
+#       options: {
+#         cache: {
+#           enabled: false
+#         }
+#       }
+#     }) {
+#       id
+#       options {
+#         cache {
+#           enabled
+#         }
+#       }
+#     }
+#   }
+# }
+
+# 清理连接缓存
+#
+# mutation ClearConnectionCache($id: ID!) {
+#   connection {
+#     clearCache(id: $id) {
+#       success
+#       clearedCount
+#       message
+#     }
+#   }
+# }
+
+# 创建带缓存的连接
+#
+# mutation CreateConnectionWithCache($input: CreateConnectionInput!) {
+#   connection {
+#     create(input: {
+#       name: "myonedrive"
+#       type: "onedrive"
+#       config: { ... }
+#       options: {
+#         cache: {
+#           enabled: true
+#           infoAge: "12h"
+#           changeNotifyPoll: "2m"
+#         }
+#       }
+#     }) {
+#       id
+#       name
+#       options {
+#         cache {
+#           enabled
+#           infoAge
+#           changeNotifyPoll
+#         }
+#       }
+#     }
+#   }
+# }

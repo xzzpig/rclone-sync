@@ -32,14 +32,14 @@ func TestTaskQuery(t *testing.T) {
 	// Create a test connection for use across tests
 	testConn, err := connQuery.CreateConnection(ctx, "test-local", "local", map[string]string{
 		"type": "local",
-	})
+	}, nil)
 	require.NoError(t, err)
 	testConnID := testConn.ID
 
 	// Create another connection for multi-connection tests
 	testConn2, err := connQuery.CreateConnection(ctx, "test-remote-2", "local", map[string]string{
 		"type": "local",
-	})
+	}, nil)
 	require.NoError(t, err)
 	testConnID2 := testConn2.ID
 
@@ -401,7 +401,7 @@ func TestTaskQuery_EdgeCases(t *testing.T) {
 	connQuery := NewConnectionQuery(client, encryptor)
 	testConn, err := connQuery.CreateConnection(ctx, "edge-case-conn", "local", map[string]string{
 		"type": "local",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	t.Run("CreateTask_WithNilOptions", func(t *testing.T) {
@@ -479,7 +479,7 @@ func TestTaskQuery_EdgeCases(t *testing.T) {
 		// Create a connection with no tasks
 		emptyConn, err := connQuery.CreateConnection(ctx, "empty-conn", "local", map[string]string{
 			"type": "local",
-		})
+		}, nil)
 		require.NoError(t, err)
 
 		tasks, err := query.ListTasksByConnection(ctx, emptyConn.ID)
@@ -502,7 +502,7 @@ func TestTaskQuery_ListTasksPaginated(t *testing.T) {
 	connQuery := NewConnectionQuery(client, encryptor)
 	testConn, err := connQuery.CreateConnection(ctx, "paginated-tasks-conn", "local", map[string]string{
 		"type": "local",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	// Initially empty
@@ -579,10 +579,10 @@ func TestTaskQuery_ListTasksByConnectionPaginated(t *testing.T) {
 	require.NoError(t, err)
 	connQuery := NewConnectionQuery(client, encryptor)
 
-	conn1, err := connQuery.CreateConnection(ctx, "paginated-conn-1", "local", map[string]string{"type": "local"})
+	conn1, err := connQuery.CreateConnection(ctx, "paginated-conn-1", "local", map[string]string{"type": "local"}, nil)
 	require.NoError(t, err)
 
-	conn2, err := connQuery.CreateConnection(ctx, "paginated-conn-2", "local", map[string]string{"type": "local"})
+	conn2, err := connQuery.CreateConnection(ctx, "paginated-conn-2", "local", map[string]string{"type": "local"}, nil)
 	require.NoError(t, err)
 
 	// Create tasks for conn1
@@ -638,7 +638,7 @@ func TestTaskQuery_ListTasksByConnectionPaginated(t *testing.T) {
 	})
 
 	t.Run("EmptyConnection", func(t *testing.T) {
-		emptyConn, err := connQuery.CreateConnection(ctx, "empty-paginated-conn", "local", map[string]string{"type": "local"})
+		emptyConn, err := connQuery.CreateConnection(ctx, "empty-paginated-conn", "local", map[string]string{"type": "local"}, nil)
 		require.NoError(t, err)
 
 		tasks, total, err := query.ListTasksByConnectionPaginated(ctx, emptyConn.ID, 10, 0)
@@ -675,7 +675,7 @@ func TestTaskQuery_ListJobsByTaskPaginated(t *testing.T) {
 	connQuery := NewConnectionQuery(client, encryptor)
 	testConn, err := connQuery.CreateConnection(ctx, "jobs-by-task-conn", "local", map[string]string{
 		"type": "local",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	// Create task

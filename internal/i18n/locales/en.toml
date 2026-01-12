@@ -91,6 +91,15 @@ other = "Filter rule #{{.Index}} \"{{.Rule}}\" is invalid: {{.Reason}}"
 [error_transfers_out_of_range]
 other = "Transfers must be between 1 and 64, got {{.Value}}"
 
+[error_invalid_info_age]
+other = "Invalid infoAge format: {{.Error}}"
+
+[error_invalid_change_notify_poll]
+other = "Invalid changeNotifyPoll format: {{.Error}}"
+
+[error_change_notify_poll_too_short]
+other = "changeNotifyPoll must be at least 10s"
+
 # Status messages
 [status_syncing]
 other = "Syncing"
@@ -123,3 +132,16 @@ other = "Deleted successfully"
 
 [success_sync_started]
 other = "Sync started"
+
+# Cache messages
+[cache_clear_success]
+other = "Cache cleared successfully"
+
+[cache_clear_success_empty]
+other = "Cache cleared successfully (no cached data)"
+
+[cache_clear_failed]
+other = "Failed to clear cache: {{.Error}}"
+
+[cache_not_enabled]
+other = "Cache is not enabled for this connection"

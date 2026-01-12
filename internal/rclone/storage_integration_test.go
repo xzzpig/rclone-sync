@@ -32,7 +32,7 @@ func TestDBStorage_Integration_FsNewFs(t *testing.T) {
 
 	// Create a local connection in the database
 	tempDir := t.TempDir()
-	_, err := connSvc.CreateConnection(ctx, "test-local", "local", map[string]string{})
+	_, err := connSvc.CreateConnection(ctx, "test-local", "local", map[string]string{}, nil)
 	require.NoError(t, err)
 
 	// Create a test file in tempDir
@@ -62,11 +62,11 @@ func TestDBStorage_Integration_ConfigGetRemoteNames(t *testing.T) {
 	assert.Empty(t, names, "Should have no remotes initially")
 
 	// Create some connections
-	_, err := connSvc.CreateConnection(ctx, "remote-a", "local", map[string]string{})
+	_, err := connSvc.CreateConnection(ctx, "remote-a", "local", map[string]string{}, nil)
 	require.NoError(t, err)
-	_, err = connSvc.CreateConnection(ctx, "remote-b", "local", map[string]string{})
+	_, err = connSvc.CreateConnection(ctx, "remote-b", "local", map[string]string{}, nil)
 	require.NoError(t, err)
-	_, err = connSvc.CreateConnection(ctx, "remote-c", "local", map[string]string{})
+	_, err = connSvc.CreateConnection(ctx, "remote-c", "local", map[string]string{}, nil)
 	require.NoError(t, err)
 
 	// Verify config.GetRemoteNames returns all connections
@@ -86,7 +86,7 @@ func TestDBStorage_Integration_ConfigFileGet(t *testing.T) {
 	_, err := connSvc.CreateConnection(ctx, "config-test", "onedrive", map[string]string{
 		"token":    `{"access_token":"test-token"}`,
 		"drive_id": "abc123",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	// Verify config.FileGetValue reads from DBStorage
@@ -115,7 +115,7 @@ func TestDBStorage_Integration_ConfigFileSet(t *testing.T) {
 	// Create a connection
 	_, err := connSvc.CreateConnection(ctx, "set-test", "s3", map[string]string{
 		"token": "old-token",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	// Update value via config.FileSetValue (simulating rclone token refresh)
@@ -141,7 +141,7 @@ func TestDBStorage_Integration_TokenRefresh_Persistence(t *testing.T) {
 	initialToken := `{"access_token":"old_access","refresh_token":"xxx","expiry":"2024-01-01T00:00:00Z"}`
 	_, err := connSvc.CreateConnection(ctx, "oauth-remote", "onedrive", map[string]string{
 		"token": initialToken,
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	// Simulate rclone refreshing the token (this is what rclone does internally)
@@ -167,7 +167,7 @@ func TestDBStorage_ConcurrentAccess(t *testing.T) {
 	// Create a connection for testing
 	_, err := connSvc.CreateConnection(ctx, "concurrent-test", "local", map[string]string{
 		"counter": "0",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	// Run concurrent operations
@@ -219,8 +219,9 @@ func TestSyncEngine_WithDBStorage_Integration(t *testing.T) {
 	jobSvc := query.NewJobQuery(client)
 	taskSvc := query.NewTaskQuery(client)
 
-	// Install DBStorage
-	storage := rclone.NewDBStorage(connSvc)
+	// Install DBStorage (use temp dir for cache)
+	cacheDir := t.TempDir()
+	storage := rclone.NewDBStorage(connSvc, cacheDir)
 	storage.Install()
 
 	ctx := context.Background()
@@ -235,7 +236,7 @@ func TestSyncEngine_WithDBStorage_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create local connection via ConnectionQuery (this goes to database)
-	testConn, err := connSvc.CreateConnection(ctx, "db-local", "local", map[string]string{})
+	testConn, err := connSvc.CreateConnection(ctx, "db-local", "local", map[string]string{}, nil)
 	require.NoError(t, err)
 
 	// Create task
@@ -282,7 +283,7 @@ func TestDBStorage_Integration_DeleteConnection(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a connection
-	_, err := connSvc.CreateConnection(ctx, "delete-test", "local", map[string]string{})
+	_, err := connSvc.CreateConnection(ctx, "delete-test", "local", map[string]string{}, nil)
 	require.NoError(t, err)
 
 	// Verify it exists
@@ -333,13 +334,13 @@ func TestDBStorage_Integration_AliasRemote(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(subDir, "file2.txt"), []byte("content2"), 0644))
 
 	// Create base local connection
-	_, err := connSvc.CreateConnection(ctx, "base-local", "local", map[string]string{})
+	_, err := connSvc.CreateConnection(ctx, "base-local", "local", map[string]string{}, nil)
 	require.NoError(t, err)
 
 	// Create alias connection pointing to base-local:subdir
 	_, err = connSvc.CreateConnection(ctx, "my-alias", "alias", map[string]string{
 		"remote": "base-local:" + subDir,
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	// Use alias remote to list files
@@ -373,16 +374,16 @@ func TestDBStorage_Integration_UnionRemote(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir2, "from-dir2.txt"), []byte("dir2"), 0644))
 
 	// Create two local connections
-	_, err := connSvc.CreateConnection(ctx, "local-1", "local", map[string]string{})
+	_, err := connSvc.CreateConnection(ctx, "local-1", "local", map[string]string{}, nil)
 	require.NoError(t, err)
 
-	_, err = connSvc.CreateConnection(ctx, "local-2", "local", map[string]string{})
+	_, err = connSvc.CreateConnection(ctx, "local-2", "local", map[string]string{}, nil)
 	require.NoError(t, err)
 
 	// Create union connection that merges both locals
 	_, err = connSvc.CreateConnection(ctx, "my-union", "union", map[string]string{
 		"upstreams": "local-1:" + dir1 + " local-2:" + dir2,
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	// Use union remote to list files from both directories
@@ -416,16 +417,16 @@ func TestDBStorage_Integration_CombineRemote(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dirB, "fileB.txt"), []byte("B"), 0644))
 
 	// Create two local connections
-	_, err := connSvc.CreateConnection(ctx, "local-a", "local", map[string]string{})
+	_, err := connSvc.CreateConnection(ctx, "local-a", "local", map[string]string{}, nil)
 	require.NoError(t, err)
 
-	_, err = connSvc.CreateConnection(ctx, "local-b", "local", map[string]string{})
+	_, err = connSvc.CreateConnection(ctx, "local-b", "local", map[string]string{}, nil)
 	require.NoError(t, err)
 
 	// Create combine connection that maps locals to subdirectories
 	_, err = connSvc.CreateConnection(ctx, "my-combine", "combine", map[string]string{
 		"upstreams": "folder-a=local-a:" + dirA + " folder-b=local-b:" + dirB,
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	// Use combine remote to list root - should see two virtual directories
@@ -473,19 +474,19 @@ func TestDBStorage_Integration_NestedWrappers(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(baseDir, "nested-file.txt"), []byte("nested"), 0644))
 
 	// Create base local connection
-	_, err := connSvc.CreateConnection(ctx, "nested-local", "local", map[string]string{})
+	_, err := connSvc.CreateConnection(ctx, "nested-local", "local", map[string]string{}, nil)
 	require.NoError(t, err)
 
 	// Create first alias pointing to local
 	_, err = connSvc.CreateConnection(ctx, "alias-level1", "alias", map[string]string{
 		"remote": "nested-local:" + baseDir,
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	// Create second alias pointing to first alias (nested)
 	_, err = connSvc.CreateConnection(ctx, "alias-level2", "alias", map[string]string{
 		"remote": "alias-level1:",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	// Use the deeply nested alias to access files

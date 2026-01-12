@@ -84,7 +84,7 @@ func setupIntegrationTest(t *testing.T, opts ...setupOption) *testContext {
 	dataDir := t.TempDir()
 
 	// Install DBStorage for rclone configuration
-	storage := rclone.NewDBStorage(connQuery)
+	storage := rclone.NewDBStorage(connQuery, dataDir)
 	storage.Install()
 
 	// Create SyncEngine and Runner
@@ -119,7 +119,7 @@ func createTestTask(t *testing.T, tc *testContext, name, sourceDir, destDir stri
 	// Create or get local connection
 	conn, err := tc.connQuery.GetConnectionByName(ctx, "local")
 	if err != nil {
-		conn, err = tc.connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"})
+		conn, err = tc.connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"}, nil)
 		require.NoError(t, err)
 	}
 
@@ -154,7 +154,7 @@ func createSlowTask(t *testing.T, tc *testContext, name, sourceDir, destDir stri
 		conn, err = tc.connQuery.CreateConnection(ctx, "slowlocal", "slowfs", map[string]string{
 			"type":   "slowfs",
 			"remote": "/",
-		})
+		}, nil)
 		require.NoError(t, err)
 	}
 

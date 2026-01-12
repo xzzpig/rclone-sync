@@ -2,10 +2,12 @@ package rclone
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/db"
 	"github.com/xzzpig/rclone-sync/internal/core/db/query"
@@ -14,7 +16,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func setupStorageTest(t *testing.T) (*DBStorage, *query.ConnectionQuery) {
+func setupStorageTest(t *testing.T) (*DBStorage, *query.ConnectionQuery, string) {
 	t.Helper()
 
 	// Create test database client
@@ -28,15 +30,16 @@ func setupStorageTest(t *testing.T) (*DBStorage, *query.ConnectionQuery) {
 	// Create connection query
 	connSvc := query.NewConnectionQuery(client, encryptor)
 
-	// Create DBStorage
-	storage := NewDBStorage(connSvc)
+	// Create DBStorage (use temp dir for cache)
+	dataDir := t.TempDir()
+	storage := NewDBStorage(connSvc, dataDir)
 
-	return storage, connSvc
+	return storage, connSvc, dataDir
 }
 
 // T045: 单元测试：DBStorage.GetValue
 func TestDBStorage_GetValue(t *testing.T) {
-	storage, connSvc := setupStorageTest(t)
+	storage, connSvc, _ := setupStorageTest(t)
 	ctx := context.Background()
 
 	// Create a test connection
@@ -45,7 +48,7 @@ func TestDBStorage_GetValue(t *testing.T) {
 		"token":    `{"access_token":"test-token"}`,
 		"drive_id": "abc123",
 	}
-	_, err := connSvc.CreateConnection(ctx, "test-remote", "onedrive", config)
+	_, err := connSvc.CreateConnection(ctx, "test-remote", "onedrive", config, nil)
 	require.NoError(t, err)
 
 	t.Run("get existing key", func(t *testing.T) {
@@ -75,7 +78,7 @@ func TestDBStorage_GetValue(t *testing.T) {
 
 // T046: 单元测试：DBStorage.SetValue
 func TestDBStorage_SetValue(t *testing.T) {
-	storage, connSvc := setupStorageTest(t)
+	storage, connSvc, _ := setupStorageTest(t)
 	ctx := context.Background()
 
 	t.Run("set value on existing connection", func(t *testing.T) {
@@ -84,7 +87,7 @@ func TestDBStorage_SetValue(t *testing.T) {
 			"type":  "s3",
 			"token": "old-token",
 		}
-		_, err := connSvc.CreateConnection(ctx, "update-remote", "s3", config)
+		_, err := connSvc.CreateConnection(ctx, "update-remote", "s3", config, nil)
 		require.NoError(t, err)
 
 		// Update a value
@@ -123,7 +126,7 @@ func TestDBStorage_SetValue(t *testing.T) {
 			"type":  "onedrive",
 			"token": `{"access_token":"old","refresh_token":"xxx","expiry":"2024-01-01T00:00:00Z"}`,
 		}
-		_, err := connSvc.CreateConnection(ctx, "oauth-remote", "onedrive", config)
+		_, err := connSvc.CreateConnection(ctx, "oauth-remote", "onedrive", config, nil)
 		require.NoError(t, err)
 
 		// Simulate rclone refreshing the token
@@ -139,12 +142,12 @@ func TestDBStorage_SetValue(t *testing.T) {
 
 // T047: 单元测试：DBStorage.HasSection
 func TestDBStorage_HasSection(t *testing.T) {
-	storage, connSvc := setupStorageTest(t)
+	storage, connSvc, _ := setupStorageTest(t)
 	ctx := context.Background()
 
 	// Create a test connection
 	config := map[string]string{"type": "local"}
-	_, err := connSvc.CreateConnection(ctx, "existing-remote", "local", config)
+	_, err := connSvc.CreateConnection(ctx, "existing-remote", "local", config, nil)
 	require.NoError(t, err)
 
 	t.Run("existing section returns true", func(t *testing.T) {
@@ -161,7 +164,7 @@ func TestDBStorage_HasSection(t *testing.T) {
 }
 
 func TestDBStorage_GetSectionList(t *testing.T) {
-	storage, connSvc := setupStorageTest(t)
+	storage, connSvc, _ := setupStorageTest(t)
 	ctx := context.Background()
 
 	t.Run("empty database returns empty list", func(t *testing.T) {
@@ -171,11 +174,11 @@ func TestDBStorage_GetSectionList(t *testing.T) {
 
 	t.Run("returns all connection names", func(t *testing.T) {
 		// Create multiple connections
-		_, err := connSvc.CreateConnection(ctx, "remote-a", "s3", map[string]string{"type": "s3"})
+		_, err := connSvc.CreateConnection(ctx, "remote-a", "s3", map[string]string{"type": "s3"}, nil)
 		require.NoError(t, err)
-		_, err = connSvc.CreateConnection(ctx, "remote-b", "gdrive", map[string]string{"type": "gdrive"})
+		_, err = connSvc.CreateConnection(ctx, "remote-b", "gdrive", map[string]string{"type": "gdrive"}, nil)
 		require.NoError(t, err)
-		_, err = connSvc.CreateConnection(ctx, "remote-c", "onedrive", map[string]string{"type": "onedrive"})
+		_, err = connSvc.CreateConnection(ctx, "remote-c", "onedrive", map[string]string{"type": "onedrive"}, nil)
 		require.NoError(t, err)
 
 		sections := storage.GetSectionList()
@@ -187,7 +190,7 @@ func TestDBStorage_GetSectionList(t *testing.T) {
 }
 
 func TestDBStorage_GetKeyList(t *testing.T) {
-	storage, connSvc := setupStorageTest(t)
+	storage, connSvc, _ := setupStorageTest(t)
 	ctx := context.Background()
 
 	config := map[string]string{
@@ -195,7 +198,7 @@ func TestDBStorage_GetKeyList(t *testing.T) {
 		"token":    "xxx",
 		"drive_id": "abc",
 	}
-	_, err := connSvc.CreateConnection(ctx, "keylist-remote", "onedrive", config)
+	_, err := connSvc.CreateConnection(ctx, "keylist-remote", "onedrive", config, nil)
 	require.NoError(t, err)
 
 	t.Run("returns all keys for existing section", func(t *testing.T) {
@@ -213,7 +216,7 @@ func TestDBStorage_GetKeyList(t *testing.T) {
 }
 
 func TestDBStorage_DeleteKey(t *testing.T) {
-	storage, connSvc := setupStorageTest(t)
+	storage, connSvc, _ := setupStorageTest(t)
 	ctx := context.Background()
 
 	config := map[string]string{
@@ -221,7 +224,7 @@ func TestDBStorage_DeleteKey(t *testing.T) {
 		"key_id":     "xxx",
 		"access_key": "yyy",
 	}
-	_, err := connSvc.CreateConnection(ctx, "delete-key-remote", "s3", config)
+	_, err := connSvc.CreateConnection(ctx, "delete-key-remote", "s3", config, nil)
 	require.NoError(t, err)
 
 	t.Run("delete existing key", func(t *testing.T) {
@@ -250,11 +253,11 @@ func TestDBStorage_DeleteKey(t *testing.T) {
 }
 
 func TestDBStorage_DeleteSection(t *testing.T) {
-	storage, connSvc := setupStorageTest(t)
+	storage, connSvc, _ := setupStorageTest(t)
 	ctx := context.Background()
 
 	config := map[string]string{"type": "local"}
-	_, err := connSvc.CreateConnection(ctx, "delete-section-remote", "local", config)
+	_, err := connSvc.CreateConnection(ctx, "delete-section-remote", "local", config, nil)
 	require.NoError(t, err)
 
 	t.Run("delete existing section", func(t *testing.T) {
@@ -272,7 +275,7 @@ func TestDBStorage_DeleteSection(t *testing.T) {
 }
 
 func TestDBStorage_LoadSave(t *testing.T) {
-	storage, _ := setupStorageTest(t)
+	storage, _, _ := setupStorageTest(t)
 
 	t.Run("Load always returns nil", func(t *testing.T) {
 		err := storage.Load()
@@ -286,7 +289,7 @@ func TestDBStorage_LoadSave(t *testing.T) {
 }
 
 func TestDBStorage_Serialize(t *testing.T) {
-	storage, connSvc := setupStorageTest(t)
+	storage, connSvc, _ := setupStorageTest(t)
 	ctx := context.Background()
 
 	t.Run("empty database returns empty JSON", func(t *testing.T) {
@@ -296,7 +299,7 @@ func TestDBStorage_Serialize(t *testing.T) {
 	})
 
 	t.Run("serializes all connections to JSON", func(t *testing.T) {
-		_, err := connSvc.CreateConnection(ctx, "ser-remote", "s3", map[string]string{"type": "s3", "key": "value"})
+		_, err := connSvc.CreateConnection(ctx, "ser-remote", "s3", map[string]string{"type": "s3", "key": "value"}, nil)
 		require.NoError(t, err)
 
 		result, err := storage.Serialize()
@@ -309,14 +312,14 @@ func TestDBStorage_Serialize(t *testing.T) {
 
 // TestDBStorage_SetValue_UpdateType tests SetValue when updating the type field
 func TestDBStorage_SetValue_UpdateType(t *testing.T) {
-	storage, connSvc := setupStorageTest(t)
+	storage, connSvc, _ := setupStorageTest(t)
 	ctx := context.Background()
 
 	// Create initial connection
 	_, err := connSvc.CreateConnection(ctx, "type-update-remote", "s3", map[string]string{
 		"type": "s3",
 		"key":  "value",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	// Update the type field
@@ -330,7 +333,7 @@ func TestDBStorage_SetValue_UpdateType(t *testing.T) {
 
 // TestDBStorage_GetSectionList_Empty tests GetSectionList when query returns error
 func TestDBStorage_GetSectionList_Empty(t *testing.T) {
-	storage, _ := setupStorageTest(t)
+	storage, _, _ := setupStorageTest(t)
 
 	// Initially empty
 	sections := storage.GetSectionList()
@@ -339,10 +342,271 @@ func TestDBStorage_GetSectionList_Empty(t *testing.T) {
 
 // TestDBStorage_Install tests the Install method
 func TestDBStorage_Install(t *testing.T) {
-	storage, _ := setupStorageTest(t)
+	storage, _, _ := setupStorageTest(t)
 
 	// Should not panic
 	assert.NotPanics(t, func() {
 		storage.Install()
+	})
+}
+
+// createConnectionWithCacheOptions creates a connection with optional cache configuration
+func createConnectionWithCacheOptions(t *testing.T, connSvc *query.ConnectionQuery, name string, cacheEnabled bool, infoAge, changeNotifyPoll *string) string {
+	t.Helper()
+
+	ctx := context.Background()
+
+	// Create connection
+	conn, err := connSvc.CreateConnection(ctx, name, "local", map[string]string{"type": "local"}, nil)
+	require.NoError(t, err)
+
+	// Update with cache options if enabled
+	if cacheEnabled {
+		opts := &model.ConnectionOptions{
+			Cache: &model.ConnectionCacheOptions{
+				Enabled:          true,
+				InfoAge:          infoAge,
+				ChangeNotifyPoll: changeNotifyPoll,
+			},
+		}
+		_, err = conn.Update().SetOptions(opts).Save(ctx)
+		require.NoError(t, err)
+	}
+
+	return conn.ID.String()
+}
+
+// TestDBStorage_HasSection_CacheSuffix tests HasSection with -cache suffix handling
+func TestDBStorage_HasSection_CacheSuffix(t *testing.T) {
+	storage, connSvc, _ := setupStorageTest(t)
+
+	// Create a connection with cache enabled
+	createConnectionWithCacheOptions(t, connSvc, "myremote", true, nil, nil)
+
+	// Create a connection without cache enabled
+	createConnectionWithCacheOptions(t, connSvc, "nocache-remote", false, nil, nil)
+
+	t.Run("cache suffix returns true when cache is enabled", func(t *testing.T) {
+		// "myremote-cache" should exist because "myremote" has cache enabled
+		assert.True(t, storage.HasSection("myremote-cache"))
+	})
+
+	t.Run("cache suffix returns false when cache is not enabled", func(t *testing.T) {
+		// "nocache-remote-cache" should not exist because cache is not enabled
+		assert.False(t, storage.HasSection("nocache-remote-cache"))
+	})
+
+	t.Run("cache suffix returns false when base connection does not exist", func(t *testing.T) {
+		// "nonexistent-cache" should not exist
+		assert.False(t, storage.HasSection("nonexistent-cache"))
+	})
+
+	t.Run("base connection still accessible", func(t *testing.T) {
+		// "myremote" should still work normally
+		assert.True(t, storage.HasSection("myremote"))
+		assert.True(t, storage.HasSection("nocache-remote"))
+	})
+}
+
+// TestDBStorage_HasSection_EdgeCase_NameEndingWithCache tests connections whose name ends with -cache
+func TestDBStorage_HasSection_EdgeCase_NameEndingWithCache(t *testing.T) {
+	storage, connSvc, _ := setupStorageTest(t)
+
+	// Create a connection whose name literally ends with "-cache"
+	createConnectionWithCacheOptions(t, connSvc, "my-backup-cache", true, nil, nil)
+
+	t.Run("connection name ending with -cache is found as-is", func(t *testing.T) {
+		// Should find "my-backup-cache" as a real connection, not as cache for "my-backup"
+		assert.True(t, storage.HasSection("my-backup-cache"))
+	})
+
+	t.Run("cache suffix for connection ending with -cache works", func(t *testing.T) {
+		// "my-backup-cache-cache" should exist because "my-backup-cache" has cache enabled
+		assert.True(t, storage.HasSection("my-backup-cache-cache"))
+	})
+
+	t.Run("nonexistent base connection returns false", func(t *testing.T) {
+		// "my-backup" does not exist, so "my-backup-cache" should be found as real connection
+		// but we should verify the logic works correctly
+		assert.False(t, storage.HasSection("my-backup"))
+	})
+}
+
+// TestDBStorage_GetValue_CacheSuffix tests GetValue with -cache suffix handling
+func TestDBStorage_GetValue_CacheSuffix(t *testing.T) {
+	storage, connSvc, dataDir := setupStorageTest(t)
+
+	infoAge := "12h"
+	changeNotifyPoll := "30s"
+
+	// Create a connection with cache enabled and custom options
+	connID := createConnectionWithCacheOptions(t, connSvc, "test-remote", true, &infoAge, &changeNotifyPoll)
+
+	t.Run("cache suffix returns metacache type", func(t *testing.T) {
+		value, ok := storage.GetValue("test-remote-cache", "type")
+		assert.True(t, ok)
+		assert.Equal(t, "metacache", value)
+	})
+
+	t.Run("cache suffix returns remote pointing to base connection", func(t *testing.T) {
+		value, ok := storage.GetValue("test-remote-cache", "remote")
+		assert.True(t, ok)
+		assert.Equal(t, "test-remote:", value)
+	})
+
+	t.Run("cache suffix returns info_age from options", func(t *testing.T) {
+		value, ok := storage.GetValue("test-remote-cache", "info_age")
+		assert.True(t, ok)
+		assert.Equal(t, "12h", value)
+	})
+
+	t.Run("cache suffix returns change_notify_poll from options", func(t *testing.T) {
+		value, ok := storage.GetValue("test-remote-cache", "change_notify_poll")
+		assert.True(t, ok)
+		assert.Equal(t, "30s", value)
+	})
+
+	t.Run("cache suffix returns db_path", func(t *testing.T) {
+		value, ok := storage.GetValue("test-remote-cache", "db_path")
+		assert.True(t, ok)
+		expectedPath := filepath.Join(dataDir, "cache", connID+".db")
+		assert.Equal(t, expectedPath, value)
+	})
+
+	t.Run("cache suffix returns false for unknown key", func(t *testing.T) {
+		value, ok := storage.GetValue("test-remote-cache", "unknown_key")
+		assert.False(t, ok)
+		assert.Empty(t, value)
+	})
+
+	t.Run("base connection values still accessible", func(t *testing.T) {
+		value, ok := storage.GetValue("test-remote", "type")
+		assert.True(t, ok)
+		assert.Equal(t, "local", value)
+	})
+}
+
+// TestDBStorage_GetValue_CacheSuffix_DefaultOptions tests GetValue when cache options use defaults
+func TestDBStorage_GetValue_CacheSuffix_DefaultOptions(t *testing.T) {
+	storage, connSvc, _ := setupStorageTest(t)
+
+	// Create a connection with cache enabled but no custom options (defaults)
+	createConnectionWithCacheOptions(t, connSvc, "default-options", true, nil, nil)
+
+	t.Run("info_age returns false when not set (use backend default)", func(t *testing.T) {
+		_, ok := storage.GetValue("default-options-cache", "info_age")
+		assert.False(t, ok)
+	})
+
+	t.Run("change_notify_poll returns false when not set (use backend default)", func(t *testing.T) {
+		_, ok := storage.GetValue("default-options-cache", "change_notify_poll")
+		assert.False(t, ok)
+	})
+}
+
+// TestDBStorage_GetValue_CacheSuffix_NotEnabled tests GetValue when cache is not enabled
+func TestDBStorage_GetValue_CacheSuffix_NotEnabled(t *testing.T) {
+	storage, connSvc, _ := setupStorageTest(t)
+
+	// Create a connection without cache enabled
+	createConnectionWithCacheOptions(t, connSvc, "no-cache", false, nil, nil)
+
+	t.Run("cache suffix returns false when cache not enabled", func(t *testing.T) {
+		_, ok := storage.GetValue("no-cache-cache", "type")
+		assert.False(t, ok)
+	})
+}
+
+// TestDBStorage_GetValue_EdgeCase_NameEndingWithCache tests connections whose name ends with -cache
+func TestDBStorage_GetValue_EdgeCase_NameEndingWithCache(t *testing.T) {
+	storage, connSvc, _ := setupStorageTest(t)
+
+	// Create a connection whose name literally ends with "-cache"
+	createConnectionWithCacheOptions(t, connSvc, "my-data-cache", true, nil, nil)
+
+	t.Run("connection name ending with -cache returns its own type", func(t *testing.T) {
+		// Should return "local" (the real connection type), not "metacache"
+		value, ok := storage.GetValue("my-data-cache", "type")
+		assert.True(t, ok)
+		assert.Equal(t, "local", value)
+	})
+
+	t.Run("cache suffix for connection ending with -cache returns metacache", func(t *testing.T) {
+		// "my-data-cache-cache" should return metacache type
+		value, ok := storage.GetValue("my-data-cache-cache", "type")
+		assert.True(t, ok)
+		assert.Equal(t, "metacache", value)
+	})
+
+	t.Run("cache suffix for connection ending with -cache returns correct remote", func(t *testing.T) {
+		// "my-data-cache-cache" remote should point to "my-data-cache:"
+		value, ok := storage.GetValue("my-data-cache-cache", "remote")
+		assert.True(t, ok)
+		assert.Equal(t, "my-data-cache:", value)
+	})
+}
+
+// TestDBStorage_GetKeyList_CacheSuffix tests GetKeyList with -cache suffix handling
+func TestDBStorage_GetKeyList_CacheSuffix(t *testing.T) {
+	storage, connSvc, _ := setupStorageTest(t)
+
+	// Create a connection with cache enabled
+	createConnectionWithCacheOptions(t, connSvc, "keylist-test", true, nil, nil)
+
+	// Create a connection without cache enabled
+	createConnectionWithCacheOptions(t, connSvc, "keylist-nocache", false, nil, nil)
+
+	t.Run("cache suffix returns metacache keys when cache is enabled", func(t *testing.T) {
+		keys := storage.GetKeyList("keylist-test-cache")
+		assert.NotNil(t, keys)
+		assert.Contains(t, keys, "type")
+		assert.Contains(t, keys, "remote")
+		assert.Contains(t, keys, "info_age")
+		assert.Contains(t, keys, "change_notify_poll")
+		assert.Contains(t, keys, "db_path")
+	})
+
+	t.Run("cache suffix returns nil when cache is not enabled", func(t *testing.T) {
+		keys := storage.GetKeyList("keylist-nocache-cache")
+		assert.Nil(t, keys)
+	})
+
+	t.Run("cache suffix returns nil when base connection does not exist", func(t *testing.T) {
+		keys := storage.GetKeyList("nonexistent-cache")
+		assert.Nil(t, keys)
+	})
+
+	t.Run("base connection returns its own keys", func(t *testing.T) {
+		keys := storage.GetKeyList("keylist-test")
+		assert.NotNil(t, keys)
+		assert.Contains(t, keys, "type")
+		// Should NOT contain metacache-specific keys
+		assert.NotContains(t, keys, "remote")
+		assert.NotContains(t, keys, "db_path")
+	})
+}
+
+// TestDBStorage_GetKeyList_EdgeCase_NameEndingWithCache tests connections whose name ends with -cache
+func TestDBStorage_GetKeyList_EdgeCase_NameEndingWithCache(t *testing.T) {
+	storage, connSvc, _ := setupStorageTest(t)
+
+	// Create a connection whose name literally ends with "-cache"
+	createConnectionWithCacheOptions(t, connSvc, "backup-cache", true, nil, nil)
+
+	t.Run("connection name ending with -cache returns its own keys", func(t *testing.T) {
+		keys := storage.GetKeyList("backup-cache")
+		assert.NotNil(t, keys)
+		assert.Contains(t, keys, "type")
+		// Should NOT contain metacache-specific keys for the base connection
+		assert.NotContains(t, keys, "remote")
+		assert.NotContains(t, keys, "db_path")
+	})
+
+	t.Run("cache suffix for connection ending with -cache returns metacache keys", func(t *testing.T) {
+		keys := storage.GetKeyList("backup-cache-cache")
+		assert.NotNil(t, keys)
+		assert.Contains(t, keys, "type")
+		assert.Contains(t, keys, "remote")
+		assert.Contains(t, keys, "db_path")
 	})
 }

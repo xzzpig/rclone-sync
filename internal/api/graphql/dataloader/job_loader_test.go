@@ -40,7 +40,7 @@ func setupJobTestDB(t *testing.T) (*ent.Client, *query.JobQuery, *query.TaskQuer
 	jobQuery := query.NewJobQuery(client)
 
 	// Install DBStorage for rclone configuration
-	storage := rclone.NewDBStorage(connectionQuery)
+	storage := rclone.NewDBStorage(connectionQuery, t.TempDir())
 	storage.Install()
 
 	t.Cleanup(func() {
@@ -57,7 +57,7 @@ func createTestTask(t *testing.T, taskQuery *query.TaskQuery, connectionQuery *q
 
 	conn, err := connectionQuery.CreateConnection(ctx, "test-connection", "local", map[string]string{
 		"type": "local",
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	task, err := taskQuery.CreateTask(

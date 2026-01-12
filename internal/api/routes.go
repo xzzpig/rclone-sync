@@ -31,6 +31,8 @@ type RouterDeps struct {
 	Scheduler           ports.Scheduler
 	JobProgressBus      *subscription.JobProgressBus
 	TransferProgressBus *subscription.TransferProgressBus
+	CacheStatusBus      *subscription.CacheStatusBus
+	PinManager          *rclone.PinManager
 }
 
 // routesLog returns a named logger for the api.routes package.
@@ -63,7 +65,10 @@ func RegisterAPIRoutes(router *gin.RouterGroup, deps RouterDeps) error {
 		Encryptor:           encryptor,
 		JobProgressBus:      deps.JobProgressBus,
 		TransferProgressBus: deps.TransferProgressBus,
+		CacheStatusBus:      deps.CacheStatusBus,
+		PinManager:          deps.PinManager,
 	}
+
 	gqlHandler := graphql.NewHandler(gqlDeps)
 
 	gqlGroup := router.Group("/graphql")

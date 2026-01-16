@@ -71,7 +71,7 @@ func (s *Scheduler) loadScheduledTasks() {
 	}
 
 	for _, task := range tasks {
-		if task.Schedule != "" {
+		if task.Schedule != "" && task.Enabled {
 			if err := s.addJob(task); err != nil {
 				s.logger.Error("Failed to add task to scheduler on load",
 					zap.String("task_name", task.Name),
@@ -87,7 +87,7 @@ func (s *Scheduler) loadScheduledTasks() {
 
 // AddTask adds a task to the scheduler.
 func (s *Scheduler) AddTask(task *ent.Task) error {
-	if task.Schedule == "" {
+	if task.Schedule == "" || !task.Enabled {
 		return nil
 	}
 	s.mu.Lock()
@@ -120,6 +120,13 @@ func (s *Scheduler) addJob(task *ent.Task) error {
 			s.logger.Error("Failed to get task for scheduled run",
 				zap.String("task_id", taskIDStr),
 				zap.Error(err))
+			return
+		}
+
+		if !currentTask.Enabled {
+			s.logger.Debug("Skipping disabled task",
+				zap.String("task_id", taskIDStr),
+				zap.String("task_name", currentTask.Name))
 			return
 		}
 

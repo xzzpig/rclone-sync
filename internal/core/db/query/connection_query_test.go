@@ -618,13 +618,13 @@ func TestConnectionQuery_DeleteConnection_CascadeDeleteTasks(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create multiple tasks associated with this connection
-	task1, err := taskQuery.CreateTask(ctx, "task1", "/source1", conn.ID, "/dest1", string(model.SyncDirectionBidirectional), "0 0 * * *", false, nil)
+	task1, err := taskQuery.CreateTask(ctx, "task1", "/source1", conn.ID, "/dest1", string(model.SyncDirectionBidirectional), "0 0 * * *", false, true, nil)
 	require.NoError(t, err)
 
-	task2, err := taskQuery.CreateTask(ctx, "task2", "/source2", conn.ID, "/dest2", string(model.SyncDirectionUpload), "0 1 * * *", false, nil)
+	task2, err := taskQuery.CreateTask(ctx, "task2", "/source2", conn.ID, "/dest2", string(model.SyncDirectionUpload), "0 1 * * *", false, true, nil)
 	require.NoError(t, err)
 
-	task3, err := taskQuery.CreateTask(ctx, "task3", "/source3", conn.ID, "/dest3", string(model.SyncDirectionDownload), "0 2 * * *", false, nil)
+	task3, err := taskQuery.CreateTask(ctx, "task3", "/source3", conn.ID, "/dest3", string(model.SyncDirectionDownload), "0 2 * * *", false, true, nil)
 	require.NoError(t, err)
 
 	// Verify tasks exist
@@ -677,7 +677,7 @@ func TestConnectionQuery_HasAssociatedTasks(t *testing.T) {
 	assert.False(t, hasTasks)
 
 	// Create a task
-	_, err = taskQuery.CreateTask(ctx, "task1", "/source", conn.ID, "/dest", string(model.SyncDirectionBidirectional), "0 0 * * *", false, nil)
+	_, err = taskQuery.CreateTask(ctx, "task1", "/source", conn.ID, "/dest", string(model.SyncDirectionBidirectional), "0 0 * * *", false, true, nil)
 	require.NoError(t, err)
 
 	// Now should have tasks
@@ -705,10 +705,10 @@ func TestConnectionQuery_DeleteConnection_MultipleConnections(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create tasks for each connection
-	task1, err := taskQuery.CreateTask(ctx, "task1", "/s1", conn1.ID, "/d1", string(model.SyncDirectionBidirectional), "0 0 * * *", false, nil)
+	task1, err := taskQuery.CreateTask(ctx, "task1", "/s1", conn1.ID, "/d1", string(model.SyncDirectionBidirectional), "0 0 * * *", false, true, nil)
 	require.NoError(t, err)
 
-	task2, err := taskQuery.CreateTask(ctx, "task2", "/s2", conn2.ID, "/d2", string(model.SyncDirectionBidirectional), "0 0 * * *", false, nil)
+	task2, err := taskQuery.CreateTask(ctx, "task2", "/s2", conn2.ID, "/d2", string(model.SyncDirectionBidirectional), "0 0 * * *", false, true, nil)
 	require.NoError(t, err)
 
 	// Delete conn1
@@ -1101,7 +1101,7 @@ func TestConnectionQuery_CountAssociatedTasks(t *testing.T) {
 
 	t.Run("OneTasks", func(t *testing.T) {
 		// Create one task
-		_, err := taskQuery.CreateTask(ctx, "task1", "/src", conn.ID, "/dst", string(model.SyncDirectionBidirectional), "", false, nil)
+		_, err := taskQuery.CreateTask(ctx, "task1", "/src", conn.ID, "/dst", string(model.SyncDirectionBidirectional), "", false, true, nil)
 		require.NoError(t, err)
 
 		count, err := connQuery.CountAssociatedTasks(ctx, conn.ID)
@@ -1111,9 +1111,9 @@ func TestConnectionQuery_CountAssociatedTasks(t *testing.T) {
 
 	t.Run("MultipleTasks", func(t *testing.T) {
 		// Create more tasks
-		_, err := taskQuery.CreateTask(ctx, "task2", "/src2", conn.ID, "/dst2", string(model.SyncDirectionUpload), "", false, nil)
+		_, err := taskQuery.CreateTask(ctx, "task2", "/src2", conn.ID, "/dst2", string(model.SyncDirectionUpload), "", false, true, nil)
 		require.NoError(t, err)
-		_, err = taskQuery.CreateTask(ctx, "task3", "/src3", conn.ID, "/dst3", string(model.SyncDirectionDownload), "", false, nil)
+		_, err = taskQuery.CreateTask(ctx, "task3", "/src3", conn.ID, "/dst3", string(model.SyncDirectionDownload), "", false, true, nil)
 		require.NoError(t, err)
 
 		count, err := connQuery.CountAssociatedTasks(ctx, conn.ID)

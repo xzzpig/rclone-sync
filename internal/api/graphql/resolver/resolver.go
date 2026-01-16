@@ -1,9 +1,6 @@
 // Package resolver provides GraphQL resolver implementations.
 package resolver
 
-//go:generate go run github.com/99designs/gqlgen generate
-//go:generate node ../../../../scripts/merge-schema.js
-
 import (
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/generated"
 

@@ -131,6 +131,7 @@ var (
 		{Name: "direction", Type: field.TypeEnum, Enums: []string{"UPLOAD", "DOWNLOAD", "BIDIRECTIONAL"}, Default: "BIDIRECTIONAL"},
 		{Name: "schedule", Type: field.TypeString, Nullable: true},
 		{Name: "realtime", Type: field.TypeBool, Default: false},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
 		{Name: "options", Type: field.TypeJSON, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -144,7 +145,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "tasks_connections_tasks",
-				Columns:    []*schema.Column{TasksColumns[10]},
+				Columns:    []*schema.Column{TasksColumns[11]},
 				RefColumns: []*schema.Column{ConnectionsColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
@@ -153,12 +154,12 @@ var (
 			{
 				Name:    "task_connection_id",
 				Unique:  false,
-				Columns: []*schema.Column{TasksColumns[10]},
+				Columns: []*schema.Column{TasksColumns[11]},
 			},
 			{
 				Name:    "task_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{TasksColumns[8]},
+				Columns: []*schema.Column{TasksColumns[9]},
 			},
 		},
 	}

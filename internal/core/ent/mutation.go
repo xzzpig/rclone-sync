@@ -2625,6 +2625,7 @@ type TaskMutation struct {
 	direction         *model.SyncDirection
 	schedule          *string
 	realtime          *bool
+	enabled           *bool
 	options           **model.TaskSyncOptions
 	created_at        *time.Time
 	updated_at        *time.Time
@@ -3021,6 +3022,42 @@ func (m *TaskMutation) ResetRealtime() {
 	m.realtime = nil
 }
 
+// SetEnabled sets the "enabled" field.
+func (m *TaskMutation) SetEnabled(b bool) {
+	m.enabled = &b
+}
+
+// Enabled returns the value of the "enabled" field in the mutation.
+func (m *TaskMutation) Enabled() (r bool, exists bool) {
+	v := m.enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnabled returns the old "enabled" field's value of the Task entity.
+// If the Task object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TaskMutation) OldEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnabled: %w", err)
+	}
+	return oldValue.Enabled, nil
+}
+
+// ResetEnabled resets all changes to the "enabled" field.
+func (m *TaskMutation) ResetEnabled() {
+	m.enabled = nil
+}
+
 // SetOptions sets the "options" field.
 func (m *TaskMutation) SetOptions(mso *model.TaskSyncOptions) {
 	m.options = &mso
@@ -3257,7 +3294,7 @@ func (m *TaskMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TaskMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 11)
 	if m.name != nil {
 		fields = append(fields, task.FieldName)
 	}
@@ -3278,6 +3315,9 @@ func (m *TaskMutation) Fields() []string {
 	}
 	if m.realtime != nil {
 		fields = append(fields, task.FieldRealtime)
+	}
+	if m.enabled != nil {
+		fields = append(fields, task.FieldEnabled)
 	}
 	if m.options != nil {
 		fields = append(fields, task.FieldOptions)
@@ -3310,6 +3350,8 @@ func (m *TaskMutation) Field(name string) (ent.Value, bool) {
 		return m.Schedule()
 	case task.FieldRealtime:
 		return m.Realtime()
+	case task.FieldEnabled:
+		return m.Enabled()
 	case task.FieldOptions:
 		return m.Options()
 	case task.FieldCreatedAt:
@@ -3339,6 +3381,8 @@ func (m *TaskMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldSchedule(ctx)
 	case task.FieldRealtime:
 		return m.OldRealtime(ctx)
+	case task.FieldEnabled:
+		return m.OldEnabled(ctx)
 	case task.FieldOptions:
 		return m.OldOptions(ctx)
 	case task.FieldCreatedAt:
@@ -3402,6 +3446,13 @@ func (m *TaskMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetRealtime(v)
+		return nil
+	case task.FieldEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnabled(v)
 		return nil
 	case task.FieldOptions:
 		v, ok := value.(*model.TaskSyncOptions)
@@ -3514,6 +3565,9 @@ func (m *TaskMutation) ResetField(name string) error {
 		return nil
 	case task.FieldRealtime:
 		m.ResetRealtime()
+		return nil
+	case task.FieldEnabled:
+		m.ResetEnabled()
 		return nil
 	case task.FieldOptions:
 		m.ResetOptions()

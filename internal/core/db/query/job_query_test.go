@@ -43,7 +43,7 @@ func TestJobQuery(t *testing.T) {
 
 	// Helper to create a task for jobs
 	createTask := func(t *testing.T) uuid.UUID {
-		task, err := taskQuery.CreateTask(ctx, "Job Test Task "+uuid.NewString(), "/l", testConnID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
+		task, err := taskQuery.CreateTask(ctx, "Job Test Task "+uuid.NewString(), "/l", testConnID, "/r", string(model.SyncDirectionBidirectional), "", false, true, nil)
 		require.NoError(t, err)
 		return task.ID
 	}
@@ -281,7 +281,7 @@ func TestJobQuery(t *testing.T) {
 				"type": "local",
 			}, nil)
 			require.NoError(t, err)
-			uniqueTask, err := taskQuery.CreateTask(ctx, "Unique Connection Task", "/l", uniqueConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
+			uniqueTask, err := taskQuery.CreateTask(ctx, "Unique Connection Task", "/l", uniqueConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, true, nil)
 			require.NoError(t, err)
 			_, err = query.CreateJob(ctx, uniqueTask.ID, model.JobTriggerManual)
 			require.NoError(t, err)
@@ -365,7 +365,7 @@ func TestJobQuery(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create a task for this connection
-		uniqueTask, err := taskQuery.CreateTask(ctx, "List Jobs Task "+uuid.NewString(), "/l", uniqueConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
+		uniqueTask, err := taskQuery.CreateTask(ctx, "List Jobs Task "+uuid.NewString(), "/l", uniqueConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, true, nil)
 		require.NoError(t, err)
 
 		// Create jobs for this task
@@ -471,7 +471,7 @@ func TestJobQuery_UpdateJobStatus_Transitions(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create task
-	task, err := taskQuery.CreateTask(ctx, "Transition Test Task", "/l", testConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
+	task, err := taskQuery.CreateTask(ctx, "Transition Test Task", "/l", testConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, true, nil)
 	require.NoError(t, err)
 
 	// Create job
@@ -513,7 +513,7 @@ func TestJobQuery_ListJobLogsByJobPaginated(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create task
-	task, err := taskQuery.CreateTask(ctx, "Paginated Logs Task", "/l", testConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
+	task, err := taskQuery.CreateTask(ctx, "Paginated Logs Task", "/l", testConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, true, nil)
 	require.NoError(t, err)
 
 	// Create job
@@ -605,7 +605,7 @@ func TestJobQuery_DeleteOldLogsForConnection(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create task
-	task, err := taskQuery.CreateTask(ctx, "Cleanup Logs Task", "/l", testConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
+	task, err := taskQuery.CreateTask(ctx, "Cleanup Logs Task", "/l", testConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, true, nil)
 	require.NoError(t, err)
 
 	// Create job
@@ -674,7 +674,7 @@ func TestJobQuery_DeleteOldLogsForConnection(t *testing.T) {
 		}, nil)
 		require.NoError(t, err)
 
-		multiTask, err := taskQuery.CreateTask(ctx, "Multi Job Task "+uuid.NewString(), "/l", multiJobConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
+		multiTask, err := taskQuery.CreateTask(ctx, "Multi Job Task "+uuid.NewString(), "/l", multiJobConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, true, nil)
 		require.NoError(t, err)
 
 		// Create two jobs with logs
@@ -713,7 +713,7 @@ func TestJobQuery_DeleteOldLogsForConnection(t *testing.T) {
 		}, nil)
 		require.NoError(t, err)
 
-		verifyTask, err := taskQuery.CreateTask(ctx, "Verify Newest Task "+uuid.NewString(), "/l", verifyConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
+		verifyTask, err := taskQuery.CreateTask(ctx, "Verify Newest Task "+uuid.NewString(), "/l", verifyConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, true, nil)
 		require.NoError(t, err)
 
 		verifyJob, err := query.CreateJob(ctx, verifyTask.ID, model.JobTriggerManual)
@@ -778,7 +778,7 @@ func TestJobQuery_DeleteOldLogsForConnection(t *testing.T) {
 		}, nil)
 		require.NoError(t, err)
 
-		partialTask, err := taskQuery.CreateTask(ctx, "Partial Keep Task "+uuid.NewString(), "/l", partialConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
+		partialTask, err := taskQuery.CreateTask(ctx, "Partial Keep Task "+uuid.NewString(), "/l", partialConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, true, nil)
 		require.NoError(t, err)
 
 		partialJob, err := query.CreateJob(ctx, partialTask.ID, model.JobTriggerManual)
@@ -843,7 +843,7 @@ func TestJobQuery_CountJobLogs_ComplexFilters(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create task
-	task, err := taskQuery.CreateTask(ctx, "Count Logs Task", "/l", testConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
+	task, err := taskQuery.CreateTask(ctx, "Count Logs Task", "/l", testConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, true, nil)
 	require.NoError(t, err)
 
 	// Create job
@@ -897,7 +897,7 @@ func TestJobQuery_DeleteJob(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create task
-	task, err := taskQuery.CreateTask(ctx, "Delete Job Task", "/l", testConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
+	task, err := taskQuery.CreateTask(ctx, "Delete Job Task", "/l", testConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, true, nil)
 	require.NoError(t, err)
 
 	t.Run("DeleteJob_WithLogs_Cascade", func(t *testing.T) {

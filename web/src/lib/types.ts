@@ -93,8 +93,8 @@ export type JobLogListItem = NonNullable<
 export type LogLevel = JobLogListItem['level'];
 export type LogAction = JobLogListItem['what'];
 
-// Status type for UI components (JobStatus + IDLE for idle state)
-export type StatusType = JobStatus | 'IDLE';
+// Status type for UI components (JobStatus + IDLE/DISABLED for task states)
+export type StatusType = JobStatus | 'IDLE' | 'DISABLED';
 
 // Provider types (from ProvidersListQuery and ProviderGetQuery)
 export type ProviderListItem = NonNullable<

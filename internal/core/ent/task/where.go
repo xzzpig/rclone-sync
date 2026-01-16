@@ -87,6 +87,11 @@ func Realtime(v bool) predicate.Task {
 	return predicate.Task(sql.FieldEQ(FieldRealtime, v))
 }
 
+// Enabled applies equality check predicate on the "enabled" field. It's identical to EnabledEQ.
+func Enabled(v bool) predicate.Task {
+	return predicate.Task(sql.FieldEQ(FieldEnabled, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.Task {
 	return predicate.Task(sql.FieldEQ(FieldCreatedAt, v))
@@ -435,6 +440,16 @@ func RealtimeEQ(v bool) predicate.Task {
 // RealtimeNEQ applies the NEQ predicate on the "realtime" field.
 func RealtimeNEQ(v bool) predicate.Task {
 	return predicate.Task(sql.FieldNEQ(FieldRealtime, v))
+}
+
+// EnabledEQ applies the EQ predicate on the "enabled" field.
+func EnabledEQ(v bool) predicate.Task {
+	return predicate.Task(sql.FieldEQ(FieldEnabled, v))
+}
+
+// EnabledNEQ applies the NEQ predicate on the "enabled" field.
+func EnabledNEQ(v bool) predicate.Task {
+	return predicate.Task(sql.FieldNEQ(FieldEnabled, v))
 }
 
 // OptionsIsNil applies the IsNil predicate on the "options" field.

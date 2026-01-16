@@ -75,6 +75,7 @@ func TestSyncEngine_RunTask_Integration(t *testing.T) {
 		string(model.SyncDirectionBidirectional),
 		"",
 		false,
+		true,
 		nil,
 	)
 	require.NoError(t, err)
@@ -121,38 +122,43 @@ func TestSyncEngine_RunTask_Integration(t *testing.T) {
 	assert.True(t, foundLog, "Should find a log entry for test.txt")
 }
 
-// TestSyncEngine_RunTask_AutoDeleteEmptyJob tests the auto-delete empty job logic.
-// This test covers the auto-delete logic in sync.go lines 285-294.
+// TestSyncEngine_RunTask_AutoDeleteEmptyJob tests the rolling replacement logic for empty jobs.
+// When autoDeleteEmptyJobs is enabled, completing a job deletes the PREVIOUS empty job, not the current one.
 func TestSyncEngine_RunTask_AutoDeleteEmptyJob(t *testing.T) {
 	tests := []struct {
 		name                string
 		autoDeleteEmptyJobs bool
-		hasFile             bool // whether to create a file to transfer
-		expectJobDeleted    bool
-		expectFiles         int
-		expectBytes         int64
+		firstJobHasFile     bool
+		secondJobHasFile    bool
+		expectJobCount      int
 	}{
 		{
-			name:                "empty job deleted when autoDelete enabled",
+			name:                "two empty jobs: first deleted, second kept",
 			autoDeleteEmptyJobs: true,
-			hasFile:             false,
-			expectJobDeleted:    true,
+			firstJobHasFile:     false,
+			secondJobHasFile:    false,
+			expectJobCount:      1,
 		},
 		{
-			name:                "empty job kept when autoDelete disabled",
+			name:                "empty then non-empty: first deleted, second kept",
+			autoDeleteEmptyJobs: true,
+			firstJobHasFile:     false,
+			secondJobHasFile:    true,
+			expectJobCount:      1,
+		},
+		{
+			name:                "non-empty then empty: both kept",
+			autoDeleteEmptyJobs: true,
+			firstJobHasFile:     true,
+			secondJobHasFile:    false,
+			expectJobCount:      2,
+		},
+		{
+			name:                "autoDelete disabled: both kept",
 			autoDeleteEmptyJobs: false,
-			hasFile:             false,
-			expectJobDeleted:    false,
-			expectFiles:         0,
-			expectBytes:         0,
-		},
-		{
-			name:                "non-empty job kept even when autoDelete enabled",
-			autoDeleteEmptyJobs: true,
-			hasFile:             true,
-			expectJobDeleted:    false,
-			expectFiles:         1,
-			expectBytes:         11, // len("hello world")
+			firstJobHasFile:     false,
+			secondJobHasFile:    false,
+			expectJobCount:      2,
 		},
 	}
 
@@ -161,18 +167,9 @@ func TestSyncEngine_RunTask_AutoDeleteEmptyJob(t *testing.T) {
 			connQuery, taskQuery, jobQuery, _ := setupIntegrationTest(t)
 			ctx := context.Background()
 
-			// 1. Setup test directories
 			sourceDir := t.TempDir()
 			destDir := t.TempDir()
 
-			// Create a test file if needed
-			if tt.hasFile {
-				testFilePath := filepath.Join(sourceDir, "test.txt")
-				err := os.WriteFile(testFilePath, []byte("hello world"), 0644)
-				require.NoError(t, err)
-			}
-
-			// 2. Create Connection and Task via ConnectionQuery
 			testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"}, nil)
 			require.NoError(t, err)
 
@@ -181,38 +178,42 @@ func TestSyncEngine_RunTask_AutoDeleteEmptyJob(t *testing.T) {
 				sourceDir,
 				testConn.ID,
 				destDir,
-				string(model.SyncDirectionBidirectional),
+				string(model.SyncDirectionUpload),
 				"",
 				false,
+				true,
 				nil,
 			)
 			require.NoError(t, err)
 
-			// 3. Setup SyncEngine
 			dataDir := t.TempDir()
 			syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, tt.autoDeleteEmptyJobs, 0)
 
-			// 4. Reload task with Connection edge before running
 			testTask, err = taskQuery.GetTaskWithConnection(ctx, testTask.ID)
 			require.NoError(t, err)
 
-			// 5. Run the task
+			if tt.firstJobHasFile {
+				err = os.WriteFile(filepath.Join(sourceDir, "first.txt"), []byte("first"), 0644)
+				require.NoError(t, err)
+			}
+
 			err = syncEngine.RunTask(ctx, testTask, model.JobTriggerManual)
 			require.NoError(t, err)
 
-			// 6. Verify results
-			jobs, err := jobQuery.ListJobs(ctx, &testTask.ID, nil, 10, 0)
+			if tt.firstJobHasFile {
+				os.Remove(filepath.Join(sourceDir, "first.txt"))
+			}
+			if tt.secondJobHasFile {
+				err = os.WriteFile(filepath.Join(sourceDir, "second.txt"), []byte("second"), 0644)
+				require.NoError(t, err)
+			}
+
+			err = syncEngine.RunTask(ctx, testTask, model.JobTriggerManual)
 			require.NoError(t, err)
 
-			if tt.expectJobDeleted {
-				assert.Empty(t, jobs, "Job should be auto-deleted")
-			} else {
-				require.Len(t, jobs, 1, "Job should exist in database")
-				job := jobs[0]
-				assert.Equal(t, string(model.JobStatusSuccess), string(job.Status), "Job status should be success")
-				assert.Equal(t, tt.expectFiles, job.FilesTransferred, "FilesTransferred mismatch")
-				assert.Equal(t, tt.expectBytes, job.BytesTransferred, "BytesTransferred mismatch")
-			}
+			jobs, err := jobQuery.ListJobs(ctx, &testTask.ID, nil, 10, 0)
+			require.NoError(t, err)
+			assert.Len(t, jobs, tt.expectJobCount)
 		})
 	}
 }
@@ -237,6 +238,7 @@ func TestSyncEngine_RunTask_Failure(t *testing.T) {
 		string(model.SyncDirectionBidirectional),
 		"",
 		false,
+		true,
 		nil,
 	)
 	require.NoError(t, err)
@@ -288,6 +290,7 @@ func TestSyncEngine_RunTask_Cancel(t *testing.T) {
 		string(model.SyncDirectionBidirectional),
 		"",
 		false,
+		true,
 		nil,
 	)
 	require.NoError(t, err)
@@ -353,6 +356,7 @@ func TestSyncEngine_RunTask_CancelDuringSync(t *testing.T) {
 		string(model.SyncDirectionUpload),
 		"",
 		false,
+		true,
 		nil,
 	)
 	require.NoError(t, err)
@@ -480,6 +484,7 @@ func TestSyncEngine_RunTask_NoDelete(t *testing.T) {
 				string(model.SyncDirectionUpload), // noDelete only applies to one-way sync
 				"",
 				false,
+				true,
 				options,
 			)
 			require.NoError(t, err)
@@ -560,6 +565,7 @@ func TestSyncEngine_RunTask_ProgressEvents(t *testing.T) {
 		string(model.SyncDirectionBidirectional),
 		"",
 		false,
+		true,
 		nil,
 	)
 	require.NoError(t, err)
@@ -736,6 +742,7 @@ func TestSyncEngine_RunTask_MetacacheIntegration(t *testing.T) {
 		string(model.SyncDirectionBidirectional),
 		"",
 		false,
+		true,
 		nil,
 	)
 	require.NoError(t, err)

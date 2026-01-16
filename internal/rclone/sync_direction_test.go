@@ -44,6 +44,7 @@ func TestSyncEngine_RunTask_Upload(t *testing.T) {
 		string(model.SyncDirectionUpload),
 		"",
 		false,
+		true,
 		nil,
 	)
 	require.NoError(t, err)
@@ -113,6 +114,7 @@ func TestSyncEngine_RunTask_Download(t *testing.T) {
 		string(model.SyncDirectionDownload),
 		"",
 		false,
+		true,
 		nil,
 	)
 	require.NoError(t, err)
@@ -176,6 +178,7 @@ func TestSyncEngine_RunTask_Bidirectional(t *testing.T) {
 		string(model.SyncDirectionBidirectional),
 		"",
 		false,
+		true,
 		nil,
 	)
 	require.NoError(t, err)

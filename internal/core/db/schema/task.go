@@ -38,6 +38,8 @@ func (Task) Fields() []ent.Field {
 			Optional(),
 		field.Bool("realtime").
 			Default(false),
+		field.Bool("enabled").
+			Default(true),
 		field.JSON("options", &model.TaskSyncOptions{}).
 			Optional(),
 		field.Time("created_at").

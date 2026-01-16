@@ -18,6 +18,7 @@ export const TasksListQuery = graphql(`
           direction
           schedule
           realtime
+          enabled
           createdAt
           updatedAt
           connection {

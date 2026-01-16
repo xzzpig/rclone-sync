@@ -1,0 +1,262 @@
+# GraphQL Schema Changes: 同步任务多项优化
+#
+# Feature: 013-sync-optimizations
+# Date: 2026-01-16
+#
+# 本文件定义了需要添加到现有 GraphQL Schema 的变更。
+# 实现时需要合并到对应的 .graphql 文件中。
+
+# =============================================================================
+# NEW ENUMS (添加到 job.graphql)
+# =============================================================================
+
+"""
+传输方向 - 用于区分上传和下载
+"""
+enum TransferDirection {
+	"""
+	上传 (本地 → 远程)
+	"""
+	UPLOAD
+	"""
+	下载 (远程 → 本地)
+	"""
+	DOWNLOAD
+}
+
+# =============================================================================
+# TYPE MODIFICATIONS
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Task 类型变更 (修改 task.graphql)
+# -----------------------------------------------------------------------------
+
+# 在 Task 类型中添加以下字段:
+#
+# type Task {
+#     ... 现有字段 ...
+#     """
+#     任务是否启用
+#     禁用的任务不会响应定时触发和实时触发，但可以手动运行
+#     """
+#     enabled: Boolean!
+# }
+
+# 在 CreateTaskInput 中添加:
+#
+# input CreateTaskInput {
+#     ... 现有字段 ...
+#     """
+#     任务是否启用（默认 true）
+#     """
+#     enabled: Boolean = true
+# }
+
+# 在 UpdateTaskInput 中添加:
+#
+# input UpdateTaskInput {
+#     ... 现有字段 ...
+#     """
+#     任务是否启用
+#     """
+#     enabled: Boolean
+# }
+
+# -----------------------------------------------------------------------------
+# TransferItem 类型变更 (修改 job.graphql)
+# -----------------------------------------------------------------------------
+
+# 修改 TransferItem 类型:
+#
+# type TransferItem {
+#     """
+#     文件名称（含路径）
+#     """
+#     name: String!
+#     """
+#     文件总大小（字节）
+#     """
+#     size: BigInt!
+#     """
+#     已传输字节数
+#     """
+#     bytes: BigInt!
+#     """
+#     传输方向（上传或下载）
+#     """
+#     direction: TransferDirection!  # 新增
+# }
+
+# -----------------------------------------------------------------------------
+# JobProgressEvent 类型变更 (修改 job.graphql)
+# -----------------------------------------------------------------------------
+
+# 在 JobProgressEvent 类型中添加以下字段:
+#
+# type JobProgressEvent {
+#     ... 现有字段 ...
+#     """
+#     正在检查（扫描）的文件数量
+#     实时更新，反映当前扫描进度
+#     """
+#     filesChecking: Int!
+# }
+
+# -----------------------------------------------------------------------------
+# 概览页面查询拆分 (web/src/api/graphql/queries/connections.ts)
+# -----------------------------------------------------------------------------
+
+"""
+仅获取存储配额的查询 (更新原 ConnectionGetQuotaQuery)
+"""
+query ConnectionGetQuota($id: ID!) {
+  connection {
+    get(id: $id) {
+      id
+      quota {
+        total
+        used
+        trashed
+        other
+        objects
+      }
+    }
+  }
+}
+
+"""
+仅获取缓存状态的查询
+"""
+query ConnectionGetCacheStatus($id: ID!) {
+  connection {
+    get(id: $id) {
+      id
+      cacheStatus {
+        running
+        changeNotifySupported
+        entriesCount
+        dbSizeBytes
+        lastNotifyTime
+      }
+    }
+  }
+}
+
+# =============================================================================
+# COMPLETE TYPE DEFINITIONS (供参考)
+# =============================================================================
+
+"""
+任务同步选项
+"""
+type TaskSyncOptions {
+	conflictResolution: ConflictResolution
+	filters: [String!]
+	noDelete: Boolean
+	transfers: Int
+}
+
+"""
+同步任务 (更新后)
+"""
+type Task @goExtraField(name: "ConnectionID", type: "github.com/google/uuid.UUID") {
+	id: ID!
+	name: String!
+	sourcePath: String!
+	remotePath: String!
+	direction: SyncDirection!
+	schedule: String
+	realtime: Boolean!
+	"""
+	任务是否启用
+	禁用的任务不会响应定时触发和实时触发，但可以手动运行
+	"""
+	enabled: Boolean!
+	options: TaskSyncOptions @goField(forceResolver: true)
+	createdAt: DateTime!
+	updatedAt: DateTime!
+	connection: Connection! @goField(forceResolver: true)
+	jobs(pagination: PaginationInput): JobConnection! @goField(forceResolver: true)
+	latestJob: Job @goField(forceResolver: true)
+}
+
+"""
+创建任务输入 (更新后)
+"""
+input CreateTaskInput {
+	name: String!
+	sourcePath: String!
+	connectionId: ID!
+	remotePath: String!
+	direction: SyncDirection!
+	schedule: String
+	realtime: Boolean = false
+	"""
+	任务是否启用（默认 true）
+	"""
+	enabled: Boolean = true
+	options: TaskSyncOptionsInput
+}
+
+"""
+更新任务输入 (更新后)
+"""
+input UpdateTaskInput {
+	name: String
+	sourcePath: String
+	connectionId: ID
+	remotePath: String
+	direction: SyncDirection
+	schedule: String
+	realtime: Boolean
+	"""
+	任务是否启用
+	"""
+	enabled: Boolean
+	options: TaskSyncOptionsInput
+}
+
+"""
+当前正在传输的文件项 (更新后)
+"""
+type TransferItem {
+	"""
+	文件名称（含路径），如 "documents/report.pdf"
+	"""
+	name: String!
+	"""
+	文件总大小（字节）
+	"""
+	size: BigInt!
+	"""
+	已传输字节数
+	"""
+	bytes: BigInt!
+	"""
+	传输方向（上传或下载）
+	"""
+	direction: TransferDirection!
+}
+
+"""
+作业进度事件 (更新后)
+"""
+type JobProgressEvent {
+	jobId: ID!
+	taskId: ID!
+	connectionId: ID!
+	status: JobStatus!
+	filesTransferred: Int!
+	bytesTransferred: BigInt!
+	filesTotal: Int!
+	bytesTotal: BigInt!
+	filesDeleted: Int!
+	errorCount: Int!
+	startTime: DateTime!
+	endTime: DateTime
+	"""
+	正在检查（扫描）的文件数量
+	"""
+	filesChecking: Int!
+}

@@ -51,7 +51,7 @@ func TestTaskQuery(t *testing.T) {
 
 	t.Run("CreateTask", func(t *testing.T) {
 		t.Run("Success", func(t *testing.T) {
-			task, err := query.CreateTask(ctx, "Test Task", "/local/path", testConnID, "/remote/path", string(model.SyncDirectionBidirectional), "", false, nil)
+			task, err := query.CreateTask(ctx, "Test Task", "/local/path", testConnID, "/remote/path", string(model.SyncDirectionBidirectional), "", false, true, nil)
 			require.NoError(t, err)
 			assert.NotNil(t, task)
 			assert.Equal(t, "Test Task", task.Name)
@@ -69,7 +69,7 @@ func TestTaskQuery(t *testing.T) {
 
 	t.Run("ListTasksByConnection", func(t *testing.T) {
 		// Create a task for testing
-		testTask, err := query.CreateTask(ctx, "Task For Connection Test", "/local", testConnID, "/remote", string(model.SyncDirectionBidirectional), "", false, nil)
+		testTask, err := query.CreateTask(ctx, "Task For Connection Test", "/local", testConnID, "/remote", string(model.SyncDirectionBidirectional), "", false, true, nil)
 		require.NoError(t, err)
 
 		// Create a job queryo create jobs
@@ -113,7 +113,7 @@ func TestTaskQuery(t *testing.T) {
 
 		t.Run("FiltersByConnectionID", func(t *testing.T) {
 			// Create another task with a different connection
-			otherTask, err := query.CreateTask(ctx, "Task For Other Connection", "/local2", testConnID2, "/remote2", string(model.SyncDirectionBidirectional), "", false, nil)
+			otherTask, err := query.CreateTask(ctx, "Task For Other Connection", "/local2", testConnID2, "/remote2", string(model.SyncDirectionBidirectional), "", false, true, nil)
 			require.NoError(t, err)
 
 			// Query for testConnID only
@@ -166,13 +166,13 @@ func TestTaskQuery(t *testing.T) {
 		existingTask := tasks[0]
 
 		t.Run("Success", func(t *testing.T) {
-			updated, err := query.UpdateTask(ctx, existingTask.ID, "Updated Task", existingTask.SourcePath, existingTask.ConnectionID, existingTask.RemotePath, string(existingTask.Direction), existingTask.Schedule, existingTask.Realtime, existingTask.Options)
+			updated, err := query.UpdateTask(ctx, existingTask.ID, "Updated Task", existingTask.SourcePath, existingTask.ConnectionID, existingTask.RemotePath, string(existingTask.Direction), existingTask.Schedule, existingTask.Realtime, true, existingTask.Options)
 			assert.NoError(t, err)
 			assert.Equal(t, "Updated Task", updated.Name)
 		})
 
 		t.Run("NotFound", func(t *testing.T) {
-			_, err := query.UpdateTask(ctx, uuid.New(), "New Name", "s", testConnID, "rp", string(model.SyncDirectionBidirectional), "", false, nil)
+			_, err := query.UpdateTask(ctx, uuid.New(), "New Name", "s", testConnID, "rp", string(model.SyncDirectionBidirectional), "", false, true, nil)
 			assert.Error(t, err)
 			assert.ErrorIs(t, err, errs.ErrNotFound)
 		})
@@ -180,7 +180,7 @@ func TestTaskQuery(t *testing.T) {
 
 	t.Run("DeleteTask", func(t *testing.T) {
 		// Create a task to delete to avoid interfering with other tests sequences if any
-		tToDelete, err := query.CreateTask(ctx, "To Delete", "/l", testConnID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
+		tToDelete, err := query.CreateTask(ctx, "To Delete", "/l", testConnID, "/r", string(model.SyncDirectionBidirectional), "", false, true, nil)
 		require.NoError(t, err)
 
 		t.Run("Success", func(t *testing.T) {
@@ -200,7 +200,7 @@ func TestTaskQuery(t *testing.T) {
 
 		t.Run("WithAssociatedJobs", func(t *testing.T) {
 			// Create a new task for this test
-			taskWithJobs, err := query.CreateTask(ctx, "Task With Jobs", "/path", testConnID, "/remote", string(model.SyncDirectionBidirectional), "", false, nil)
+			taskWithJobs, err := query.CreateTask(ctx, "Task With Jobs", "/path", testConnID, "/remote", string(model.SyncDirectionBidirectional), "", false, true, nil)
 			require.NoError(t, err)
 
 			// Create a job query to create jobs
@@ -244,7 +244,7 @@ func TestTaskQuery(t *testing.T) {
 
 	t.Run("GetTaskWithJobs", func(t *testing.T) {
 		// Setup: Task with multiple jobs
-		taskWithJobs, err := query.CreateTask(ctx, "Task With Jobs", "/l", testConnID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
+		taskWithJobs, err := query.CreateTask(ctx, "Task With Jobs", "/l", testConnID, "/r", string(model.SyncDirectionBidirectional), "", false, true, nil)
 		require.NoError(t, err)
 
 		jobQuery := NewJobQuery(client)
@@ -276,7 +276,7 @@ func TestTaskQuery(t *testing.T) {
 
 	t.Run("GetTaskWithConnection", func(t *testing.T) {
 		// Create a task
-		testTask, err := query.CreateTask(ctx, "Task With Connection", "/local", testConnID, "/remote", string(model.SyncDirectionUpload), "", false, nil)
+		testTask, err := query.CreateTask(ctx, "Task With Connection", "/local", testConnID, "/remote", string(model.SyncDirectionUpload), "", false, true, nil)
 		require.NoError(t, err)
 
 		t.Run("Success", func(t *testing.T) {
@@ -301,13 +301,13 @@ func TestTaskQuery(t *testing.T) {
 	t.Run("CreateTask_ConstraintError", func(t *testing.T) {
 		// Create a task with a specific name
 		taskName := "Unique Task Name"
-		_, err := query.CreateTask(ctx, taskName, "/source", testConnID, "/dest", string(model.SyncDirectionBidirectional), "", false, nil)
+		_, err := query.CreateTask(ctx, taskName, "/source", testConnID, "/dest", string(model.SyncDirectionBidirectional), "", false, true, nil)
 		require.NoError(t, err)
 
 		// Try to create another task with the same name (if unique constraint exists)
 		// Note: This depends on whether the schema enforces unique task names
 		// If there's no unique constraint, this test may need adjustment
-		_, err = query.CreateTask(ctx, taskName, "/source2", testConnID, "/dest2", string(model.SyncDirectionUpload), "", false, nil)
+		_, err = query.CreateTask(ctx, taskName, "/source2", testConnID, "/dest2", string(model.SyncDirectionUpload), "", false, true, nil)
 		if err != nil {
 			// If there IS a unique constraint on task names
 			assert.ErrorIs(t, err, errs.ErrAlreadyExists)
@@ -320,14 +320,14 @@ func TestTaskQuery(t *testing.T) {
 
 	t.Run("UpdateTask_ConstraintError", func(t *testing.T) {
 		// Create two tasks
-		task1, err := query.CreateTask(ctx, "Update Task 1", "/s1", testConnID, "/d1", string(model.SyncDirectionBidirectional), "", false, nil)
+		task1, err := query.CreateTask(ctx, "Update Task 1", "/s1", testConnID, "/d1", string(model.SyncDirectionBidirectional), "", false, true, nil)
 		require.NoError(t, err)
 
-		task2, err := query.CreateTask(ctx, "Update Task 2", "/s2", testConnID, "/d2", string(model.SyncDirectionUpload), "", false, nil)
+		task2, err := query.CreateTask(ctx, "Update Task 2", "/s2", testConnID, "/d2", string(model.SyncDirectionUpload), "", false, true, nil)
 		require.NoError(t, err)
 
 		// Try to update task2 to have the same name as task1 (if unique constraint exists)
-		_, err = query.UpdateTask(ctx, task2.ID, "Update Task 1", task2.SourcePath, task2.ConnectionID, task2.RemotePath, string(task2.Direction), task2.Schedule, task2.Realtime, task2.Options)
+		_, err = query.UpdateTask(ctx, task2.ID, "Update Task 1", task2.SourcePath, task2.ConnectionID, task2.RemotePath, string(task2.Direction), task2.Schedule, task2.Realtime, true, task2.Options)
 		if err != nil {
 			// If there IS a unique constraint on task names
 			assert.ErrorIs(t, err, errs.ErrAlreadyExists)
@@ -344,7 +344,7 @@ func TestTaskQuery(t *testing.T) {
 
 	t.Run("ListAllTasks_WithLatestJobs", func(t *testing.T) {
 		// Create a fresh task with multiple jobs
-		freshTask, err := query.CreateTask(ctx, "Task for ListAll Test", "/src", testConnID, "/dst", string(model.SyncDirectionBidirectional), "", false, nil)
+		freshTask, err := query.CreateTask(ctx, "Task for ListAll Test", "/src", testConnID, "/dst", string(model.SyncDirectionBidirectional), "", false, true, nil)
 		require.NoError(t, err)
 
 		jobQuery := NewJobQuery(client)
@@ -405,7 +405,7 @@ func TestTaskQuery_EdgeCases(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("CreateTask_WithNilOptions", func(t *testing.T) {
-		task, err := query.CreateTask(ctx, "Nil Options Task", "/src", testConn.ID, "/dst", string(model.SyncDirectionBidirectional), "", false, nil)
+		task, err := query.CreateTask(ctx, "Nil Options Task", "/src", testConn.ID, "/dst", string(model.SyncDirectionBidirectional), "", false, true, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, task)
 		assert.Nil(t, task.Options)
@@ -423,21 +423,21 @@ func TestTaskQuery_EdgeCases(t *testing.T) {
 			NoDelete:           &noDelete,
 			Transfers:          &transfers,
 		}
-		task, err := query.CreateTask(ctx, "Task With Options", "/src", testConn.ID, "/dst", string(model.SyncDirectionUpload), "", false, options)
+		task, err := query.CreateTask(ctx, "Task With Options", "/src", testConn.ID, "/dst", string(model.SyncDirectionUpload), "", false, true, options)
 		assert.NoError(t, err)
 		assert.NotNil(t, task)
 		assert.NotNil(t, task.Options)
 	})
 
 	t.Run("CreateTask_WithSchedule", func(t *testing.T) {
-		task, err := query.CreateTask(ctx, "Scheduled Task", "/src", testConn.ID, "/dst", string(model.SyncDirectionDownload), "0 */6 * * *", false, nil)
+		task, err := query.CreateTask(ctx, "Scheduled Task", "/src", testConn.ID, "/dst", string(model.SyncDirectionDownload), "0 */6 * * *", false, true, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, task)
 		assert.Equal(t, "0 */6 * * *", task.Schedule)
 	})
 
 	t.Run("CreateTask_WithRealtime", func(t *testing.T) {
-		task, err := query.CreateTask(ctx, "Realtime Task", "/src", testConn.ID, "/dst", string(model.SyncDirectionBidirectional), "", true, nil)
+		task, err := query.CreateTask(ctx, "Realtime Task", "/src", testConn.ID, "/dst", string(model.SyncDirectionBidirectional), "", true, true, nil)
 		assert.NoError(t, err)
 		assert.NotNil(t, task)
 		assert.True(t, task.Realtime)
@@ -445,7 +445,7 @@ func TestTaskQuery_EdgeCases(t *testing.T) {
 
 	t.Run("UpdateTask_ChangeAllFields", func(t *testing.T) {
 		// Create initial task
-		task, err := query.CreateTask(ctx, "Initial Task", "/old-src", testConn.ID, "/old-dst", string(model.SyncDirectionUpload), "0 0 * * *", false, nil)
+		task, err := query.CreateTask(ctx, "Initial Task", "/old-src", testConn.ID, "/old-dst", string(model.SyncDirectionUpload), "0 0 * * *", false, true, nil)
 		require.NoError(t, err)
 
 		// Update all fields
@@ -462,6 +462,7 @@ func TestTaskQuery_EdgeCases(t *testing.T) {
 			"/new-dst",
 			string(model.SyncDirectionDownload),
 			"0 12 * * *",
+			true,
 			true,
 			newOptions,
 		)
@@ -513,7 +514,7 @@ func TestTaskQuery_ListTasksPaginated(t *testing.T) {
 
 	// Create multiple tasks
 	for i := 0; i < 5; i++ {
-		_, err := query.CreateTask(ctx, "Paginated Task "+uuid.NewString()[:8], "/src", testConn.ID, "/dst", string(model.SyncDirectionBidirectional), "", false, nil)
+		_, err := query.CreateTask(ctx, "Paginated Task "+uuid.NewString()[:8], "/src", testConn.ID, "/dst", string(model.SyncDirectionBidirectional), "", false, true, nil)
 		require.NoError(t, err)
 		time.Sleep(time.Millisecond) // Ensure different creation times
 	}
@@ -587,14 +588,14 @@ func TestTaskQuery_ListTasksByConnectionPaginated(t *testing.T) {
 
 	// Create tasks for conn1
 	for i := 0; i < 5; i++ {
-		_, err := query.CreateTask(ctx, "Conn1 Task "+uuid.NewString()[:8], "/src", conn1.ID, "/dst", string(model.SyncDirectionBidirectional), "", false, nil)
+		_, err := query.CreateTask(ctx, "Conn1 Task "+uuid.NewString()[:8], "/src", conn1.ID, "/dst", string(model.SyncDirectionBidirectional), "", false, true, nil)
 		require.NoError(t, err)
 		time.Sleep(time.Millisecond)
 	}
 
 	// Create tasks for conn2
 	for i := 0; i < 3; i++ {
-		_, err := query.CreateTask(ctx, "Conn2 Task "+uuid.NewString()[:8], "/src", conn2.ID, "/dst", string(model.SyncDirectionUpload), "", false, nil)
+		_, err := query.CreateTask(ctx, "Conn2 Task "+uuid.NewString()[:8], "/src", conn2.ID, "/dst", string(model.SyncDirectionUpload), "", false, true, nil)
 		require.NoError(t, err)
 	}
 
@@ -679,7 +680,7 @@ func TestTaskQuery_ListJobsByTaskPaginated(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create task
-	task, err := query.CreateTask(ctx, "Jobs By Task Test", "/src", testConn.ID, "/dst", string(model.SyncDirectionBidirectional), "", false, nil)
+	task, err := query.CreateTask(ctx, "Jobs By Task Test", "/src", testConn.ID, "/dst", string(model.SyncDirectionBidirectional), "", false, true, nil)
 	require.NoError(t, err)
 
 	// Initially no jobs
@@ -744,7 +745,7 @@ func TestTaskQuery_ListJobsByTaskPaginated(t *testing.T) {
 
 	t.Run("DifferentTask", func(t *testing.T) {
 		// Create another task with different jobs
-		task2, err := query.CreateTask(ctx, "Jobs By Task Test 2", "/src2", testConn.ID, "/dst2", string(model.SyncDirectionUpload), "", false, nil)
+		task2, err := query.CreateTask(ctx, "Jobs By Task Test 2", "/src2", testConn.ID, "/dst2", string(model.SyncDirectionUpload), "", false, true, nil)
 		require.NoError(t, err)
 
 		for i := 0; i < 3; i++ {

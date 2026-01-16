@@ -37,6 +37,7 @@ func TestRecursiveWatcher_RecursiveAdd(t *testing.T) {
 		ID:         uuid.New(),
 		Name:       "Recursive Task",
 		Realtime:   true,
+		Enabled:    true,
 		SourcePath: rootDir,
 	}
 
@@ -78,6 +79,7 @@ func TestRecursiveWatcher_DynamicAdd(t *testing.T) {
 		ID:         uuid.New(),
 		Name:       "Dynamic Task",
 		Realtime:   true,
+		Enabled:    true,
 		SourcePath: rootDir,
 	}
 

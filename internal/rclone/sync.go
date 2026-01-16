@@ -323,15 +323,8 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger model.
 
 	e.logger.Info("Sync task completed successfully", zap.Stringer("job_id", jobEntity.ID))
 
-	// Auto-delete empty jobs if configured
-	if shouldDeleteEmptyJob(e.autoDeleteEmptyJobs, model.JobStatusSuccess, int(files), bytes, int(filesDeleted), int(errorCount)) {
-		e.logger.Debug("Auto-deleting empty job", zap.Stringer("job_id", jobEntity.ID))
-		if err := e.jobQuery.DeleteJob(ctx, jobEntity.ID); err != nil {
-			// Log warning but don't fail the task - the job has already succeeded
-			e.logger.Warn("Failed to auto-delete empty job", zap.Stringer("job_id", jobEntity.ID), zap.Error(err))
-		} else {
-			e.logger.Debug("Successfully auto-deleted empty job", zap.Stringer("job_id", jobEntity.ID))
-		}
+	if e.autoDeleteEmptyJobs {
+		e.deletePreviousEmptyJob(ctx, task.ID, jobEntity.ID)
 	}
 
 	return nil
@@ -342,32 +335,31 @@ func (e *SyncEngine) failJob(ctx context.Context, jobID uuid.UUID, err error) {
 	_, _ = e.jobQuery.UpdateJobStatus(ctx, jobID, string(model.JobStatusFailed), err.Error())
 }
 
-// shouldDeleteEmptyJob determines if a job should be deleted based on its configuration and result.
-// A job is considered "empty" if:
-// - filesTransferred = 0 (no files were transferred)
-// - bytesTransferred = 0 (no bytes were transferred)
-// - filesDeleted = 0 (no files were deleted)
-// - errorCount = 0 (no errors occurred)
-// - status = SUCCESS (the job completed successfully)
-// Failed jobs are always kept for debugging purposes.
-func shouldDeleteEmptyJob(autoDeleteEmptyJobs bool, status model.JobStatus, filesTransferred int, bytesTransferred int64, filesDeleted int, errorCount int) bool {
-	// If auto-delete is disabled, never delete
-	if !autoDeleteEmptyJobs {
-		return false
+func (e *SyncEngine) deletePreviousEmptyJob(ctx context.Context, taskID, currentJobID uuid.UUID) {
+	prevJobs, err := e.jobQuery.ListJobs(ctx, &taskID, nil, 1, 1)
+	if err != nil || len(prevJobs) == 0 {
+		return
 	}
 
-	// Only delete successful jobs
-	if status != model.JobStatusSuccess {
-		return false
+	prevJob := prevJobs[0]
+	if prevJob.ID == currentJobID {
+		return
 	}
 
-	// Check if job had any activity (transfers, bytes, deletes, or errors)
-	if filesTransferred > 0 || bytesTransferred > 0 || filesDeleted > 0 || errorCount > 0 {
-		return false
+	if isEmptyJob(prevJob) {
+		e.logger.Debug("Deleting previous empty job", zap.Stringer("prev_job_id", prevJob.ID))
+		if err := e.jobQuery.DeleteJob(ctx, prevJob.ID); err != nil {
+			e.logger.Warn("Failed to delete previous empty job", zap.Stringer("prev_job_id", prevJob.ID), zap.Error(err))
+		}
 	}
+}
 
-	// Job is empty and successful, delete it
-	return true
+func isEmptyJob(job *ent.Job) bool {
+	return job.Status == model.JobStatusSuccess &&
+		job.FilesTransferred == 0 &&
+		job.BytesTransferred == 0 &&
+		job.FilesDeleted == 0 &&
+		job.ErrorCount == 0
 }
 
 // getSyncOptionsFromTask extracts SyncOptions from task.Options.
@@ -596,11 +588,11 @@ func (e *SyncEngine) processStats(ctx context.Context, jobID uuid.UUID, task *en
 				// Skip pure check operations (e.g., MD5 verification, listing)
 				continue
 			case "transferring":
+				direction := getTransferDirection(snapshot.SrcFs, task.SourcePath)
 				what := model.LogActionUpload
-				if snapshot.SrcFs != task.SourcePath {
+				if direction == model.TransferDirectionDownload {
 					what = model.LogActionDownload
 				}
-				// Log successful transfers (including 0-byte files)
 				logsToSave = append(logsToSave, &ent.JobLog{
 					Level: model.LogLevelInfo,
 					What:  what,
@@ -608,11 +600,11 @@ func (e *SyncEngine) processStats(ctx context.Context, jobID uuid.UUID, task *en
 					Size:  snapshot.Size,
 					Time:  snapshot.CompletedAt,
 				})
-				// Include completed transfers in broadcast (bytes == size signals completion to frontend)
 				activeTransfers = append(activeTransfers, &model.TransferItem{
-					Name:  snapshot.Name,
-					Size:  snapshot.Size,
-					Bytes: snapshot.Size, // bytes == size indicates completion
+					Name:      snapshot.Name,
+					Size:      snapshot.Size,
+					Bytes:     snapshot.Size,
+					Direction: direction,
 				})
 			default:
 				// Unknown operation type
@@ -624,12 +616,13 @@ func (e *SyncEngine) processStats(ctx context.Context, jobID uuid.UUID, task *en
 				})
 			}
 		} else {
-			// Collect active transfers for progress broadcast
 			snapshot := tr.Snapshot()
+			direction := getTransferDirection(snapshot.SrcFs, task.SourcePath)
 			activeTransfers = append(activeTransfers, &model.TransferItem{
-				Name:  snapshot.Name,
-				Size:  snapshot.Size,
-				Bytes: snapshot.Bytes,
+				Name:      snapshot.Name,
+				Size:      snapshot.Size,
+				Bytes:     snapshot.Bytes,
+				Direction: direction,
 			})
 		}
 	}
@@ -653,7 +646,7 @@ func (e *SyncEngine) processStats(ctx context.Context, jobID uuid.UUID, task *en
 	}
 
 	// Get total stats for progress display
-	totalTransfers, totalBytes := getTotalStats(s)
+	totalTransfers, totalBytes, filesChecked := getTotalStats(s)
 	filesDeleted, errorCount := s.GetDeletes(), s.GetErrors()
 
 	// Broadcast progress update
@@ -669,6 +662,7 @@ func (e *SyncEngine) processStats(ctx context.Context, jobID uuid.UUID, task *en
 			BytesTotal:       totalBytes,
 			FilesDeleted:     int(filesDeleted),
 			ErrorCount:       int(errorCount),
+			FilesChecked:     filesChecked,
 			StartTime:        startTime,
 		})
 
@@ -752,20 +746,31 @@ func (e *SyncEngine) broadcastJobUpdate(event *model.JobProgressEvent) {
 	e.jobProgressBus.Publish(event)
 }
 
-// getTotalStats retrieves total transfers and total bytes from rclone stats using RemoteStats API.
-// Returns (totalTransfers, totalBytes). Returns (0, 0) if stats is nil or on error.
-func getTotalStats(s *accounting.StatsInfo) (int64, int64) {
+// getTransferDirection determines the transfer direction based on source filesystem.
+// If srcFs matches the task's SourcePath, it's an upload (local → remote).
+// Otherwise, it's a download (remote → local).
+func getTransferDirection(srcFs, taskSourcePath string) model.TransferDirection {
+	if srcFs == taskSourcePath {
+		return model.TransferDirectionUpload
+	}
+	return model.TransferDirectionDownload
+}
+
+// getTotalStats retrieves total transfers, total bytes, and checks count from rclone stats.
+// Uses a single RemoteStats call to avoid redundant API calls.
+// Returns (totalTransfers, totalBytes, filesChecked). Returns (0, 0, 0) if stats is nil or on error.
+func getTotalStats(s *accounting.StatsInfo) (int64, int64, int) {
 	if s == nil {
-		return 0, 0
+		return 0, 0, 0
 	}
 
 	rc, err := s.RemoteStats(false)
 	if err != nil {
-		return 0, 0
+		return 0, 0, 0
 	}
 
-	// Extract totalTransfers and totalBytes from rc.Params
 	var totalTransfers, totalBytes int64
+	var filesChecked int
 
 	if v, ok := rc["totalTransfers"]; ok {
 		switch val := v.(type) {
@@ -789,7 +794,18 @@ func getTotalStats(s *accounting.StatsInfo) (int64, int64) {
 		}
 	}
 
-	return totalTransfers, totalBytes
+	if v, ok := rc["checks"]; ok {
+		switch val := v.(type) {
+		case int64:
+			filesChecked = int(val)
+		case int:
+			filesChecked = val
+		case float64:
+			filesChecked = int(val)
+		}
+	}
+
+	return totalTransfers, totalBytes, filesChecked
 }
 
 // getStatsInternals uses unsafe reflection to access private fields of rclone's StatsInfo.

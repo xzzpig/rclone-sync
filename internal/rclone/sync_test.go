@@ -310,18 +310,20 @@ func TestGetTotalStats(t *testing.T) {
 	assert.NotNil(t, stats, "Stats should not be nil")
 
 	// Get total stats using the helper function
-	totalTransfers, totalBytes := getTotalStats(stats)
+	totalTransfers, totalBytes, filesChecked := getTotalStats(stats)
 
-	// Initially, both should be 0 (no transfers started)
+	// Initially, all should be 0 (no transfers started)
 	assert.Equal(t, int64(0), totalTransfers, "Initial totalTransfers should be 0")
 	assert.Equal(t, int64(0), totalBytes, "Initial totalBytes should be 0")
+	assert.Equal(t, 0, filesChecked, "Initial filesChecked should be 0")
 }
 
 // TestGetTotalStats_NilStats tests getTotalStats with nil stats.
 func TestGetTotalStats_NilStats(t *testing.T) {
-	totalTransfers, totalBytes := getTotalStats(nil)
+	totalTransfers, totalBytes, filesChecked := getTotalStats(nil)
 	assert.Equal(t, int64(0), totalTransfers, "totalTransfers should be 0 for nil stats")
 	assert.Equal(t, int64(0), totalBytes, "totalBytes should be 0 for nil stats")
+	assert.Equal(t, 0, filesChecked, "filesChecked should be 0 for nil stats")
 }
 
 // TestApplyFilterRules tests the applyFilterRules helper function.
@@ -526,134 +528,147 @@ func TestDetermineTransfers(t *testing.T) {
 	}
 }
 
-// TestShouldDeleteEmptyJob tests the shouldDeleteEmptyJob helper function.
-func TestShouldDeleteEmptyJob(t *testing.T) {
+// TestGetTransferDirection tests the getTransferDirection helper function.
+func TestGetTransferDirection(t *testing.T) {
 	tests := []struct {
-		name                string
-		autoDeleteEmptyJobs bool
-		status              model.JobStatus
-		filesTransferred    int
-		bytesTransferred    int64
-		filesDeleted        int
-		errorCount          int
-		expectedDelete      bool
+		name           string
+		srcFs          string
+		taskSourcePath string
+		expected       model.TransferDirection
 	}{
 		{
-			name:                "enabled+success+no_activity->delete",
-			autoDeleteEmptyJobs: true,
-			status:              model.JobStatusSuccess,
-			filesTransferred:    0,
-			bytesTransferred:    0,
-			filesDeleted:        0,
-			errorCount:          0,
-			expectedDelete:      true,
+			name:           "srcFs equals taskSourcePath -> UPLOAD",
+			srcFs:          "/home/user/data",
+			taskSourcePath: "/home/user/data",
+			expected:       model.TransferDirectionUpload,
 		},
 		{
-			name:                "enabled+success+has_activity->keep",
-			autoDeleteEmptyJobs: true,
-			status:              model.JobStatusSuccess,
-			filesTransferred:    5,
-			bytesTransferred:    1024,
-			filesDeleted:        0,
-			errorCount:          0,
-			expectedDelete:      false,
+			name:           "srcFs differs from taskSourcePath -> DOWNLOAD",
+			srcFs:          "remote:/backup",
+			taskSourcePath: "/home/user/data",
+			expected:       model.TransferDirectionDownload,
 		},
 		{
-			name:                "enabled+success+only_bytes_transferred->keep",
-			autoDeleteEmptyJobs: true,
-			status:              model.JobStatusSuccess,
-			filesTransferred:    0,
-			bytesTransferred:    1024,
-			filesDeleted:        0,
-			errorCount:          0,
-			expectedDelete:      false,
+			name:           "empty srcFs with non-empty taskSourcePath -> DOWNLOAD",
+			srcFs:          "",
+			taskSourcePath: "/home/user/data",
+			expected:       model.TransferDirectionDownload,
 		},
 		{
-			name:                "enabled+success+only_files_transferred->keep",
-			autoDeleteEmptyJobs: true,
-			status:              model.JobStatusSuccess,
-			filesTransferred:    5,
-			bytesTransferred:    0,
-			filesDeleted:        0,
-			errorCount:          0,
-			expectedDelete:      false,
+			name:           "both empty -> UPLOAD (equal strings)",
+			srcFs:          "",
+			taskSourcePath: "",
+			expected:       model.TransferDirectionUpload,
 		},
 		{
-			name:                "enabled+success+only_files_deleted->keep",
-			autoDeleteEmptyJobs: true,
-			status:              model.JobStatusSuccess,
-			filesTransferred:    0,
-			bytesTransferred:    0,
-			filesDeleted:        3,
-			errorCount:          0,
-			expectedDelete:      false,
+			name:           "srcFs with trailing slash differs -> DOWNLOAD",
+			srcFs:          "/home/user/data/",
+			taskSourcePath: "/home/user/data",
+			expected:       model.TransferDirectionDownload,
 		},
 		{
-			name:                "enabled+success+only_errors->keep",
-			autoDeleteEmptyJobs: true,
-			status:              model.JobStatusSuccess,
-			filesTransferred:    0,
-			bytesTransferred:    0,
-			filesDeleted:        0,
-			errorCount:          2,
-			expectedDelete:      false,
-		},
-		{
-			name:                "enabled+success+deletes_and_errors->keep",
-			autoDeleteEmptyJobs: true,
-			status:              model.JobStatusSuccess,
-			filesTransferred:    0,
-			bytesTransferred:    0,
-			filesDeleted:        1,
-			errorCount:          1,
-			expectedDelete:      false,
-		},
-		{
-			name:                "enabled+failed+no_activity->keep",
-			autoDeleteEmptyJobs: true,
-			status:              model.JobStatusFailed,
-			filesTransferred:    0,
-			bytesTransferred:    0,
-			filesDeleted:        0,
-			errorCount:          0,
-			expectedDelete:      false,
-		},
-		{
-			name:                "enabled+cancelled+no_activity->keep",
-			autoDeleteEmptyJobs: true,
-			status:              model.JobStatusCancelled,
-			filesTransferred:    0,
-			bytesTransferred:    0,
-			filesDeleted:        0,
-			errorCount:          0,
-			expectedDelete:      false,
-		},
-		{
-			name:                "disabled+success+no_activity->keep",
-			autoDeleteEmptyJobs: false,
-			status:              model.JobStatusSuccess,
-			filesTransferred:    0,
-			bytesTransferred:    0,
-			filesDeleted:        0,
-			errorCount:          0,
-			expectedDelete:      false,
-		},
-		{
-			name:                "disabled+success+has_activity->keep",
-			autoDeleteEmptyJobs: false,
-			status:              model.JobStatusSuccess,
-			filesTransferred:    5,
-			bytesTransferred:    1024,
-			filesDeleted:        0,
-			errorCount:          0,
-			expectedDelete:      false,
+			name:           "remote source matches task source -> UPLOAD",
+			srcFs:          "gdrive:/Documents",
+			taskSourcePath: "gdrive:/Documents",
+			expected:       model.TransferDirectionUpload,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			shouldDelete := shouldDeleteEmptyJob(tt.autoDeleteEmptyJobs, tt.status, tt.filesTransferred, tt.bytesTransferred, tt.filesDeleted, tt.errorCount)
-			assert.Equal(t, tt.expectedDelete, shouldDelete, "shouldDeleteEmptyJob result mismatch")
+			result := getTransferDirection(tt.srcFs, tt.taskSourcePath)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestIsEmptyJob tests the isEmptyJob helper function.
+func TestIsEmptyJob(t *testing.T) {
+	tests := []struct {
+		name             string
+		status           model.JobStatus
+		filesTransferred int
+		bytesTransferred int64
+		filesDeleted     int
+		errorCount       int
+		expected         bool
+	}{
+		{
+			name:             "success+no_activity->empty",
+			status:           model.JobStatusSuccess,
+			filesTransferred: 0,
+			bytesTransferred: 0,
+			filesDeleted:     0,
+			errorCount:       0,
+			expected:         true,
+		},
+		{
+			name:             "success+has_files->not_empty",
+			status:           model.JobStatusSuccess,
+			filesTransferred: 5,
+			bytesTransferred: 1024,
+			filesDeleted:     0,
+			errorCount:       0,
+			expected:         false,
+		},
+		{
+			name:             "success+only_bytes->not_empty",
+			status:           model.JobStatusSuccess,
+			filesTransferred: 0,
+			bytesTransferred: 1024,
+			filesDeleted:     0,
+			errorCount:       0,
+			expected:         false,
+		},
+		{
+			name:             "success+only_deletes->not_empty",
+			status:           model.JobStatusSuccess,
+			filesTransferred: 0,
+			bytesTransferred: 0,
+			filesDeleted:     3,
+			errorCount:       0,
+			expected:         false,
+		},
+		{
+			name:             "success+only_errors->not_empty",
+			status:           model.JobStatusSuccess,
+			filesTransferred: 0,
+			bytesTransferred: 0,
+			filesDeleted:     0,
+			errorCount:       2,
+			expected:         false,
+		},
+		{
+			name:             "failed+no_activity->not_empty",
+			status:           model.JobStatusFailed,
+			filesTransferred: 0,
+			bytesTransferred: 0,
+			filesDeleted:     0,
+			errorCount:       0,
+			expected:         false,
+		},
+		{
+			name:             "cancelled+no_activity->not_empty",
+			status:           model.JobStatusCancelled,
+			filesTransferred: 0,
+			bytesTransferred: 0,
+			filesDeleted:     0,
+			errorCount:       0,
+			expected:         false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			job := &ent.Job{
+				Status:           tt.status,
+				FilesTransferred: tt.filesTransferred,
+				BytesTransferred: tt.bytesTransferred,
+				FilesDeleted:     tt.filesDeleted,
+				ErrorCount:       tt.errorCount,
+			}
+			result := isEmptyJob(job)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }

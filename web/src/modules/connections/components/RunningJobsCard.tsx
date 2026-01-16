@@ -37,6 +37,7 @@ interface RunningJob {
   filesTotal: number;
   bytesTransferred: number;
   bytesTotal: number;
+  filesChecked: number;
 }
 
 const RunningJobsCard: Component<RunningJobsCardProps> = (props) => {
@@ -79,6 +80,7 @@ const RunningJobsCard: Component<RunningJobsCardProps> = (props) => {
               filesTotal: event.filesTotal,
               bytesTransferred: event.bytesTransferred,
               bytesTotal: event.bytesTotal,
+              filesChecked: event.filesChecked ?? 0,
             });
           } else {
             // Job completed, remove it
@@ -172,6 +174,11 @@ const RunningJobsCard: Component<RunningJobsCardProps> = (props) => {
                           {job().filesTotal > 0
                             ? `${job().filesTransferred}/${job().filesTotal} ${m.common_files().toLowerCase()}`
                             : `${job().filesTransferred} ${m.common_files().toLowerCase()}`}
+                          {job().filesChecked > 0 && (
+                            <span class="ml-2">
+                              {m.overview_checked({ count: job().filesChecked })}
+                            </span>
+                          )}
                         </span>
                         <span>
                           {job().bytesTotal > 0

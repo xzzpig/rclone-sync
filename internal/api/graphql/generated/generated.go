@@ -214,6 +214,7 @@ type ComplexityRoot struct {
 		ConnectionID     func(childComplexity int) int
 		EndTime          func(childComplexity int) int
 		ErrorCount       func(childComplexity int) int
+		FilesChecked     func(childComplexity int) int
 		FilesDeleted     func(childComplexity int) int
 		FilesTotal       func(childComplexity int) int
 		FilesTransferred func(childComplexity int) int
@@ -301,6 +302,7 @@ type ComplexityRoot struct {
 		Connection func(childComplexity int) int
 		CreatedAt  func(childComplexity int) int
 		Direction  func(childComplexity int) int
+		Enabled    func(childComplexity int) int
 		ID         func(childComplexity int) int
 		Jobs       func(childComplexity int, pagination *model.PaginationInput) int
 		LatestJob  func(childComplexity int) int
@@ -339,9 +341,10 @@ type ComplexityRoot struct {
 	}
 
 	TransferItem struct {
-		Bytes func(childComplexity int) int
-		Name  func(childComplexity int) int
-		Size  func(childComplexity int) int
+		Bytes     func(childComplexity int) int
+		Direction func(childComplexity int) int
+		Name      func(childComplexity int) int
+		Size      func(childComplexity int) int
 	}
 
 	TransferProgressEvent struct {
@@ -1064,6 +1067,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.JobProgressEvent.ErrorCount(childComplexity), true
+	case "JobProgressEvent.filesChecked":
+		if e.complexity.JobProgressEvent.FilesChecked == nil {
+			break
+		}
+
+		return e.complexity.JobProgressEvent.FilesChecked(childComplexity), true
 	case "JobProgressEvent.filesDeleted":
 		if e.complexity.JobProgressEvent.FilesDeleted == nil {
 			break
@@ -1422,6 +1431,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Task.Direction(childComplexity), true
+	case "Task.enabled":
+		if e.complexity.Task.Enabled == nil {
+			break
+		}
+
+		return e.complexity.Task.Enabled(childComplexity), true
 	case "Task.id":
 		if e.complexity.Task.ID == nil {
 			break
@@ -1606,6 +1621,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.TransferItem.Bytes(childComplexity), true
+	case "TransferItem.direction":
+		if e.complexity.TransferItem.Direction == nil {
+			break
+		}
+
+		return e.complexity.TransferItem.Direction(childComplexity), true
 	case "TransferItem.name":
 		if e.complexity.TransferItem.Name == nil {
 			break
@@ -2496,6 +2517,20 @@ enum LogAction {
 	UNKNOWN
 }
 
+"""
+传输方向
+"""
+enum TransferDirection {
+	"""
+	上传（本地 -> 远程）
+	"""
+	UPLOAD
+	"""
+	下载（远程 -> 本地）
+	"""
+	DOWNLOAD
+}
+
 # =============================================================================
 # TYPES
 # =============================================================================
@@ -2677,6 +2712,10 @@ type JobProgressEvent {
 	"""
 	errorCount: Int!
 	"""
+	已检查的文件数
+	"""
+	filesChecked: Int!
+	"""
 	开始时间
 	"""
 	startTime: DateTime!
@@ -2702,6 +2741,10 @@ type TransferItem {
 	已传输字节数
 	"""
 	bytes: BigInt!
+	"""
+	传输方向
+	"""
+	direction: TransferDirection!
 }
 
 """
@@ -3196,6 +3239,10 @@ type Task @goExtraField(name: "ConnectionID", type: "github.com/google/uuid.UUID
 	"""
 	realtime: Boolean!
 	"""
+	任务是否启用
+	"""
+	enabled: Boolean!
+	"""
 	同步选项（JSON → 类型转换）
 	"""
 	options: TaskSyncOptions @goField(forceResolver: true)
@@ -3298,6 +3345,10 @@ input CreateTaskInput {
 	"""
 	realtime: Boolean = false
 	"""
+	任务是否启用
+	"""
+	enabled: Boolean = true
+	"""
 	同步选项
 	"""
 	options: TaskSyncOptionsInput
@@ -3335,6 +3386,10 @@ input UpdateTaskInput {
 	是否启用实时同步
 	"""
 	realtime: Boolean
+	"""
+	任务是否启用
+	"""
+	enabled: Boolean
 	"""
 	同步选项
 	"""
@@ -6202,6 +6257,8 @@ func (ec *executionContext) fieldContext_Job_task(_ context.Context, field graph
 				return ec.fieldContext_Task_schedule(ctx, field)
 			case "realtime":
 				return ec.fieldContext_Task_realtime(ctx, field)
+			case "enabled":
+				return ec.fieldContext_Task_enabled(ctx, field)
 			case "options":
 				return ec.fieldContext_Task_options(ctx, field)
 			case "createdAt":
@@ -6314,6 +6371,8 @@ func (ec *executionContext) fieldContext_Job_progress(_ context.Context, field g
 				return ec.fieldContext_JobProgressEvent_filesDeleted(ctx, field)
 			case "errorCount":
 				return ec.fieldContext_JobProgressEvent_errorCount(ctx, field)
+			case "filesChecked":
+				return ec.fieldContext_JobProgressEvent_filesChecked(ctx, field)
 			case "startTime":
 				return ec.fieldContext_JobProgressEvent_startTime(ctx, field)
 			case "endTime":
@@ -7084,6 +7143,35 @@ func (ec *executionContext) fieldContext_JobProgressEvent_errorCount(_ context.C
 	return fc, nil
 }
 
+func (ec *executionContext) _JobProgressEvent_filesChecked(ctx context.Context, field graphql.CollectedField, obj *model.JobProgressEvent) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_JobProgressEvent_filesChecked,
+		func(ctx context.Context) (any, error) {
+			return obj.FilesChecked, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_JobProgressEvent_filesChecked(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "JobProgressEvent",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _JobProgressEvent_startTime(ctx context.Context, field graphql.CollectedField, obj *model.JobProgressEvent) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -7304,6 +7392,8 @@ func (ec *executionContext) fieldContext_JobQuery_progress(ctx context.Context, 
 				return ec.fieldContext_JobProgressEvent_filesDeleted(ctx, field)
 			case "errorCount":
 				return ec.fieldContext_JobProgressEvent_errorCount(ctx, field)
+			case "filesChecked":
+				return ec.fieldContext_JobProgressEvent_filesChecked(ctx, field)
 			case "startTime":
 				return ec.fieldContext_JobProgressEvent_startTime(ctx, field)
 			case "endTime":
@@ -8693,6 +8783,8 @@ func (ec *executionContext) fieldContext_Subscription_jobProgress(ctx context.Co
 				return ec.fieldContext_JobProgressEvent_filesDeleted(ctx, field)
 			case "errorCount":
 				return ec.fieldContext_JobProgressEvent_errorCount(ctx, field)
+			case "filesChecked":
+				return ec.fieldContext_JobProgressEvent_filesChecked(ctx, field)
 			case "startTime":
 				return ec.fieldContext_JobProgressEvent_startTime(ctx, field)
 			case "endTime":
@@ -8957,6 +9049,35 @@ func (ec *executionContext) _Task_realtime(ctx context.Context, field graphql.Co
 }
 
 func (ec *executionContext) fieldContext_Task_realtime(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Task",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Task_enabled(ctx context.Context, field graphql.CollectedField, obj *model.Task) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Task_enabled,
+		func(ctx context.Context) (any, error) {
+			return obj.Enabled, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Task_enabled(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Task",
 		Field:      field,
@@ -9265,6 +9386,8 @@ func (ec *executionContext) fieldContext_TaskConnection_items(_ context.Context,
 				return ec.fieldContext_Task_schedule(ctx, field)
 			case "realtime":
 				return ec.fieldContext_Task_realtime(ctx, field)
+			case "enabled":
+				return ec.fieldContext_Task_enabled(ctx, field)
 			case "options":
 				return ec.fieldContext_Task_options(ctx, field)
 			case "createdAt":
@@ -9391,6 +9514,8 @@ func (ec *executionContext) fieldContext_TaskMutation_create(ctx context.Context
 				return ec.fieldContext_Task_schedule(ctx, field)
 			case "realtime":
 				return ec.fieldContext_Task_realtime(ctx, field)
+			case "enabled":
+				return ec.fieldContext_Task_enabled(ctx, field)
 			case "options":
 				return ec.fieldContext_Task_options(ctx, field)
 			case "createdAt":
@@ -9460,6 +9585,8 @@ func (ec *executionContext) fieldContext_TaskMutation_update(ctx context.Context
 				return ec.fieldContext_Task_schedule(ctx, field)
 			case "realtime":
 				return ec.fieldContext_Task_realtime(ctx, field)
+			case "enabled":
+				return ec.fieldContext_Task_enabled(ctx, field)
 			case "options":
 				return ec.fieldContext_Task_options(ctx, field)
 			case "createdAt":
@@ -9529,6 +9656,8 @@ func (ec *executionContext) fieldContext_TaskMutation_delete(ctx context.Context
 				return ec.fieldContext_Task_schedule(ctx, field)
 			case "realtime":
 				return ec.fieldContext_Task_realtime(ctx, field)
+			case "enabled":
+				return ec.fieldContext_Task_enabled(ctx, field)
 			case "options":
 				return ec.fieldContext_Task_options(ctx, field)
 			case "createdAt":
@@ -9716,6 +9845,8 @@ func (ec *executionContext) fieldContext_TaskQuery_get(ctx context.Context, fiel
 				return ec.fieldContext_Task_schedule(ctx, field)
 			case "realtime":
 				return ec.fieldContext_Task_realtime(ctx, field)
+			case "enabled":
+				return ec.fieldContext_Task_enabled(ctx, field)
 			case "options":
 				return ec.fieldContext_Task_options(ctx, field)
 			case "createdAt":
@@ -9949,6 +10080,35 @@ func (ec *executionContext) fieldContext_TransferItem_bytes(_ context.Context, f
 	return fc, nil
 }
 
+func (ec *executionContext) _TransferItem_direction(ctx context.Context, field graphql.CollectedField, obj *model.TransferItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TransferItem_direction,
+		func(ctx context.Context) (any, error) {
+			return obj.Direction, nil
+		},
+		nil,
+		ec.marshalNTransferDirection2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐTransferDirection,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TransferItem_direction(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TransferItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type TransferDirection does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _TransferProgressEvent_jobId(ctx context.Context, field graphql.CollectedField, obj *model.TransferProgressEvent) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -10066,6 +10226,8 @@ func (ec *executionContext) fieldContext_TransferProgressEvent_transfers(_ conte
 				return ec.fieldContext_TransferItem_size(ctx, field)
 			case "bytes":
 				return ec.fieldContext_TransferItem_bytes(ctx, field)
+			case "direction":
+				return ec.fieldContext_TransferItem_direction(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type TransferItem", field.Name)
 		},
@@ -11645,8 +11807,11 @@ func (ec *executionContext) unmarshalInputCreateTaskInput(ctx context.Context, o
 	if _, present := asMap["realtime"]; !present {
 		asMap["realtime"] = false
 	}
+	if _, present := asMap["enabled"]; !present {
+		asMap["enabled"] = true
+	}
 
-	fieldsInOrder := [...]string{"name", "sourcePath", "connectionId", "remotePath", "direction", "schedule", "realtime", "options"}
+	fieldsInOrder := [...]string{"name", "sourcePath", "connectionId", "remotePath", "direction", "schedule", "realtime", "enabled", "options"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -11702,6 +11867,13 @@ func (ec *executionContext) unmarshalInputCreateTaskInput(ctx context.Context, o
 				return it, err
 			}
 			it.Realtime = data
+		case "enabled":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("enabled"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Enabled = data
 		case "options":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("options"))
 			data, err := ec.unmarshalOTaskSyncOptionsInput2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐTaskSyncOptionsInput(ctx, v)
@@ -11992,7 +12164,7 @@ func (ec *executionContext) unmarshalInputUpdateTaskInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"name", "sourcePath", "connectionId", "remotePath", "direction", "schedule", "realtime", "options"}
+	fieldsInOrder := [...]string{"name", "sourcePath", "connectionId", "remotePath", "direction", "schedule", "realtime", "enabled", "options"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -12048,6 +12220,13 @@ func (ec *executionContext) unmarshalInputUpdateTaskInput(ctx context.Context, o
 				return it, err
 			}
 			it.Realtime = data
+		case "enabled":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("enabled"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Enabled = data
 		case "options":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("options"))
 			data, err := ec.unmarshalOTaskSyncOptionsInput2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐTaskSyncOptionsInput(ctx, v)
@@ -13899,6 +14078,11 @@ func (ec *executionContext) _JobProgressEvent(ctx context.Context, sel ast.Selec
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "filesChecked":
+			out.Values[i] = ec._JobProgressEvent_filesChecked(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "startTime":
 			out.Values[i] = ec._JobProgressEvent_startTime(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -14792,6 +14976,11 @@ func (ec *executionContext) _Task(ctx context.Context, sel ast.SelectionSet, obj
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "enabled":
+			out.Values[i] = ec._Task_enabled(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
 		case "options":
 			field := field
 
@@ -15358,6 +15547,11 @@ func (ec *executionContext) _TransferItem(ctx context.Context, sel ast.Selection
 			}
 		case "bytes":
 			out.Values[i] = ec._TransferItem_bytes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "direction":
+			out.Values[i] = ec._TransferItem_direction(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -16716,6 +16910,16 @@ func (ec *executionContext) marshalNTestConnectionResult2githubᚗcomᚋxzzpig�
 		return graphql.Null
 	}
 	return ec._TestConnectionResult(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNTransferDirection2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐTransferDirection(ctx context.Context, v any) (model.TransferDirection, error) {
+	var res model.TransferDirection
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNTransferDirection2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐTransferDirection(ctx context.Context, sel ast.SelectionSet, v model.TransferDirection) graphql.Marshaler {
+	return v
 }
 
 func (ec *executionContext) marshalNTransferItem2ᚕᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐTransferItemᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.TransferItem) graphql.Marshaler {

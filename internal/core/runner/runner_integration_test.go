@@ -132,6 +132,7 @@ func createTestTask(t *testing.T, tc *testContext, name, sourceDir, destDir stri
 		string(model.SyncDirectionBidirectional),
 		"",
 		false,
+		true,
 		nil,
 	)
 	require.NoError(t, err)
@@ -167,6 +168,7 @@ func createSlowTask(t *testing.T, tc *testContext, name, sourceDir, destDir stri
 		string(model.SyncDirectionUpload), // Use upload direction to trigger Put on destination
 		"",
 		false,
+		true,
 		nil,
 	)
 	require.NoError(t, err)

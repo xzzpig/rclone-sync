@@ -51,6 +51,7 @@ func TestCrashRecovery_ResetStuckJobs(t *testing.T) {
 		string(model.SyncDirectionUpload),
 		"",
 		false,
+		true,
 		nil,
 	)
 	require.NoError(t, err)

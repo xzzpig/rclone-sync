@@ -35,6 +35,8 @@ type Task struct {
 	Schedule string `json:"schedule,omitempty"`
 	// Realtime holds the value of the "realtime" field.
 	Realtime bool `json:"realtime,omitempty"`
+	// Enabled holds the value of the "enabled" field.
+	Enabled bool `json:"enabled,omitempty"`
 	// Options holds the value of the "options" field.
 	Options *model.TaskSyncOptions `json:"options,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -85,7 +87,7 @@ func (*Task) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case task.FieldOptions:
 			values[i] = new([]byte)
-		case task.FieldRealtime:
+		case task.FieldRealtime, task.FieldEnabled:
 			values[i] = new(sql.NullBool)
 		case task.FieldName, task.FieldSourcePath, task.FieldRemotePath, task.FieldDirection, task.FieldSchedule:
 			values[i] = new(sql.NullString)
@@ -155,6 +157,12 @@ func (_m *Task) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field realtime", values[i])
 			} else if value.Valid {
 				_m.Realtime = value.Bool
+			}
+		case task.FieldEnabled:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field enabled", values[i])
+			} else if value.Valid {
+				_m.Enabled = value.Bool
 			}
 		case task.FieldOptions:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -242,6 +250,9 @@ func (_m *Task) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("realtime=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Realtime))
+	builder.WriteString(", ")
+	builder.WriteString("enabled=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Enabled))
 	builder.WriteString(", ")
 	builder.WriteString("options=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Options))

@@ -142,6 +142,20 @@ func (_u *TaskUpdate) SetNillableRealtime(v *bool) *TaskUpdate {
 	return _u
 }
 
+// SetEnabled sets the "enabled" field.
+func (_u *TaskUpdate) SetEnabled(v bool) *TaskUpdate {
+	_u.mutation.SetEnabled(v)
+	return _u
+}
+
+// SetNillableEnabled sets the "enabled" field if the given value is not nil.
+func (_u *TaskUpdate) SetNillableEnabled(v *bool) *TaskUpdate {
+	if v != nil {
+		_u.SetEnabled(*v)
+	}
+	return _u
+}
+
 // SetOptions sets the "options" field.
 func (_u *TaskUpdate) SetOptions(v *model.TaskSyncOptions) *TaskUpdate {
 	_u.mutation.SetOptions(v)
@@ -319,6 +333,9 @@ func (_u *TaskUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Realtime(); ok {
 		_spec.SetField(task.FieldRealtime, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.Enabled(); ok {
+		_spec.SetField(task.FieldEnabled, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.Options(); ok {
 		_spec.SetField(task.FieldOptions, field.TypeJSON, value)
@@ -536,6 +553,20 @@ func (_u *TaskUpdateOne) SetNillableRealtime(v *bool) *TaskUpdateOne {
 	return _u
 }
 
+// SetEnabled sets the "enabled" field.
+func (_u *TaskUpdateOne) SetEnabled(v bool) *TaskUpdateOne {
+	_u.mutation.SetEnabled(v)
+	return _u
+}
+
+// SetNillableEnabled sets the "enabled" field if the given value is not nil.
+func (_u *TaskUpdateOne) SetNillableEnabled(v *bool) *TaskUpdateOne {
+	if v != nil {
+		_u.SetEnabled(*v)
+	}
+	return _u
+}
+
 // SetOptions sets the "options" field.
 func (_u *TaskUpdateOne) SetOptions(v *model.TaskSyncOptions) *TaskUpdateOne {
 	_u.mutation.SetOptions(v)
@@ -743,6 +774,9 @@ func (_u *TaskUpdateOne) sqlSave(ctx context.Context) (_node *Task, err error) {
 	}
 	if value, ok := _u.mutation.Realtime(); ok {
 		_spec.SetField(task.FieldRealtime, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.Enabled(); ok {
+		_spec.SetField(task.FieldEnabled, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.Options(); ok {
 		_spec.SetField(task.FieldOptions, field.TypeJSON, value)

@@ -81,6 +81,7 @@ func TestWatcher_Debounce(t *testing.T) {
 		ID:         uuid.New(),
 		Name:       "Realtime Task",
 		Realtime:   true,
+		Enabled:    true,
 		SourcePath: tempDir,
 	}
 
@@ -109,6 +110,38 @@ func TestWatcher_Debounce(t *testing.T) {
 	mockRunner.AssertExpectations(t)
 }
 
+func TestWatcher_SkipsDisabledTask(t *testing.T) {
+	setupTest(t)
+	mockTaskSvc := new(MockTaskQuery)
+	mockRunner := new(MockRunner)
+
+	tempDir := t.TempDir()
+
+	task := &ent.Task{
+		ID:         uuid.New(),
+		Name:       "Realtime Task",
+		Realtime:   true,
+		Enabled:    false,
+		SourcePath: tempDir,
+	}
+
+	mockTaskSvc.On("GetTaskWithConnection", mock.Anything, task.ID).Return(task, nil)
+
+	w, err := NewWatcher(mockTaskSvc, mockRunner)
+	assert.NoError(t, err)
+
+	w.mu.Lock()
+	w.watchMap[task.ID.String()] = task.SourcePath
+	w.mu.Unlock()
+
+	w.handleEvent(fsnotify.Event{Name: filepath.Join(tempDir, "file.txt"), Op: fsnotify.Write})
+
+	time.Sleep(2500 * time.Millisecond)
+
+	mockRunner.AssertNotCalled(t, "StartTask", mock.Anything, mock.Anything)
+	mockTaskSvc.AssertExpectations(t)
+}
+
 func TestWatcher_PathFiltering(t *testing.T) {
 	setupTest(t)
 	mockTaskSvc := new(MockTaskQuery)
@@ -121,6 +154,7 @@ func TestWatcher_PathFiltering(t *testing.T) {
 		ID:         uuid.New(),
 		Name:       "Realtime Task",
 		Realtime:   true,
+		Enabled:    true,
 		SourcePath: tempDir,
 	}
 
@@ -212,6 +246,7 @@ func TestWatcher_RemoveTask(t *testing.T) {
 		ID:         uuid.New(),
 		Name:       "Task1",
 		Realtime:   true,
+		Enabled:    true,
 		SourcePath: "/tmp/test",
 	}
 
@@ -242,6 +277,7 @@ func TestWatcher_Start_LoadWatchTasks(t *testing.T) {
 		ID:         uuid.New(),
 		Name:       "Realtime Task",
 		Realtime:   true,
+		Enabled:    true,
 		SourcePath: "/tmp/task1",
 	}
 	task2 := &ent.Task{

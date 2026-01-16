@@ -36,6 +36,7 @@ func entTaskToModel(t *ent.Task) *model.Task {
 		Direction:    t.Direction,
 		Schedule:     schedule,
 		Realtime:     t.Realtime,
+		Enabled:      t.Enabled,
 		CreatedAt:    t.CreatedAt,
 		UpdatedAt:    t.UpdatedAt,
 		ConnectionID: t.ConnectionID, // FK for dataloader optimization

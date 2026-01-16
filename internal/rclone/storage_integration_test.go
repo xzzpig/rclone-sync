@@ -248,6 +248,7 @@ func TestSyncEngine_WithDBStorage_Integration(t *testing.T) {
 		string(model.SyncDirectionBidirectional),
 		"",
 		false,
+		true,
 		nil,
 	)
 	require.NoError(t, err)

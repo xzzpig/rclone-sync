@@ -98,6 +98,20 @@ func (_c *TaskCreate) SetNillableRealtime(v *bool) *TaskCreate {
 	return _c
 }
 
+// SetEnabled sets the "enabled" field.
+func (_c *TaskCreate) SetEnabled(v bool) *TaskCreate {
+	_c.mutation.SetEnabled(v)
+	return _c
+}
+
+// SetNillableEnabled sets the "enabled" field if the given value is not nil.
+func (_c *TaskCreate) SetNillableEnabled(v *bool) *TaskCreate {
+	if v != nil {
+		_c.SetEnabled(*v)
+	}
+	return _c
+}
+
 // SetOptions sets the "options" field.
 func (_c *TaskCreate) SetOptions(v *model.TaskSyncOptions) *TaskCreate {
 	_c.mutation.SetOptions(v)
@@ -209,6 +223,10 @@ func (_c *TaskCreate) defaults() {
 		v := task.DefaultRealtime
 		_c.mutation.SetRealtime(v)
 	}
+	if _, ok := _c.mutation.Enabled(); !ok {
+		v := task.DefaultEnabled
+		_c.mutation.SetEnabled(v)
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := task.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
@@ -259,6 +277,9 @@ func (_c *TaskCreate) check() error {
 	}
 	if _, ok := _c.mutation.Realtime(); !ok {
 		return &ValidationError{Name: "realtime", err: errors.New(`ent: missing required field "Task.realtime"`)}
+	}
+	if _, ok := _c.mutation.Enabled(); !ok {
+		return &ValidationError{Name: "enabled", err: errors.New(`ent: missing required field "Task.enabled"`)}
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "Task.created_at"`)}
@@ -324,6 +345,10 @@ func (_c *TaskCreate) createSpec() (*Task, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Realtime(); ok {
 		_spec.SetField(task.FieldRealtime, field.TypeBool, value)
 		_node.Realtime = value
+	}
+	if value, ok := _c.mutation.Enabled(); ok {
+		_spec.SetField(task.FieldEnabled, field.TypeBool, value)
+		_node.Enabled = value
 	}
 	if value, ok := _c.mutation.Options(); ok {
 		_spec.SetField(task.FieldOptions, field.TypeJSON, value)

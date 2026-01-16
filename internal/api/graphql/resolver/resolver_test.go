@@ -210,6 +210,7 @@ func (e *TestEnv) CreateTestTask(t *testing.T, name string, connectionID uuid.UU
 		"UPLOAD",
 		"",
 		false,
+		true,
 		nil,
 	)
 	require.NoError(t, err)

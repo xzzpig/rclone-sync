@@ -45,7 +45,7 @@ func withLatestJobPredicate(q *ent.JobQuery) {
 }
 
 // CreateTask creates a new sync task with the given parameters.
-func (s *TaskQuery) CreateTask(ctx context.Context, name, sourcePath string, connectionID uuid.UUID, remotePath, direction, schedule string, realtime bool, options *model.TaskSyncOptions) (*ent.Task, error) {
+func (s *TaskQuery) CreateTask(ctx context.Context, name, sourcePath string, connectionID uuid.UUID, remotePath, direction, schedule string, realtime, enabled bool, options *model.TaskSyncOptions) (*ent.Task, error) {
 	t, err := s.client.Task.Create().
 		SetName(name).
 		SetSourcePath(sourcePath).
@@ -54,6 +54,7 @@ func (s *TaskQuery) CreateTask(ctx context.Context, name, sourcePath string, con
 		SetDirection(model.SyncDirection(direction)).
 		SetSchedule(schedule).
 		SetRealtime(realtime).
+		SetEnabled(enabled).
 		SetOptions(options).
 		Save(ctx)
 	if err != nil {
@@ -136,7 +137,7 @@ func (s *TaskQuery) GetTaskWithJobs(ctx context.Context, id uuid.UUID) (*ent.Tas
 }
 
 // UpdateTask updates an existing task with the given parameters.
-func (s *TaskQuery) UpdateTask(ctx context.Context, id uuid.UUID, name, sourcePath string, connectionID uuid.UUID, remotePath, direction, schedule string, realtime bool, options *model.TaskSyncOptions) (*ent.Task, error) {
+func (s *TaskQuery) UpdateTask(ctx context.Context, id uuid.UUID, name, sourcePath string, connectionID uuid.UUID, remotePath, direction, schedule string, realtime, enabled bool, options *model.TaskSyncOptions) (*ent.Task, error) {
 	t, err := s.client.Task.UpdateOneID(id).
 		SetName(name).
 		SetSourcePath(sourcePath).
@@ -145,6 +146,7 @@ func (s *TaskQuery) UpdateTask(ctx context.Context, id uuid.UUID, name, sourcePa
 		SetDirection(model.SyncDirection(direction)).
 		SetSchedule(schedule).
 		SetRealtime(realtime).
+		SetEnabled(enabled).
 		SetOptions(options).
 		Save(ctx)
 	if err != nil {

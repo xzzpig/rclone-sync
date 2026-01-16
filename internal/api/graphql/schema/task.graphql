@@ -107,6 +107,10 @@ type Task @goExtraField(name: "ConnectionID", type: "github.com/google/uuid.UUID
 	"""
 	realtime: Boolean!
 	"""
+	任务是否启用
+	"""
+	enabled: Boolean!
+	"""
 	同步选项（JSON → 类型转换）
 	"""
 	options: TaskSyncOptions @goField(forceResolver: true)
@@ -209,6 +213,10 @@ input CreateTaskInput {
 	"""
 	realtime: Boolean = false
 	"""
+	任务是否启用
+	"""
+	enabled: Boolean = true
+	"""
 	同步选项
 	"""
 	options: TaskSyncOptionsInput
@@ -246,6 +254,10 @@ input UpdateTaskInput {
 	是否启用实时同步
 	"""
 	realtime: Boolean
+	"""
+	任务是否启用
+	"""
+	enabled: Boolean
 	"""
 	同步选项
 	"""

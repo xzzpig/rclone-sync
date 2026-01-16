@@ -87,6 +87,20 @@ enum LogAction {
 	UNKNOWN
 }
 
+"""
+传输方向
+"""
+enum TransferDirection {
+	"""
+	上传（本地 -> 远程）
+	"""
+	UPLOAD
+	"""
+	下载（远程 -> 本地）
+	"""
+	DOWNLOAD
+}
+
 # =============================================================================
 # TYPES
 # =============================================================================
@@ -268,6 +282,10 @@ type JobProgressEvent {
 	"""
 	errorCount: Int!
 	"""
+	已检查的文件数
+	"""
+	filesChecked: Int!
+	"""
 	开始时间
 	"""
 	startTime: DateTime!
@@ -293,6 +311,10 @@ type TransferItem {
 	已传输字节数
 	"""
 	bytes: BigInt!
+	"""
+	传输方向
+	"""
+	direction: TransferDirection!
 }
 
 """

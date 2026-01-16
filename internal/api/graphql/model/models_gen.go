@@ -211,6 +211,8 @@ type CreateTaskInput struct {
 	Schedule *string `json:"schedule,omitempty"`
 	// 是否启用实时同步
 	Realtime *bool `json:"realtime,omitempty"`
+	// 任务是否启用
+	Enabled *bool `json:"enabled,omitempty"`
 	// 同步选项
 	Options *TaskSyncOptionsInput `json:"options,omitempty"`
 }
@@ -385,6 +387,8 @@ type JobProgressEvent struct {
 	FilesDeleted int `json:"filesDeleted"`
 	// 错误数量
 	ErrorCount int `json:"errorCount"`
+	// 已检查的文件数
+	FilesChecked int `json:"filesChecked"`
 	// 开始时间
 	StartTime time.Time `json:"startTime"`
 	// 结束时间
@@ -514,6 +518,8 @@ type Task struct {
 	Schedule *string `json:"schedule,omitempty"`
 	// 是否启用实时同步
 	Realtime bool `json:"realtime"`
+	// 任务是否启用
+	Enabled bool `json:"enabled"`
 	// 同步选项（JSON → 类型转换）
 	Options *TaskSyncOptions `json:"options,omitempty"`
 	// 创建时间
@@ -603,6 +609,8 @@ type TransferItem struct {
 	Size int64 `json:"size"`
 	// 已传输字节数
 	Bytes int64 `json:"bytes"`
+	// 传输方向
+	Direction TransferDirection `json:"direction"`
 }
 
 // 传输进度事件 - 当前正在传输的文件列表
@@ -644,6 +652,8 @@ type UpdateTaskInput struct {
 	Schedule *string `json:"schedule,omitempty"`
 	// 是否启用实时同步
 	Realtime *bool `json:"realtime,omitempty"`
+	// 任务是否启用
+	Enabled *bool `json:"enabled,omitempty"`
 	// 同步选项
 	Options *TaskSyncOptionsInput `json:"options,omitempty"`
 }
@@ -1085,6 +1095,64 @@ func (e *SyncDirection) UnmarshalJSON(b []byte) error {
 }
 
 func (e SyncDirection) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+// 传输方向
+type TransferDirection string
+
+const (
+	// 上传（本地 -> 远程）
+	TransferDirectionUpload TransferDirection = "UPLOAD"
+	// 下载（远程 -> 本地）
+	TransferDirectionDownload TransferDirection = "DOWNLOAD"
+)
+
+var AllTransferDirection = []TransferDirection{
+	TransferDirectionUpload,
+	TransferDirectionDownload,
+}
+
+func (e TransferDirection) IsValid() bool {
+	switch e {
+	case TransferDirectionUpload, TransferDirectionDownload:
+		return true
+	}
+	return false
+}
+
+func (e TransferDirection) String() string {
+	return string(e)
+}
+
+func (e *TransferDirection) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = TransferDirection(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid TransferDirection", str)
+	}
+	return nil
+}
+
+func (e TransferDirection) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *TransferDirection) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e TransferDirection) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	e.MarshalGQL(&buf)
 	return buf.Bytes(), nil

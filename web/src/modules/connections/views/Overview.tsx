@@ -1,4 +1,7 @@
-import { ConnectionGetQuotaQuery } from '@/api/graphql/queries/connections';
+import {
+  ConnectionGetQuotaQuery,
+  ConnectionGetCacheStatusQuery,
+} from '@/api/graphql/queries/connections';
 import ActiveTransfersCard from '@/modules/connections/components/ActiveTransfersCard';
 import RunningJobsCard from '@/modules/connections/components/RunningJobsCard';
 import { CacheStatusCard } from '@/modules/connections/components/CacheStatusCard';
@@ -35,8 +38,18 @@ const Overview: Component = () => {
     pause: () => !connectionId(),
   });
 
+  // Fetch cache status separately to avoid blocking on quota
+  const [cacheStatusResult] = createQuery({
+    query: ConnectionGetCacheStatusQuery,
+    variables: () => ({ id: connectionId()! }),
+    pause: () => !connectionId(),
+  });
+
   // Extract quota from GraphQL response
   const quota = () => connectionResult.data?.connection?.get?.quota;
+
+  // Extract cache status from GraphQL response
+  const initialCacheStatus = () => cacheStatusResult.data?.connection?.get?.cacheStatus;
 
   // Use createMemo to ensure proper reactive tracking when connection changes
   const status = createMemo(() => actions.getTaskStatus(connectionId()));
@@ -188,9 +201,9 @@ const Overview: Component = () => {
           </CardContent>
         </Card>
 
-        <Show when={connectionResult.data?.connection?.get?.cacheStatus}>
+        <Show when={initialCacheStatus()}>
           <CacheStatusCard
-            status={realtimeCacheStatus() ?? connectionResult.data?.connection?.get?.cacheStatus}
+            status={realtimeCacheStatus() ?? initialCacheStatus()!}
             connectionId={connectionId()}
             class="col-span-1 md:col-span-2 lg:col-span-4"
           />

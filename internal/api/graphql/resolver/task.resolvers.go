@@ -123,6 +123,12 @@ func (r *taskMutationResolver) Create(ctx context.Context, obj *model.TaskMutati
 		realtime = *input.Realtime
 	}
 
+	// Default enabled to true if not provided
+	enabled := true
+	if input.Enabled != nil {
+		enabled = *input.Enabled
+	}
+
 	// Create task
 	entTask, err := r.deps.TaskQuery.CreateTask(
 		ctx,
@@ -133,6 +139,7 @@ func (r *taskMutationResolver) Create(ctx context.Context, obj *model.TaskMutati
 		string(input.Direction),
 		schedule,
 		realtime,
+		enabled,
 		options,
 	)
 	if err != nil {
@@ -202,6 +209,11 @@ func (r *taskMutationResolver) Update(ctx context.Context, obj *model.TaskMutati
 		realtime = *input.Realtime
 	}
 
+	enabled := existingTask.Enabled
+	if input.Enabled != nil {
+		enabled = *input.Enabled
+	}
+
 	// Use complete options from input (not merge) - caller should pass full options
 	options := buildOptions(input.Options)
 
@@ -216,6 +228,7 @@ func (r *taskMutationResolver) Update(ctx context.Context, obj *model.TaskMutati
 		direction,
 		schedule,
 		realtime,
+		enabled,
 		options,
 	)
 	if err != nil {
@@ -224,16 +237,16 @@ func (r *taskMutationResolver) Update(ctx context.Context, obj *model.TaskMutati
 
 	// Handle watcher updates based on realtime status changes
 	if r.deps.Watcher != nil {
-		if existingTask.Realtime != realtime {
-			if realtime {
-				// Realtime was enabled, add to watcher
+		enabledChanged := existingTask.Enabled != enabled
+		realtimeChanged := existingTask.Realtime != realtime
+
+		if enabledChanged || realtimeChanged {
+			if realtime && enabled {
 				_ = r.deps.Watcher.AddTask(updatedTask)
 			} else {
-				// Realtime was disabled, remove from watcher
 				_ = r.deps.Watcher.RemoveTask(updatedTask)
 			}
-		} else if realtime && existingTask.SourcePath != updatedTask.SourcePath {
-			// Realtime is still enabled but source path changed, update watcher
+		} else if realtime && enabled && existingTask.SourcePath != updatedTask.SourcePath {
 			_ = r.deps.Watcher.RemoveTask(existingTask)
 			_ = r.deps.Watcher.AddTask(updatedTask)
 		}
@@ -241,12 +254,13 @@ func (r *taskMutationResolver) Update(ctx context.Context, obj *model.TaskMutati
 
 	// Handle scheduler updates based on schedule changes
 	if r.deps.Scheduler != nil {
-		if existingTask.Schedule != schedule {
-			if schedule != "" {
-				// Schedule was added/updated
+		enabledChanged := existingTask.Enabled != enabled
+		scheduleChanged := existingTask.Schedule != schedule
+
+		if enabledChanged || scheduleChanged {
+			if schedule != "" && enabled {
 				_ = r.deps.Scheduler.AddTask(updatedTask)
 			} else {
-				// Schedule was removed
 				_ = r.deps.Scheduler.RemoveTask(updatedTask)
 			}
 		}

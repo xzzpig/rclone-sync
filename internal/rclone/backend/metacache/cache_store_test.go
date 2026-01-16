@@ -462,6 +462,34 @@ func TestCacheStore_GetDBSize(t *testing.T) {
 	assert.Greater(t, size, int64(0))
 }
 
+func TestCacheStore_GetDBSize_IncludesWALAndSHM(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+
+	store, err := NewCacheStore(dbPath)
+	require.NoError(t, err)
+	defer store.Close()
+
+	mainInfo, err := os.Stat(dbPath)
+	require.NoError(t, err)
+	mainSize := mainInfo.Size()
+
+	walPath := dbPath + "-wal"
+	shmPath := dbPath + "-shm"
+
+	var expectedTotal int64 = mainSize
+	if walInfo, err := os.Stat(walPath); err == nil {
+		expectedTotal += walInfo.Size()
+	}
+	if shmInfo, err := os.Stat(shmPath); err == nil {
+		expectedTotal += shmInfo.Size()
+	}
+
+	actualSize, err := store.GetDBSize()
+	require.NoError(t, err)
+	assert.Equal(t, expectedTotal, actualSize)
+}
+
 func TestCacheStore_SetDirLoaded(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test.db")

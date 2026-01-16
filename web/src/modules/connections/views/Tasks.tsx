@@ -34,6 +34,8 @@ import IconLayers from '~icons/lucide/layers';
 import IconPlay from '~icons/lucide/play';
 import IconSearch from '~icons/lucide/search';
 import IconShieldCheck from '~icons/lucide/shield-check';
+import IconToggleLeft from '~icons/lucide/toggle-left';
+import IconToggleRight from '~icons/lucide/toggle-right';
 import IconTrash2 from '~icons/lucide/trash-2';
 import { CreateTaskWizard } from '../components/CreateTaskWizard';
 import { EditTaskDialog } from '../components/EditTaskDialog';
@@ -141,6 +143,10 @@ function Tasks() {
     await actions.updateTask(id, updates);
   };
 
+  const handleToggleEnabled = async (task: TaskListItem) => {
+    await actions.updateTask(task.id, { enabled: !task.enabled });
+  };
+
   const handleCreateTask = async (input: CreateTaskInput) => {
     await actions.createTask(input);
   };
@@ -216,7 +222,10 @@ function Tasks() {
                 <For each={filteredTasks()}>
                   {(task) => {
                     const latestJob = () => task.latestJob;
-                    const status = (): StatusType => latestJob()?.status ?? 'IDLE';
+                    const status = (): StatusType => {
+                      if (!task.enabled) return 'DISABLED';
+                      return latestJob()?.status ?? 'IDLE';
+                    };
                     const lastRun = () => {
                       const job = latestJob();
                       return job?.endTime ?? job?.startTime;
@@ -240,7 +249,10 @@ function Tasks() {
                               <div class="min-w-0 flex-1">
                                 <div class="flex flex-col md:flex-row md:items-baseline md:gap-4">
                                   <h3
-                                    class="truncate text-base font-bold tracking-tight md:max-w-[300px]"
+                                    class={cn(
+                                      'truncate text-base font-bold tracking-tight md:max-w-[300px]',
+                                      !task.enabled && 'text-muted-foreground'
+                                    )}
                                     title={task.name}
                                   >
                                     {task.name}
@@ -382,6 +394,36 @@ function Tasks() {
                                   <IconEdit class="size-3.5" />
                                 </TooltipTrigger>
                                 <TooltipContent>{m.common_edit()}</TooltipContent>
+                              </Tooltip>
+
+                              <Tooltip>
+                                <TooltipTrigger
+                                  as={Button}
+                                  size="icon"
+                                  variant="ghost"
+                                  aria-label={task.enabled ? m.task_disable() : m.task_enable()}
+                                  aria-pressed={task.enabled}
+                                  onClick={(e: MouseEvent) => {
+                                    e.stopPropagation();
+                                    handleToggleEnabled(task);
+                                  }}
+                                  class={cn(
+                                    'size-7',
+                                    task.enabled
+                                      ? 'text-green-500 hover:bg-green-500/10 hover:text-green-600'
+                                      : 'text-muted-foreground hover:bg-muted-foreground/10'
+                                  )}
+                                >
+                                  <Show
+                                    when={task.enabled}
+                                    fallback={<IconToggleLeft class="size-3.5" />}
+                                  >
+                                    <IconToggleRight class="size-3.5" />
+                                  </Show>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {task.enabled ? m.task_disable() : m.task_enable()}
+                                </TooltipContent>
                               </Tooltip>
 
                               <div class="mx-1 h-3 w-px bg-border" />

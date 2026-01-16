@@ -13,6 +13,7 @@ export const JOB_PROGRESS_SUBSCRIPTION = graphql(`
       bytesTotal
       filesDeleted
       errorCount
+      filesChecked
       startTime
       endTime
     }
@@ -29,6 +30,7 @@ export const TRANSFER_PROGRESS_SUBSCRIPTION = graphql(`
         name
         size
         bytes
+        direction
       }
     }
   }

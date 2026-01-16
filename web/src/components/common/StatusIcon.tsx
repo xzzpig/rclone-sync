@@ -19,7 +19,8 @@ interface StatusIconProps {
 
 const StatusIcon: Component<StatusIconProps> = (props) => {
   // 如果 showIdle 为 false 且状态为 IDLE，则不显示任何内容
-  const shouldShow = () => props.showIdle !== false || props.status !== 'IDLE';
+  const shouldShow = () =>
+    props.showIdle !== false || (props.status !== 'IDLE' && props.status !== 'DISABLED');
 
   return (
     <Show when={shouldShow()}>
@@ -49,9 +50,14 @@ const StatusIcon: Component<StatusIconProps> = (props) => {
             <IconBan class={cn('h-5 w-5 text-gray-500', props.class)} />
           </HelpTooltip>
         </Match>
+        <Match when={props.status === 'DISABLED'}>
+          <HelpTooltip content={m.task_disabled()}>
+            <IconPauseCircle class={cn('h-5 w-5 text-muted-foreground', props.class)} />
+          </HelpTooltip>
+        </Match>
         <Match when={props.status === 'IDLE'}>
           <HelpTooltip content={m.status_idle()}>
-            <IconPauseCircle class={cn('h-5 w-5 text-gray-400', props.class)} />
+            <IconClock class={cn('h-5 w-5 text-gray-400', props.class)} />
           </HelpTooltip>
         </Match>
       </Switch>

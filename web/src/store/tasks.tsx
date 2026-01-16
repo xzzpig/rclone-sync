@@ -6,6 +6,7 @@ import {
   TaskUpdateMutation,
   TasksListQuery,
 } from '@/api/graphql/queries/tasks';
+import { showToast } from '@/components/ui/toast';
 import type {
   CreateTaskInput,
   JobProgressEvent,
@@ -45,6 +46,30 @@ export const TaskProvider: ParentComponent = (props) => {
   const [state, setState] = createStore<TaskState>(initialState);
   const jobProgress = useJobProgress();
 
+  // Helper to check if status is terminal
+  const isTerminalStatus = (status?: string) =>
+    status === 'SUCCESS' || status === 'FAILED' || status === 'CANCELLED';
+
+  // Helper to show job completion toast
+  const showJobCompletionToast = (taskName: string, status: string, errorCount: number) => {
+    if (status === 'SUCCESS') {
+      showToast({
+        title: m.toast_jobSuccess({ taskName }),
+        variant: 'success',
+      });
+    } else if (status === 'FAILED') {
+      showToast({
+        title: m.toast_jobFailed({ taskName, errorCount }),
+        variant: 'error',
+      });
+    } else if (status === 'CANCELLED') {
+      showToast({
+        title: m.toast_jobCancelled({ taskName }),
+        variant: 'warning',
+      });
+    }
+  };
+
   // Handle job progress events from centralized subscription
   const handleJobProgress = (data: JobProgressEvent) => {
     setState(
@@ -52,6 +77,8 @@ export const TaskProvider: ParentComponent = (props) => {
         const taskIndex = s.tasks.findIndex((t) => t.id === data.taskId);
         if (taskIndex !== -1) {
           const task = s.tasks[taskIndex];
+          const prevStatus = task.latestJob?.status;
+
           // Update the task's latest job with subscription data
           task.latestJob = {
             id: data.jobId,
@@ -62,6 +89,15 @@ export const TaskProvider: ParentComponent = (props) => {
             bytesTransferred: data.bytesTransferred,
           };
           console.info('Updated task from GraphQL subscription:', task.id);
+
+          // Show toast when job transitions to terminal status
+          if (
+            isTerminalStatus(data.status) &&
+            !isTerminalStatus(prevStatus) &&
+            (prevStatus === 'RUNNING' || prevStatus === 'PENDING')
+          ) {
+            showJobCompletionToast(task.name, data.status, data.errorCount);
+          }
         }
       })
     );

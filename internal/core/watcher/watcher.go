@@ -105,7 +105,7 @@ func (w *Watcher) loadWatchTasks() {
 	}
 
 	for _, task := range tasks {
-		if task.Realtime {
+		if task.Realtime && task.Enabled {
 			if err := w.addWatch(task); err != nil {
 				w.logger.Error("Failed to add path to watcher on load",
 					zap.String("task_id", task.ID.String()),
@@ -120,7 +120,7 @@ func (w *Watcher) loadWatchTasks() {
 
 // AddTask adds a task to be watched for file system changes.
 func (w *Watcher) AddTask(task *ent.Task) error {
-	if !task.Realtime {
+	if !task.Realtime || !task.Enabled {
 		return nil
 	}
 	w.mu.Lock()
@@ -232,6 +232,11 @@ func (w *Watcher) triggerSync(taskID string) {
 		task, err := w.taskSvc.GetTaskWithConnection(ctx, id)
 		if err != nil {
 			w.logger.Error("Failed to get task for sync", zap.String("task_id", taskID), zap.Error(err))
+			return
+		}
+
+		if !task.Enabled {
+			w.logger.Debug("Skipping disabled task", zap.String("task_id", taskID), zap.String("task_name", task.Name))
 			return
 		}
 

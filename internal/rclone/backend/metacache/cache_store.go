@@ -456,13 +456,23 @@ func (s *CacheStore) GetEntriesCount() (int64, error) {
 	return count, err
 }
 
-// GetDBSize returns the size of the cache database file in bytes.
+// GetDBSize returns the total size of the cache database files in bytes,
+// including .db, .db-wal, and .db-shm files (WAL mode).
 func (s *CacheStore) GetDBSize() (int64, error) {
 	info, err := os.Stat(s.dbPath)
 	if err != nil {
 		return 0, err
 	}
-	return info.Size(), nil
+	totalSize := info.Size()
+
+	if walInfo, err := os.Stat(s.dbPath + "-wal"); err == nil {
+		totalSize += walInfo.Size()
+	}
+	if shmInfo, err := os.Stat(s.dbPath + "-shm"); err == nil {
+		totalSize += shmInfo.Size()
+	}
+
+	return totalSize, nil
 }
 
 // GetLastNotifyTime returns the last time a ChangeNotify notification was received.

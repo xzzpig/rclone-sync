@@ -82,6 +82,19 @@ export const ConnectionGetQuotaQuery = graphql(`
           other
           objects
         }
+      }
+    }
+  }
+`);
+
+/**
+ * Query to get connection cache status
+ */
+export const ConnectionGetCacheStatusQuery = graphql(`
+  query ConnectionGetCacheStatus($id: ID!) {
+    connection {
+      get(id: $id) {
+        id
         cacheStatus {
           running
           changeNotifySupported

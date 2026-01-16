@@ -75,6 +75,7 @@ func TestTaskLoader_Load_ExistingTask(t *testing.T) {
 		"UPLOAD",
 		"",
 		false,
+		true,
 		nil,
 	)
 	require.NoError(t, err)
@@ -116,13 +117,13 @@ func TestTaskLoader_LoadAll_MultipleTasks(t *testing.T) {
 	connID := createTestConnectionForTask(t, connectionQuery)
 
 	// Create multiple test tasks
-	task1, err := taskQuery.CreateTask(ctx, "task-1", "/source1", connID, "/remote1", "UPLOAD", "", false, nil)
+	task1, err := taskQuery.CreateTask(ctx, "task-1", "/source1", connID, "/remote1", "UPLOAD", "", false, true, nil)
 	require.NoError(t, err)
 
-	task2, err := taskQuery.CreateTask(ctx, "task-2", "/source2", connID, "/remote2", "DOWNLOAD", "", false, nil)
+	task2, err := taskQuery.CreateTask(ctx, "task-2", "/source2", connID, "/remote2", "DOWNLOAD", "", false, true, nil)
 	require.NoError(t, err)
 
-	task3, err := taskQuery.CreateTask(ctx, "task-3", "/source3", connID, "/remote3", "BIDIRECTIONAL", "", false, nil)
+	task3, err := taskQuery.CreateTask(ctx, "task-3", "/source3", connID, "/remote3", "BIDIRECTIONAL", "", false, true, nil)
 	require.NoError(t, err)
 
 	// Create loader
@@ -154,7 +155,7 @@ func TestTaskLoader_LoadAll_MixedExistingAndNonExistent(t *testing.T) {
 	connID := createTestConnectionForTask(t, connectionQuery)
 
 	// Create one test task
-	task1, err := taskQuery.CreateTask(ctx, "task-1", "/source1", connID, "/remote1", "UPLOAD", "", false, nil)
+	task1, err := taskQuery.CreateTask(ctx, "task-1", "/source1", connID, "/remote1", "UPLOAD", "", false, true, nil)
 	require.NoError(t, err)
 
 	nonExistentID := uuid.New()
@@ -196,6 +197,7 @@ func TestTaskLoader_LoadAll_PreservesOrder(t *testing.T) {
 			"UPLOAD",
 			"",
 			false,
+			true,
 			nil,
 		)
 		require.NoError(t, err)
@@ -249,7 +251,7 @@ func TestTaskLoader_LoadAll_DuplicateIDs(t *testing.T) {
 	connID := createTestConnectionForTask(t, connectionQuery)
 
 	// Create a test task
-	task, err := taskQuery.CreateTask(ctx, "test-task", "/source", connID, "/remote", "UPLOAD", "", false, nil)
+	task, err := taskQuery.CreateTask(ctx, "test-task", "/source", connID, "/remote", "UPLOAD", "", false, true, nil)
 	require.NoError(t, err)
 
 	// Create loader
@@ -287,6 +289,7 @@ func TestTaskLoader_Load_TaskWithSchedule(t *testing.T) {
 		"UPLOAD",
 		"0 * * * *", // Every hour
 		false,
+		true,
 		nil,
 	)
 	require.NoError(t, err)
@@ -318,6 +321,7 @@ func TestTaskLoader_Load_TaskWithRealtime(t *testing.T) {
 		"UPLOAD",
 		"",
 		true, // realtime enabled
+		true,
 		nil,
 	)
 	require.NoError(t, err)

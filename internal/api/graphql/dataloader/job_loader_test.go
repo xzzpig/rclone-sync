@@ -69,6 +69,7 @@ func createTestTask(t *testing.T, taskQuery *query.TaskQuery, connectionQuery *q
 		"UPLOAD",
 		"",
 		false,
+		true,
 		nil,
 	)
 	require.NoError(t, err)

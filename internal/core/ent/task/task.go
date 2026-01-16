@@ -31,6 +31,8 @@ const (
 	FieldSchedule = "schedule"
 	// FieldRealtime holds the string denoting the realtime field in the database.
 	FieldRealtime = "realtime"
+	// FieldEnabled holds the string denoting the enabled field in the database.
+	FieldEnabled = "enabled"
 	// FieldOptions holds the string denoting the options field in the database.
 	FieldOptions = "options"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -69,6 +71,7 @@ var Columns = []string{
 	FieldDirection,
 	FieldSchedule,
 	FieldRealtime,
+	FieldEnabled,
 	FieldOptions,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -93,6 +96,8 @@ var (
 	RemotePathValidator func(string) error
 	// DefaultRealtime holds the default value on creation for the "realtime" field.
 	DefaultRealtime bool
+	// DefaultEnabled holds the default value on creation for the "enabled" field.
+	DefaultEnabled bool
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -156,6 +161,11 @@ func BySchedule(opts ...sql.OrderTermOption) OrderOption {
 // ByRealtime orders the results by the realtime field.
 func ByRealtime(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRealtime, opts...).ToFunc()
+}
+
+// ByEnabled orders the results by the enabled field.
+func ByEnabled(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldEnabled, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

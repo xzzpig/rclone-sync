@@ -7,6 +7,8 @@ import * as m from '@/paraglide/messages.js';
 import { createSubscription } from '@urql/solid';
 import { Accessor, Component, createEffect, createMemo, createSignal, For, Show } from 'solid-js';
 import IconLoader from '~icons/lucide/loader';
+import IconArrowUp from '~icons/lucide/arrow-up';
+import IconArrowDown from '~icons/lucide/arrow-down';
 
 interface ActiveTransfersCardProps {
   connectionId: Accessor<string | undefined>;
@@ -81,7 +83,15 @@ const ActiveTransfersCard: Component<ActiveTransfersCardProps> = (props) => {
                 return (
                   <div class="space-y-1">
                     <div class="flex items-center justify-between text-xs">
-                      <span class="truncate font-medium" title={transfer.name}>
+                      <span
+                        class="flex items-center gap-1 truncate font-medium"
+                        title={transfer.name}
+                      >
+                        {transfer.direction === 'UPLOAD' ? (
+                          <IconArrowUp class="size-3 shrink-0 text-muted-foreground" />
+                        ) : (
+                          <IconArrowDown class="size-3 shrink-0 text-muted-foreground" />
+                        )}
                         {transfer.name}
                       </span>
                       <span class="ml-2 shrink-0 text-muted-foreground">

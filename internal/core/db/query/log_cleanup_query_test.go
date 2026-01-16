@@ -39,7 +39,7 @@ func TestLogCleanupQuery(t *testing.T) {
 	}, nil)
 	require.NoError(t, err)
 
-	task, err := taskQuery.CreateTask(ctx, "Cleanup Test Task "+uuid.NewString(), "/l", testConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
+	task, err := taskQuery.CreateTask(ctx, "Cleanup Test Task "+uuid.NewString(), "/l", testConn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, true, nil)
 	require.NoError(t, err)
 
 	job, err := jobQuery.CreateJob(ctx, task.ID, model.JobTriggerManual)
@@ -77,7 +77,7 @@ func TestLogCleanupQuery(t *testing.T) {
 		}, nil)
 		require.NoError(t, err)
 
-		task2, err := taskQuery.CreateTask(ctx, "Cleanup Test Task 2 "+uuid.NewString(), "/l", conn2.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
+		task2, err := taskQuery.CreateTask(ctx, "Cleanup Test Task 2 "+uuid.NewString(), "/l", conn2.ID, "/r", string(model.SyncDirectionBidirectional), "", false, true, nil)
 		require.NoError(t, err)
 
 		job2, err := jobQuery.CreateJob(ctx, task2.ID, model.JobTriggerManual)
@@ -146,7 +146,7 @@ func TestLogCleanupQuery_Integration(t *testing.T) {
 		require.NoError(t, err)
 		connectionIDs = append(connectionIDs, conn.ID)
 
-		task, err := taskQuery.CreateTask(ctx, "Integration Task "+uuid.NewString(), "/l", conn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, nil)
+		task, err := taskQuery.CreateTask(ctx, "Integration Task "+uuid.NewString(), "/l", conn.ID, "/r", string(model.SyncDirectionBidirectional), "", false, true, nil)
 		require.NoError(t, err)
 
 		job, err := jobQuery.CreateJob(ctx, task.ID, model.JobTriggerManual)

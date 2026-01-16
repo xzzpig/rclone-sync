@@ -65,7 +65,7 @@ func TestScheduler_Start_LoadsScheduledTasks(t *testing.T) {
 	mockTaskSvc := new(MockTaskQuery)
 	mockRunner := new(MockRunner)
 
-	task1 := &ent.Task{ID: uuid.New(), Name: "Scheduled Task", Schedule: "* * * * * *"}
+	task1 := &ent.Task{ID: uuid.New(), Name: "Scheduled Task", Schedule: "* * * * * *", Enabled: true}
 	task2 := &ent.Task{ID: uuid.New(), Name: "Unscheduled Task", Schedule: ""}
 	tasks := []*ent.Task{task1, task2}
 
@@ -100,7 +100,7 @@ func TestScheduler_AddTask_And_RemoveTask(t *testing.T) {
 	mockTaskSvc := new(MockTaskQuery)
 	mockRunner := new(MockRunner)
 
-	task := &ent.Task{ID: uuid.New(), Name: "Dynamic Task", Schedule: "* * * * * *"}
+	task := &ent.Task{ID: uuid.New(), Name: "Dynamic Task", Schedule: "* * * * * *", Enabled: true}
 
 	// The scheduler calls ListAllTasks on Start, so we need to expect that.
 	mockTaskSvc.On("ListAllTasks", mock.Anything).Return([]*ent.Task{}, nil).Once()
@@ -138,6 +138,28 @@ func TestScheduler_AddTask_And_RemoveTask(t *testing.T) {
 	time.Sleep(1500 * time.Millisecond)
 
 	mockRunner.AssertNumberOfCalls(t, "StartTask", 1)
+	mockTaskSvc.AssertExpectations(t)
+}
+
+func TestScheduler_SkipsDisabledTask(t *testing.T) {
+	setupTest(t)
+	mockTaskSvc := new(MockTaskQuery)
+	mockRunner := new(MockRunner)
+
+	taskID := uuid.New()
+	enabledTask := &ent.Task{ID: taskID, Name: "Scheduled Task", Schedule: "* * * * * *", Enabled: true}
+	disabledTask := &ent.Task{ID: taskID, Name: "Scheduled Task", Schedule: "* * * * * *", Enabled: false}
+
+	mockTaskSvc.On("ListAllTasks", mock.Anything).Return([]*ent.Task{enabledTask}, nil)
+	mockTaskSvc.On("GetTaskWithConnection", mock.Anything, taskID).Return(disabledTask, nil)
+
+	s := scheduler.NewScheduler(mockTaskSvc, mockRunner, cron.WithSeconds())
+	s.Start()
+	defer s.Stop()
+
+	time.Sleep(1500 * time.Millisecond)
+
+	mockRunner.AssertNotCalled(t, "StartTask", mock.Anything, mock.Anything)
 	mockTaskSvc.AssertExpectations(t)
 }
 

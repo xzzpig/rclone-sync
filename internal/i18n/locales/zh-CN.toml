@@ -31,35 +31,14 @@ other = "连接未找到"
 [error_invalid_input]
 other = "输入无效"
 
-[error_invalid_schedule]
-other = "定时任务格式无效"
-
-[error_invalid_id_format]
-other = "ID 格式无效"
-
 [error_database_error]
 other = "数据库错误"
 
 [error_missing_parameter]
 other = "缺少必需参数"
 
-[error_invalid_request_body]
-other = "请求体无效"
-
 [error_path_not_exist]
 other = "路径不存在"
-
-[error_path_not_directory]
-other = "路径不是目录"
-
-[error_remote_not_found]
-other = "远程连接未找到"
-
-[error_job_not_active]
-other = "任务未激活"
-
-[error_job_not_found]
-other = "任务未找到"
 
 [error_provider_not_found]
 other = "提供商未找到"
@@ -70,26 +49,11 @@ other = "连接测试失败"
 [error_failed_to_list_remotes]
 other = "列出远程连接失败"
 
-[error_failed_to_create_remote]
-other = "创建远程连接失败"
-
-[error_failed_to_get_quota]
-other = "获取远程配额失败"
-
-[error_import_parse_failed]
-other = "解析 rclone.conf 内容失败"
-
-[error_import_empty_list]
-other = "没有可导入的连接"
-
 [error_connection_has_dependent_tasks]
 other = "无法删除包含依赖任务的连接"
 
 [error_filter_rule_invalid]
 other = "过滤器规则 #{{.Index}} \"{{.Rule}}\" 无效: {{.Reason}}"
-
-[error_transfers_out_of_range]
-other = "并行传输数量必须在 1-64 之间，当前值为 {{.Value}}"
 
 [error_invalid_info_age]
 other = "无效的 infoAge 格式: {{.Error}}"
@@ -101,9 +65,6 @@ other = "无效的 changeNotifyPoll 格式: {{.Error}}"
 other = "changeNotifyPoll 必须至少为 10 秒"
 
 # Status messages
-[status_syncing]
-other = "同步中"
-
 [status_syncing_files]
 other = "正在同步 {{.Count}} 个文件"
 
@@ -123,15 +84,7 @@ other = "已取消"
 [success_created]
 other = "创建成功"
 
-[success_updated]
-other = "更新成功"
-
-[success_deleted]
-other = "删除成功"
-
-[success_sync_started]
-other = "同步已开始"
-
+# Cache messages
 [cache_clear_success]
 other = "缓存清理成功"
 
@@ -143,3 +96,25 @@ other = "缓存清理失败: {{.Error}}"
 
 [cache_not_enabled]
 other = "此连接未启用缓存"
+
+# Hook 消息
+[error_hook_timeout]
+other = "Hook 执行超时（{{.Timeout}} 秒）"
+
+[error_hook_http_failed]
+other = "HTTP Hook 失败，状态码 {{.Status}}"
+
+[error_hook_command_failed]
+other = "命令 Hook 失败，退出码 {{.ExitCode}}"
+
+[error_hook_invalid_url]
+other = "HTTP Hook 的 URL 格式无效"
+
+[error_hook_invalid_template]
+other = "模板语法无效: {{.Error}}"
+
+[error_hook_cancelled]
+other = "Hook 请求取消"
+
+[error_hook_fatal]
+other = "Hook 致命错误"

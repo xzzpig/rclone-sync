@@ -43,10 +43,15 @@ type setupOptions struct {
 	dbName    string
 }
 
+func withDbName(name string) setupOption {
+	return func(o *setupOptions) {
+		o.dbName = name
+	}
+}
+
 func withSlowFs() setupOption {
 	return func(o *setupOptions) {
 		o.useSlowFs = true
-		o.dbName = "ent_cancel"
 	}
 }
 
@@ -65,7 +70,7 @@ func setupIntegrationTest(t *testing.T, opts ...setupOption) *testContext {
 	// Use in-memory sqlite for testing with db.InitDB
 	dsn := db.InMemoryDSN()
 	if options.dbName != "" {
-		dsn = "file:" + options.dbName + "?mode=memory&cache=shared&_fk=1"
+		dsn = db.FileDSN(options.dbName)
 	}
 	client, err := db.InitDB(db.InitDBOptions{
 		DSN:           dsn,
@@ -88,7 +93,7 @@ func setupIntegrationTest(t *testing.T, opts ...setupOption) *testContext {
 	storage.Install()
 
 	// Create SyncEngine and Runner
-	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0, nil)
 	r := runner.NewRunner(syncEngine)
 
 	cleanup := func() {
@@ -437,7 +442,7 @@ func TestRunner_Integration_TaskExecutionError(t *testing.T) {
 
 // TestRunner_Integration_ConcurrentStartStop tests thread safety of concurrent StartTask and StopTask calls.
 func TestRunner_Integration_ConcurrentStartStop(t *testing.T) {
-	tc := setupIntegrationTest(t)
+	tc := setupIntegrationTest(t, withDbName(filepath.Join(t.TempDir(), "test.db")))
 	defer tc.cleanup()
 
 	// Setup test task

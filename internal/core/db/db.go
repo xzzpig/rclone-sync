@@ -84,12 +84,12 @@ func CloseDB(client *ent.Client) {
 	}
 }
 
-// FileSDN constructs a SQLite DSN for a file-based database with common parameters.
+// FileDSN constructs a SQLite DSN for a file-based database with common parameters.
 // Note: cache=shared is intentionally not used because it introduces table-level locking
 // which causes SQLITE_LOCKED errors that cannot be resolved with busy_timeout.
 // Without shared cache, each connection has its own page cache, using more memory
 // but providing better concurrency with WAL mode.
-func FileSDN(path string) string {
+func FileDSN(path string) string {
 	return fmt.Sprintf("file:%s?_fk=1&_journal_mode=WAL&_busy_timeout=5000&_synchronous=NORMAL", path)
 }
 

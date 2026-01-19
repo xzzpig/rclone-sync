@@ -52,9 +52,12 @@ func RegisterAPIRoutes(router *gin.RouterGroup, deps RouterDeps) error {
 	// Initialize queries
 	taskQuery := query.NewTaskQuery(deps.Client)
 	connQuery := query.NewConnectionQuery(deps.Client, encryptor)
+	hookQuery := query.NewHookQuery(deps.Client)
 
 	// GraphQL endpoint
 	gqlDeps := &resolver.Dependencies{
+		Client:              deps.Client,
+		Config:              deps.Config,
 		SyncEngine:          deps.SyncEngine,
 		Runner:              deps.Runner,
 		JobQuery:            deps.JobQuery,
@@ -62,6 +65,7 @@ func RegisterAPIRoutes(router *gin.RouterGroup, deps RouterDeps) error {
 		Scheduler:           deps.Scheduler,
 		TaskQuery:           taskQuery,
 		ConnectionQuery:     connQuery,
+		HookQuery:           hookQuery,
 		Encryptor:           encryptor,
 		JobProgressBus:      deps.JobProgressBus,
 		TransferProgressBus: deps.TransferProgressBus,

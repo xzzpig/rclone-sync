@@ -37,6 +37,10 @@ type Config struct {
 		Sync struct {
 			Transfers int `mapstructure:"transfers"` // Default parallel transfers (1-64), default: 4
 		} `mapstructure:"sync"`
+		Hook struct {
+			Enabled        bool `mapstructure:"enabled"`
+			DefaultTimeout int  `mapstructure:"default_timeout"`
+		} `mapstructure:"hook"`
 	} `mapstructure:"app"`
 	Security struct {
 		EncryptionKey string `mapstructure:"encryption_key"`
@@ -134,6 +138,8 @@ func setDefaults() {
 	viper.SetDefault("app.job.max_logs_per_connection", 1000)
 	viper.SetDefault("app.job.cleanup_schedule", "0 * * * *")
 	viper.SetDefault("app.sync.transfers", 4)
+	viper.SetDefault("app.hook.enabled", true)
+	viper.SetDefault("app.hook.default_timeout", 30)
 }
 
 // registerConfigKeys 通过反射遍历结构体，为每个字段注册零值默认值

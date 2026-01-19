@@ -1,3 +1,5 @@
-h1:NiOjh4BYiDFG6SY4BmSovGe/xqSd1xwHIloloqCY2is=
+h1:ZiZfZu+PednFZ3okSYYyp8omI3OaLnAHIqGsv2khrVs=
 20251230152547_initial.up.sql h1:5rtqnNgjVkwZSnAosyfvsFnUHRqvSnJRmgw/y/s4hHM=
 20260109071216_add-connection-options.up.sql h1:CM9hQz/sFZ/uniGXWSUm1rAlGw3rfZHV4hg3UnnG62g=
+20260116020830_add-task-enabled.up.sql h1:T/bhUNH0TJLe/3svUsCC9Ne5A8mpZeQMycDO+3dQvcE=
+20260117170351_add_hooks_table.up.sql h1:WWwfUvApNA+fmj1nRJb8PfUJFCPFF7l6qul5aJqqYXM=

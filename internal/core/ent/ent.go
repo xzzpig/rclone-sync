@@ -16,6 +16,7 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/joblog"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/task"
+	"github.com/xzzpig/rclone-sync/internal/core/ent/taskhook"
 )
 
 // ent aliases to avoid import conflicts in user's code.
@@ -80,6 +81,7 @@ func checkColumn(t, c string) error {
 			job.Table:        job.ValidColumn,
 			joblog.Table:     joblog.ValidColumn,
 			task.Table:       task.ValidColumn,
+			taskhook.Table:   taskhook.ValidColumn,
 		})
 	})
 	return columnCheck(t, c)

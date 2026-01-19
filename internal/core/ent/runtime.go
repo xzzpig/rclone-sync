@@ -11,6 +11,7 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/joblog"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/task"
+	"github.com/xzzpig/rclone-sync/internal/core/ent/taskhook"
 )
 
 // The init function reads all schema descriptors with runtime code
@@ -109,4 +110,24 @@ func init() {
 	taskDescID := taskFields[0].Descriptor()
 	// task.DefaultID holds the default value on creation for the id field.
 	task.DefaultID = taskDescID.Default.(func() uuid.UUID)
+	taskhookFields := schema.TaskHook{}.Fields()
+	_ = taskhookFields
+	// taskhookDescEnabled is the schema descriptor for enabled field.
+	taskhookDescEnabled := taskhookFields[1].Descriptor()
+	// taskhook.DefaultEnabled holds the default value on creation for the enabled field.
+	taskhook.DefaultEnabled = taskhookDescEnabled.Default.(bool)
+	// taskhookDescCreatedAt is the schema descriptor for created_at field.
+	taskhookDescCreatedAt := taskhookFields[9].Descriptor()
+	// taskhook.DefaultCreatedAt holds the default value on creation for the created_at field.
+	taskhook.DefaultCreatedAt = taskhookDescCreatedAt.Default.(func() time.Time)
+	// taskhookDescUpdatedAt is the schema descriptor for updated_at field.
+	taskhookDescUpdatedAt := taskhookFields[10].Descriptor()
+	// taskhook.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	taskhook.DefaultUpdatedAt = taskhookDescUpdatedAt.Default.(func() time.Time)
+	// taskhook.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	taskhook.UpdateDefaultUpdatedAt = taskhookDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// taskhookDescID is the schema descriptor for id field.
+	taskhookDescID := taskhookFields[0].Descriptor()
+	// taskhook.DefaultID holds the default value on creation for the id field.
+	taskhook.DefaultID = taskhookDescID.Default.(func() uuid.UUID)
 }

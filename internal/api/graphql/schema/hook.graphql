@@ -1,0 +1,381 @@
+# GraphQL Schema: Hook 相关类型定义
+
+# =============================================================================
+# ENUMS
+# =============================================================================
+
+"""
+Hook 触发事件类型
+"""
+enum HookEvent {
+	"""
+	任务开始执行前
+	"""
+	ON_START
+	"""
+	任务成功完成后
+	"""
+	ON_SUCCESS
+	"""
+	任务失败后
+	"""
+	ON_FAILURE
+	"""
+	任务结束后（无论成功或失败，最后触发）
+	"""
+	ON_END
+}
+
+"""
+Hook 类型
+"""
+enum HookType {
+	"""
+	HTTP 请求
+	"""
+	HTTP
+	"""
+	Shell 命令
+	"""
+	COMMAND
+}
+
+"""
+Hook 错误处理行为
+"""
+enum HookOnError {
+	"""
+	忽略错误，继续执行后续 hooks
+	"""
+	IGNORE
+	"""
+	停止任务，Job 标记为 CANCELLED，仅触发 on_end hook
+	"""
+	CANCEL
+	"""
+	停止任务，Job 标记为 FAILED，依次触发 on_failure 和 on_end hook
+	"""
+	FATAL
+}
+
+# =============================================================================
+# TYPES
+# =============================================================================
+
+"""
+Hook 配置
+"""
+type Hook @goExtraField(name: "TaskID", type: "*github.com/google/uuid.UUID") @goExtraField(name: "ConnectionID", type: "*github.com/google/uuid.UUID") {
+	"""
+	UUID 主键
+	"""
+	id: ID!
+	"""
+	是否启用
+	"""
+	enabled: Boolean!
+	"""
+	执行优先级（升序，null 排最后）
+	"""
+	priority: Int
+	"""
+	触发事件类型
+	"""
+	event: HookEvent!
+	"""
+	Hook 类型
+	"""
+	type: HookType!
+	"""
+	错误处理行为
+	"""
+	onError: HookOnError!
+	"""
+	Hook 配置（强类型结构体）
+	"""
+	config: HookConfig!
+	"""
+	关联的任务（与 connection 互斥）
+	"""
+	task: Task @goField(forceResolver: true)
+	"""
+	关联的连接（与 task 互斥）
+	"""
+	connection: Connection @goField(forceResolver: true)
+	"""
+	创建时间
+	"""
+	createdAt: DateTime!
+	"""
+	更新时间
+	"""
+	updatedAt: DateTime!
+}
+
+"""
+Hook 配置（统一结构体，根据 Hook.type 使用不同字段子集）
+"""
+type HookConfig {
+	# HTTP Hook 配置
+	"""
+	请求 URL（支持 Go text/template 语法）- HTTP Hook
+	"""
+	url: String
+	"""
+	HTTP 方法（GET/POST/PUT），默认 POST - HTTP Hook
+	"""
+	method: String
+	"""
+	自定义请求头 - HTTP Hook
+	"""
+	headers: StringMap
+	"""
+	请求体模板（支持 Go text/template 语法）- HTTP Hook
+	"""
+	body: String
+
+	# Command Hook 配置
+	"""
+	Shell 命令（支持 Go text/template 语法）- Command Hook
+	"""
+	command: String
+	"""
+	工作目录 - Command Hook
+	"""
+	workDir: String
+	"""
+	执行超时时间（秒），默认 30 - Command Hook
+	"""
+	timeout: Int
+}
+
+# =============================================================================
+# EXTEND EXISTING TYPES
+# =============================================================================
+
+# 扩展 Task 类型，添加 hooks 字段
+extend type Task {
+	"""
+	关联的 Hooks 列表
+	"""
+	hooks: [Hook!]! @goField(forceResolver: true)
+}
+
+# 扩展 Connection 类型，添加 hooks 字段
+extend type Connection {
+	"""
+	关联的 Hooks 列表（作为共享 Hooks，关联任务触发事件时会被执行）
+	"""
+	hooks: [Hook!]! @goField(forceResolver: true)
+}
+
+# 扩展 LogAction 枚举，添加 HOOK 类型
+extend enum LogAction {
+	"""
+	Hook 执行记录
+	"""
+	HOOK
+}
+
+# =============================================================================
+# INPUT TYPES
+# =============================================================================
+
+"""
+Hook 的核心配置字段
+"""
+input HookInput {
+	"""
+	是否启用，默认 true
+	"""
+	enabled: Boolean = true
+	"""
+	执行优先级（升序，null 排最后）
+	"""
+	priority: Int
+	"""
+	触发事件类型
+	"""
+	event: HookEvent!
+	"""
+	Hook 类型
+	"""
+	type: HookType!
+	"""
+	错误处理行为，默认 IGNORE
+	"""
+	onError: HookOnError = IGNORE
+	"""
+	Hook 配置数据
+	"""
+	config: HookConfigInput!
+}
+
+"""
+任务/连接 更新时嵌套的 Hook 变更列表项
+"""
+input NestedUpdateHookInput {
+	"""
+	Hook ID (为空时表示新增)
+	"""
+	id: ID
+	"""
+	是否删除该 Hook
+	"""
+	delete: Boolean = false
+	"""
+	Hook 配置数据 (当 delete 为 false 时必填)
+	"""
+	hook: HookInput
+}
+
+"""
+Hook 配置输入（统一结构体，根据 Hook.type 填写对应字段）
+"""
+input HookConfigInput {
+	# HTTP Hook 配置
+	"""
+	请求 URL（支持 Go text/template 语法）- HTTP Hook 必填
+	"""
+	url: String
+	"""
+	HTTP 方法（GET/POST/PUT），默认 POST - HTTP Hook
+	"""
+	method: String
+	"""
+	自定义请求头 - HTTP Hook
+	"""
+	headers: StringMap
+	"""
+	请求体模板（支持 Go text/template 语法）- HTTP Hook
+	"""
+	body: String
+
+	# Command Hook 配置
+	"""
+	Shell 命令（支持 Go text/template 语法）- Command Hook 必填
+	"""
+	command: String
+	"""
+	工作目录 - Command Hook
+	"""
+	workDir: String
+	"""
+	执行超时时间（秒），默认 30 - Command Hook
+	"""
+	timeout: Int
+}
+
+"""
+更新 Hook 输入
+"""
+input UpdateHookInput {
+	"""
+	是否启用
+	"""
+	enabled: Boolean
+	"""
+	执行优先级（升序，null 排最后）
+	"""
+	priority: Int
+	"""
+	触发事件类型
+	"""
+	event: HookEvent
+	"""
+	Hook 类型（变更类型时需同时提供对应的配置）
+	"""
+	type: HookType
+	"""
+	错误处理行为
+	"""
+	onError: HookOnError
+	"""
+	Hook 配置（完整替换）
+	"""
+	config: HookConfigInput
+}
+
+# =============================================================================
+# NAMESPACED TYPES
+# =============================================================================
+
+"""
+Hook 查询命名空间
+"""
+type HookQuery {
+	"""
+	获取 Hook 列表
+	- taskId: 按任务 ID 过滤
+	- connectionId: 按连接 ID 过滤
+	- event: 按事件类型过滤
+	至少需要提供 taskId 或 connectionId 之一
+	"""
+	list(
+		"""
+		按任务 ID 过滤
+		"""
+		taskId: ID
+		"""
+		按连接 ID 过滤
+		"""
+		connectionId: ID
+		"""
+		按事件类型过滤
+		"""
+		event: HookEvent
+	): [Hook!]! @goField(forceResolver: true)
+	"""
+	获取单个 Hook
+	"""
+	get(id: ID!): Hook @goField(forceResolver: true)
+}
+
+"""
+Hook 变更命名空间
+"""
+type HookMutation {
+	"""
+	创建 Hook。taskId 和 connectionId 作为内联参数（二选一），配置数据通过 input 传递。
+	"""
+	create(
+		"""
+		关联的任务 ID（与 connectionId 互斥）
+		"""
+		taskId: ID
+		"""
+		关联的连接 ID（与 taskId 互斥）
+		"""
+		connectionId: ID
+		"""
+		Hook 配置数据
+		"""
+		input: HookInput!
+	): Hook! @goField(forceResolver: true)
+	"""
+	更新 Hook（失败抛出 GraphQL error）
+	"""
+	update(id: ID!, input: UpdateHookInput!): Hook! @goField(forceResolver: true)
+	"""
+	删除 Hook（失败抛出 GraphQL error）
+	"""
+	delete(id: ID!): Hook! @goField(forceResolver: true)
+}
+
+# =============================================================================
+# EXTEND ROOT TYPES
+# =============================================================================
+
+extend type Query {
+	"""
+	Hook 相关查询（命名空间）
+	"""
+	hook: HookQuery! @goField(forceResolver: true)
+}
+
+extend type Mutation {
+	"""
+	Hook 相关变更（命名空间）
+	"""
+	hook: HookMutation! @goField(forceResolver: true)
+}

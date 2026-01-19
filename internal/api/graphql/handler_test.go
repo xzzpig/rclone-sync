@@ -51,7 +51,7 @@ func setupHandlerTest(t *testing.T) (*gin.Engine, *ent.Client, func()) {
 	storage := rclone.NewDBStorage(connectionQuery, appDataDir)
 	storage.Install()
 
-	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, appDataDir, false, 0)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, appDataDir, false, 0, nil)
 	runnerInstance := runner.NewRunner(syncEngine)
 
 	mockWatcher := &mockWatcher{}

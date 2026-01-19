@@ -23,11 +23,12 @@ const wsClient = createWSClient({
 });
 
 // Helper to invalidate list queries after create/delete mutations
-function invalidateListQuery(cache: Cache, typename: 'Task' | 'Connection' | 'Job') {
+function invalidateListQuery(cache: Cache, typename: 'Task' | 'Connection' | 'Job' | 'Hook') {
   const queryMap = {
     Task: 'TaskQuery',
     Connection: 'ConnectionQuery',
     Job: 'JobQuery',
+    Hook: 'HookQuery',
   };
   const queryType = queryMap[typename];
 
@@ -37,7 +38,8 @@ function invalidateListQuery(cache: Cache, typename: 'Task' | 'Connection' | 'Jo
       field.fieldName === typename.toLowerCase() ||
       field.fieldName === 'task' ||
       field.fieldName === 'connection' ||
-      field.fieldName === 'job'
+      field.fieldName === 'job' ||
+      field.fieldName === 'hook'
     ) {
       cache.invalidate('Query', field.fieldName, field.arguments ?? undefined);
     }
@@ -138,6 +140,14 @@ export const client = new Client({
           },
           delete: (_result, _args, cache) => {
             invalidateListQuery(cache, 'Connection');
+          },
+        },
+        HookMutation: {
+          create: (_result, _args, cache) => {
+            invalidateListQuery(cache, 'Hook');
+          },
+          delete: (_result, _args, cache) => {
+            invalidateListQuery(cache, 'Hook');
           },
         },
       },

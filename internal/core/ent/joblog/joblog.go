@@ -82,7 +82,7 @@ const DefaultWhat model.LogAction = "UNKNOWN"
 // WhatValidator is a validator for the "what" field enum values. It is called by the builders before save.
 func WhatValidator(w model.LogAction) error {
 	switch w.String() {
-	case "UPLOAD", "DOWNLOAD", "DELETE", "MOVE", "ERROR", "UNKNOWN":
+	case "UPLOAD", "DOWNLOAD", "DELETE", "MOVE", "ERROR", "UNKNOWN", "HOOK":
 		return nil
 	default:
 		return fmt.Errorf("joblog: invalid enum value for what field: %q", w)

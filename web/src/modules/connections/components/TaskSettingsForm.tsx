@@ -10,62 +10,160 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsIndicator, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TextField, TextFieldInput, TextFieldLabel } from '@/components/ui/text-field';
-import type { ConflictResolution, SyncDirection, Task, UpdateTaskInput } from '@/lib/types';
+import {
+  type ConflictResolution,
+  type HookInput,
+  type HookListItem,
+  type NestedUpdateHookInput,
+  type SyncDirection,
+  type UpdateTaskInput,
+} from '@/lib/types';
 import * as m from '@/paraglide/messages.js';
-import { Component, createSignal, JSXElement, Show } from 'solid-js';
+import { Component, createEffect, createMemo, createSignal, JSXElement, Show } from 'solid-js';
 import { FilterPreviewPanel } from './FilterPreviewPanel';
 import { FilterRulesEditor } from './FilterRulesEditor';
+import { HookDialog } from './HookDialog';
+import { HookList } from './HookList';
 
-/**
- * Converts a Task object (from GraphQL) to an UpdateTaskInput for form state.
- * Handles null values and nested options.
- */
-export function taskToUpdateInput(task: Task): UpdateTaskInput {
-  return {
-    name: task.name,
-    direction: task.direction as SyncDirection,
-    schedule: task.schedule,
-    realtime: task.realtime,
-    options: {
-      conflictResolution: task.options?.conflictResolution,
-      filters: task.options?.filters
-        ? [...task.options.filters].filter((f): f is string => f !== null)
-        : [],
-      noDelete: task.options?.noDelete,
-      transfers: task.options?.transfers,
-    },
-  };
-}
+import { AppConfigQuery } from '@/api/graphql/queries/system';
+import { Button } from '@/components/ui/button';
+import { createQuery } from '@urql/solid';
+import { hookToHookInput } from '../utils/transformers';
+import { useTasks } from '@/store/tasks';
 
 export interface TaskSettingsFormProps {
   value: UpdateTaskInput;
   onChange: (data: UpdateTaskInput) => void;
-  /**
-   * Connection ID for filter preview (optional)
-   */
+  taskId?: string;
   connectionId?: string;
-  /**
-   * Remote path for filter preview (optional)
-   */
   remotePath?: string;
-  /**
-   * Source (local) path for filter preview (optional)
-   */
   sourcePath?: string;
   children?: JSXElement;
 }
 
 export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
-  const [activeTab, setActiveTab] = createSignal<'basic' | 'filters'>('basic');
+  const [, actions] = useTasks();
+  const [activeTab, setActiveTab] = createSignal<'basic' | 'filters' | 'hooks'>('basic');
+  const [hookDialogOpen, setHookDialogOpen] = createSignal(false);
+  const [editingHookId, setEditingHookId] = createSignal<string | undefined>(undefined);
+
+  const [appConfigResult] = createQuery({
+    query: AppConfigQuery,
+  });
+
+  const isHookEnabled = () => appConfigResult.data?.appConfig?.hook?.enabled ?? true;
+
+  const [hasLoadedHooks, setHasLoadedHooks] = createSignal(false);
+  const [isHooksLoading, setIsHooksLoading] = createSignal(false);
+  createEffect(() => {
+    if (!props.taskId) {
+      setHasLoadedHooks(false);
+      return;
+    }
+
+    if (activeTab() === 'hooks' && !hasLoadedHooks()) {
+      setHasLoadedHooks(true);
+      setIsHooksLoading(true);
+      actions.loadTaskDetail(props.taskId).finally(() => {
+        setIsHooksLoading(false);
+      });
+    }
+  });
+
+  const handleAddHook = () => {
+    setEditingHookId(undefined);
+    setHookDialogOpen(true);
+  };
+
+  const handleEditHook = (hook: HookListItem) => {
+    setEditingHookId(hook.id);
+    setHookDialogOpen(true);
+  };
+
+  const currentHooks = () => props.value.hooks ?? [];
+
+  const hookListItems = createMemo<HookListItem[]>(() => {
+    return currentHooks()
+      .filter((h) => !h.delete)
+      .map((h, index) => {
+        const id = h.id ?? `local-${index}-${h.hook?.event}-${h.hook?.type}`;
+        return {
+          id,
+          ...h.hook,
+        };
+      }) as HookListItem[];
+  });
+
+  const handleSaveHook = (data: HookInput) => {
+    const hooks = [...currentHooks()];
+    const editingId = editingHookId();
+
+    if (editingId) {
+      const listItems = hookListItems();
+      const listItemIndex = listItems.findIndex((item) => item.id === editingId);
+      if (listItemIndex !== -1) {
+        let nonDeletedCount = 0;
+        const actualIndex = hooks.findIndex((h) => {
+          if (h.delete) return false;
+          if (nonDeletedCount === listItemIndex) return true;
+          nonDeletedCount++;
+          return false;
+        });
+
+        if (actualIndex !== -1) {
+          hooks[actualIndex] = {
+            ...hooks[actualIndex],
+            hook: data,
+          };
+        }
+      }
+    } else {
+      hooks.push({
+        hook: data,
+      });
+    }
+
+    props.onChange({
+      ...props.value,
+      hooks,
+    });
+  };
+
+  const handleHooksChange = (newListItems: HookListItem[]) => {
+    const oldHooks = currentHooks();
+    const resultHooks: NestedUpdateHookInput[] = [];
+
+    oldHooks.forEach((oldH) => {
+      if (oldH.id) {
+        const isStillPresent = newListItems.some((item) => item.id === oldH.id);
+        if (!isStillPresent) {
+          resultHooks.push({ id: oldH.id, delete: true });
+        }
+      }
+    });
+
+    newListItems.forEach((item) => {
+      const isLocal = item.id.startsWith('local-');
+      resultHooks.push({
+        id: isLocal ? undefined : item.id,
+        hook: hookToHookInput(item),
+      });
+    });
+
+    props.onChange({
+      ...props.value,
+      hooks: resultHooks,
+    });
+  };
+
   const conflictResolution = () => props.value.options?.conflictResolution;
-  const filters = () => (props.value.options?.filters ?? []) as string[];
+  const filters = () => props.value.options?.filters ?? [];
   const noDelete = () => props.value.options?.noDelete ?? undefined;
   const transfers = () => props.value.options?.transfers;
 
   const updateField = <K extends keyof UpdateTaskInput>(field: K, value: UpdateTaskInput[K]) => {
     const updates: Partial<UpdateTaskInput> = { [field]: value };
 
-    // When direction switches to 'DOWNLOAD', automatically disable realtime
     if (field === 'direction' && value === 'DOWNLOAD') {
       updates.realtime = undefined;
     }
@@ -76,54 +174,37 @@ export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
     });
   };
 
-  const updateConflictResolution = (value: ConflictResolution) => {
+  const updateOptions = <K extends keyof NonNullable<UpdateTaskInput['options']>>(
+    field: K,
+    value: NonNullable<UpdateTaskInput['options']>[K]
+  ) => {
     props.onChange({
       ...props.value,
       options: {
         ...props.value.options,
-        conflictResolution: value,
+        [field]: value,
       },
     });
   };
 
-  const updateFilters = (newFilters: string[]) => {
-    props.onChange({
-      ...props.value,
-      options: {
-        ...props.value.options,
-        filters: newFilters,
-      },
-    });
-  };
-
-  const updateNoDelete = (value: boolean) => {
-    props.onChange({
-      ...props.value,
-      options: {
-        ...props.value.options,
-        noDelete: value,
-      },
-    });
-  };
-
-  const updateTransfers = (value: number | undefined) => {
-    // If value is 0 or undefined, set to undefined to let backend handle default
-    const clampedValue = value ? Math.max(1, Math.min(64, value)) : undefined;
-    props.onChange({
-      ...props.value,
-      options: {
-        ...props.value.options,
-        transfers: clampedValue,
-      },
-    });
-  };
-
-  // Check if this is unidirectional sync (not bidirectional) for noDelete option
   const isUnidirectional = () =>
     props.value.direction === 'UPLOAD' || props.value.direction === 'DOWNLOAD';
 
+  const initialHookData = createMemo<HookInput | undefined>(() => {
+    const id = editingHookId();
+    if (!id) return undefined;
+    return hookListItems().find((h) => h.id === id);
+  });
+
   return (
-    <Tabs value={activeTab()} onChange={(value) => setActiveTab(value as 'basic' | 'filters')}>
+    <Tabs
+      value={activeTab()}
+      onChange={(value) => {
+        if (value === 'basic' || value === 'filters' || value === 'hooks') {
+          setActiveTab(value);
+        }
+      }}
+    >
       <TabsList class="mb-4 w-full">
         <TabsTrigger value="basic" class="flex-1">
           {m.task_taskSettings()}
@@ -131,6 +212,11 @@ export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
         <TabsTrigger value="filters" class="flex-1">
           {m.task_filters()}
         </TabsTrigger>
+        <Show when={isHookEnabled()}>
+          <TabsTrigger value="hooks" class="flex-1">
+            {m.hook_config()}
+          </TabsTrigger>
+        </Show>
         <TabsIndicator />
       </TabsList>
 
@@ -140,10 +226,8 @@ export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
           <TextFieldLabel for="name">{m.form_taskName()}</TextFieldLabel>
           <TextFieldInput
             id="name"
-            value={props.value.name}
-            onInput={(e: InputEvent) =>
-              updateField('name', (e.currentTarget as HTMLInputElement).value)
-            }
+            value={props.value.name ?? undefined}
+            onInput={(e) => updateField('name', e.currentTarget.value)}
             placeholder={m.form_taskNamePlaceholder()}
           />
         </TextField>
@@ -151,10 +235,10 @@ export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
         {/* Direction */}
         <TextField>
           <TextFieldLabel for="direction">{m.form_syncDirection()}</TextFieldLabel>
-          <Select
+          <Select<SyncDirection>
             value={props.value.direction}
-            onChange={(value) => updateField('direction', value as SyncDirection)}
-            options={['UPLOAD', 'DOWNLOAD', 'BIDIRECTIONAL'] as const}
+            onChange={(value) => value && updateField('direction', value)}
+            options={['UPLOAD', 'DOWNLOAD', 'BIDIRECTIONAL']}
             placeholder={m.form_selectDirection()}
             itemComponent={(itemProps) => (
               <SelectItem item={itemProps.item}>
@@ -190,9 +274,7 @@ export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
           <TextFieldInput
             id="schedule"
             value={props.value.schedule ?? ''}
-            onInput={(e: InputEvent) =>
-              updateField('schedule', (e.currentTarget as HTMLInputElement).value)
-            }
+            onInput={(e) => updateField('schedule', e.currentTarget.value)}
             placeholder={m.form_scheduleExample()}
           />
           <p class="text-xs text-muted-foreground">
@@ -218,10 +300,10 @@ export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
         <Show when={props.value.direction === 'BIDIRECTIONAL'}>
           <TextField>
             <TextFieldLabel for="conflictResolution">{m.form_conflictResolution()}</TextFieldLabel>
-            <Select
+            <Select<ConflictResolution>
               value={conflictResolution()}
-              onChange={(value) => updateConflictResolution(value as ConflictResolution)}
-              options={['NEWER', 'LOCAL', 'REMOTE', 'BOTH'] as const}
+              onChange={(value) => value && updateOptions('conflictResolution', value)}
+              options={['NEWER', 'LOCAL', 'REMOTE', 'BOTH']}
               placeholder={m.form_selectConflictResolution()}
               itemComponent={(itemProps) => (
                 <SelectItem item={itemProps.item}>
@@ -260,7 +342,11 @@ export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
         {/* No Delete Option (only for unidirectional sync) */}
         <Show when={isUnidirectional()}>
           <div class="flex items-center space-x-2">
-            <Checkbox id="noDelete" checked={noDelete()} onChange={updateNoDelete} />
+            <Checkbox
+              id="noDelete"
+              checked={noDelete()}
+              onChange={(v) => updateOptions('noDelete', v)}
+            />
             <Label for="noDelete-input" class="cursor-pointer">
               {m.filter_noDelete()}
             </Label>
@@ -277,9 +363,12 @@ export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
             min={1}
             max={64}
             value={transfers() ?? ''}
-            onInput={(e: InputEvent) => {
-              const inputValue = (e.currentTarget as HTMLInputElement).value;
-              updateTransfers(inputValue ? parseInt(inputValue, 10) : undefined);
+            onInput={(e) => {
+              const inputValue = e.currentTarget.value;
+              updateOptions(
+                'transfers',
+                inputValue ? Math.max(1, Math.min(64, parseInt(inputValue, 10))) : undefined
+              );
             }}
           />
           <p class="text-xs text-muted-foreground">{m.filter_transfersHelp()}</p>
@@ -291,17 +380,45 @@ export const TaskSettingsForm: Component<TaskSettingsFormProps> = (props) => {
 
       <TabsContent value="filters" class="space-y-6">
         {/* Filter Rules Editor */}
-        <FilterRulesEditor value={filters()} onChange={updateFilters} />
+        <FilterRulesEditor value={filters()} onChange={(v) => updateOptions('filters', v)} />
 
         {/* Filter Preview Panel */}
         <Show when={props.connectionId && props.remotePath}>
           <FilterPreviewPanel
-            connectionId={props.connectionId!}
+            connectionId={props.connectionId ?? ''}
             sourcePath={props.sourcePath ?? ''}
-            remotePath={props.remotePath!}
+            remotePath={props.remotePath ?? ''}
             filters={filters()}
           />
         </Show>
+      </TabsContent>
+
+      <TabsContent value="hooks" class="space-y-6">
+        <div class="flex justify-end">
+          <Button variant="outline" size="sm" onClick={handleAddHook}>
+            {m.hook_addHook()}
+          </Button>
+        </div>
+        <HookList
+          hooks={hookListItems()}
+          fetching={isHooksLoading()}
+          onEdit={handleEditHook}
+          onEnabledChange={(id, enabled) => {
+            const newList = hookListItems().map((h) => (h.id === id ? { ...h, enabled } : h));
+            handleHooksChange(newList);
+          }}
+          onDelete={(id) => {
+            const newList = hookListItems().filter((h) => h.id !== id);
+            handleHooksChange(newList);
+          }}
+        />
+        <HookDialog
+          open={hookDialogOpen()}
+          onOpenChange={setHookDialogOpen}
+          initialData={initialHookData()}
+          isEdit={!!editingHookId()}
+          onSave={handleSaveHook}
+        />
       </TabsContent>
     </Tabs>
   );

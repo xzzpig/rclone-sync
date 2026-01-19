@@ -385,7 +385,7 @@ func (s *TaskResolverTestSuite) TestTaskMutation_UpdateConnectionID() {
 	resp := s.Env.ExecuteGraphQLWithVars(s.T(), mutation, map[string]interface{}{
 		"id": task.ID.String(),
 		"input": map[string]interface{}{
-			"connectionId": connID2.String(),
+			"connectionID": connID2.String(),
 		},
 	})
 	require.Empty(s.T(), resp.Errors)
@@ -705,7 +705,7 @@ func (s *TaskResolverTestSuite) TestTaskMutation_UpdateAllFields() {
 			"name":         "completely-updated-task",
 			"sourcePath":   "/updated/source",
 			"remotePath":   "/updated/remote",
-			"connectionId": connID2.String(),
+			"connectionID": connID2.String(),
 			"direction":    "BIDIRECTIONAL",
 			"schedule":     "30 4 * * *",
 			"realtime":     true,
@@ -1642,4 +1642,406 @@ func (s *TaskResolverTestSuite) TestTask_LatestJobNil() {
 	data := string(resp.Data)
 	latestJob := gjson.Get(data, "task.get.latestJob")
 	assert.True(s.T(), latestJob.Type == gjson.Null || !latestJob.Exists())
+}
+
+func (s *TaskResolverTestSuite) TestTaskMutation_CreateWithHooks() {
+	connID := s.Env.CreateTestConnection(s.T(), "test-conn-hooks")
+
+	mutation := `
+		mutation($input: CreateTaskInput!) {
+			task {
+				create(input: $input) {
+					id
+					name
+					hooks {
+						id
+						enabled
+						event
+						type
+						onError
+						config {
+							url
+							method
+						}
+					}
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), mutation, map[string]interface{}{
+		"input": map[string]interface{}{
+			"name":         "task-with-hooks",
+			"sourcePath":   "/local",
+			"connectionId": connID.String(),
+			"remotePath":   "/remote",
+			"direction":    "UPLOAD",
+			"hooks": []map[string]interface{}{
+				{
+					"event":   "ON_SUCCESS",
+					"type":    "HTTP",
+					"onError": "IGNORE",
+					"config": map[string]interface{}{
+						"url":    "https://example.com/webhook1",
+						"method": "POST",
+					},
+				},
+				{
+					"event":   "ON_FAILURE",
+					"type":    "HTTP",
+					"onError": "FATAL",
+					"config": map[string]interface{}{
+						"url":    "https://example.com/webhook2",
+						"method": "GET",
+					},
+				},
+			},
+		},
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	assert.NotEmpty(s.T(), gjson.Get(data, "task.create.id").String())
+	assert.Equal(s.T(), "task-with-hooks", gjson.Get(data, "task.create.name").String())
+
+	hooks := gjson.Get(data, "task.create.hooks").Array()
+	assert.Len(s.T(), hooks, 2)
+
+	foundOnSuccess := false
+	foundOnFailure := false
+	for _, h := range hooks {
+		event := h.Get("event").String()
+		if event == "ON_SUCCESS" {
+			foundOnSuccess = true
+			assert.True(s.T(), h.Get("enabled").Bool())
+			assert.Equal(s.T(), "HTTP", h.Get("type").String())
+			assert.Equal(s.T(), "IGNORE", h.Get("onError").String())
+			assert.Equal(s.T(), "https://example.com/webhook1", h.Get("config.url").String())
+		} else if event == "ON_FAILURE" {
+			foundOnFailure = true
+			assert.Equal(s.T(), "HTTP", h.Get("type").String())
+			assert.Equal(s.T(), "FATAL", h.Get("onError").String())
+			assert.Equal(s.T(), "https://example.com/webhook2", h.Get("config.url").String())
+		}
+	}
+	assert.True(s.T(), foundOnSuccess, "Should have ON_SUCCESS hook")
+	assert.True(s.T(), foundOnFailure, "Should have ON_FAILURE hook")
+}
+
+func (s *TaskResolverTestSuite) TestTaskMutation_CreateWithInvalidHookConfig() {
+	connID := s.Env.CreateTestConnection(s.T(), "test-conn-invalid-hook")
+
+	mutation := `
+		mutation($input: CreateTaskInput!) {
+			task {
+				create(input: $input) {
+					id
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), mutation, map[string]interface{}{
+		"input": map[string]interface{}{
+			"name":         "task-invalid-hook",
+			"sourcePath":   "/local",
+			"connectionId": connID.String(),
+			"remotePath":   "/remote",
+			"direction":    "UPLOAD",
+			"hooks": []map[string]interface{}{
+				{
+					"event":   "ON_SUCCESS",
+					"type":    "HTTP",
+					"onError": "IGNORE",
+					"config":  map[string]interface{}{},
+				},
+			},
+		},
+	})
+	require.NotEmpty(s.T(), resp.Errors)
+}
+
+func (s *TaskResolverTestSuite) TestTaskMutation_UpdateWithHooksCreate() {
+	connID := s.Env.CreateTestConnection(s.T(), "test-conn-update-hooks")
+	task := s.Env.CreateTestTask(s.T(), "task-update-hooks", connID)
+
+	mutation := `
+		mutation($id: ID!, $input: UpdateTaskInput!) {
+			task {
+				update(id: $id, input: $input) {
+					id
+					hooks {
+						id
+						event
+						type
+						config {
+							url
+						}
+					}
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), mutation, map[string]interface{}{
+		"id": task.ID.String(),
+		"input": map[string]interface{}{
+			"hooks": []map[string]interface{}{
+				{
+					"hook": map[string]interface{}{
+						"event":   "ON_END",
+						"type":    "HTTP",
+						"onError": "IGNORE",
+						"config": map[string]interface{}{
+							"url": "https://example.com/new-hook",
+						},
+					},
+				},
+			},
+		},
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	hooks := gjson.Get(data, "task.update.hooks").Array()
+	assert.Len(s.T(), hooks, 1)
+	assert.Equal(s.T(), "ON_END", hooks[0].Get("event").String())
+	assert.Equal(s.T(), "https://example.com/new-hook", hooks[0].Get("config.url").String())
+}
+
+func (s *TaskResolverTestSuite) TestTaskMutation_UpdateWithHooksUpdate() {
+	connID := s.Env.CreateTestConnection(s.T(), "test-conn-update-hooks-2")
+
+	createMutation := `
+		mutation($input: CreateTaskInput!) {
+			task {
+				create(input: $input) {
+					id
+					hooks { id }
+				}
+			}
+		}
+	`
+
+	createResp := s.Env.ExecuteGraphQLWithVars(s.T(), createMutation, map[string]interface{}{
+		"input": map[string]interface{}{
+			"name":         "task-update-hooks-2",
+			"sourcePath":   "/local",
+			"connectionId": connID.String(),
+			"remotePath":   "/remote",
+			"direction":    "UPLOAD",
+			"hooks": []map[string]interface{}{
+				{
+					"event":   "ON_SUCCESS",
+					"type":    "HTTP",
+					"onError": "IGNORE",
+					"config": map[string]interface{}{
+						"url": "https://example.com/original",
+					},
+				},
+			},
+		},
+	})
+	require.Empty(s.T(), createResp.Errors)
+
+	createData := string(createResp.Data)
+	taskID := gjson.Get(createData, "task.create.id").String()
+	hookID := gjson.Get(createData, "task.create.hooks.0.id").String()
+
+	updateMutation := `
+		mutation($id: ID!, $input: UpdateTaskInput!) {
+			task {
+				update(id: $id, input: $input) {
+					id
+					hooks {
+						id
+						event
+						config { url }
+					}
+				}
+			}
+		}
+	`
+
+	updateResp := s.Env.ExecuteGraphQLWithVars(s.T(), updateMutation, map[string]interface{}{
+		"id": taskID,
+		"input": map[string]interface{}{
+			"hooks": []map[string]interface{}{
+				{
+					"id": hookID,
+					"hook": map[string]interface{}{
+						"event":   "ON_END",
+						"type":    "HTTP",
+						"onError": "IGNORE",
+						"config": map[string]interface{}{
+							"url": "https://example.com/updated",
+						},
+					},
+				},
+			},
+		},
+	})
+	require.Empty(s.T(), updateResp.Errors)
+
+	updateData := string(updateResp.Data)
+	hooks := gjson.Get(updateData, "task.update.hooks").Array()
+	assert.Len(s.T(), hooks, 1)
+	assert.Equal(s.T(), hookID, hooks[0].Get("id").String())
+	assert.Equal(s.T(), "ON_END", hooks[0].Get("event").String())
+	assert.Equal(s.T(), "https://example.com/updated", hooks[0].Get("config.url").String())
+}
+
+func (s *TaskResolverTestSuite) TestTaskMutation_UpdateWithHooksDelete() {
+	connID := s.Env.CreateTestConnection(s.T(), "test-conn-delete-hooks")
+
+	createMutation := `
+		mutation($input: CreateTaskInput!) {
+			task {
+				create(input: $input) {
+					id
+					hooks { id }
+				}
+			}
+		}
+	`
+
+	createResp := s.Env.ExecuteGraphQLWithVars(s.T(), createMutation, map[string]interface{}{
+		"input": map[string]interface{}{
+			"name":         "task-delete-hooks",
+			"sourcePath":   "/local",
+			"connectionId": connID.String(),
+			"remotePath":   "/remote",
+			"direction":    "UPLOAD",
+			"hooks": []map[string]interface{}{
+				{
+					"event":   "ON_SUCCESS",
+					"type":    "HTTP",
+					"onError": "IGNORE",
+					"config": map[string]interface{}{
+						"url": "https://example.com/to-delete",
+					},
+				},
+			},
+		},
+	})
+	require.Empty(s.T(), createResp.Errors)
+
+	createData := string(createResp.Data)
+	taskID := gjson.Get(createData, "task.create.id").String()
+	hookID := gjson.Get(createData, "task.create.hooks.0.id").String()
+
+	updateMutation := `
+		mutation($id: ID!, $input: UpdateTaskInput!) {
+			task {
+				update(id: $id, input: $input) {
+					id
+					hooks { id }
+				}
+			}
+		}
+	`
+
+	updateResp := s.Env.ExecuteGraphQLWithVars(s.T(), updateMutation, map[string]interface{}{
+		"id": taskID,
+		"input": map[string]interface{}{
+			"hooks": []map[string]interface{}{
+				{
+					"id":     hookID,
+					"delete": true,
+				},
+			},
+		},
+	})
+	require.Empty(s.T(), updateResp.Errors)
+
+	updateData := string(updateResp.Data)
+	hooks := gjson.Get(updateData, "task.update.hooks").Array()
+	assert.Len(s.T(), hooks, 0)
+}
+
+func (s *TaskResolverTestSuite) TestTaskMutation_UpdateWithHooksDeleteNoID() {
+	connID := s.Env.CreateTestConnection(s.T(), "test-conn-delete-no-id")
+	task := s.Env.CreateTestTask(s.T(), "task-delete-no-id", connID)
+
+	mutation := `
+		mutation($id: ID!, $input: UpdateTaskInput!) {
+			task {
+				update(id: $id, input: $input) {
+					id
+					hooks { id }
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), mutation, map[string]interface{}{
+		"id": task.ID.String(),
+		"input": map[string]interface{}{
+			"hooks": []map[string]interface{}{
+				{
+					"delete": true,
+				},
+			},
+		},
+	})
+	require.Empty(s.T(), resp.Errors)
+}
+
+func (s *TaskResolverTestSuite) TestTaskMutation_UpdateWithHooksNoHookField() {
+	connID := s.Env.CreateTestConnection(s.T(), "test-conn-no-hook-field")
+	task := s.Env.CreateTestTask(s.T(), "task-no-hook-field", connID)
+
+	mutation := `
+		mutation($id: ID!, $input: UpdateTaskInput!) {
+			task {
+				update(id: $id, input: $input) {
+					id
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), mutation, map[string]interface{}{
+		"id": task.ID.String(),
+		"input": map[string]interface{}{
+			"hooks": []map[string]interface{}{
+				{
+					"id": nil,
+				},
+			},
+		},
+	})
+	require.Empty(s.T(), resp.Errors)
+}
+
+func (s *TaskResolverTestSuite) TestTaskMutation_UpdateWithInvalidHookConfig() {
+	connID := s.Env.CreateTestConnection(s.T(), "test-conn-invalid-update")
+	task := s.Env.CreateTestTask(s.T(), "task-invalid-update", connID)
+
+	mutation := `
+		mutation($id: ID!, $input: UpdateTaskInput!) {
+			task {
+				update(id: $id, input: $input) {
+					id
+				}
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), mutation, map[string]interface{}{
+		"id": task.ID.String(),
+		"input": map[string]interface{}{
+			"hooks": []map[string]interface{}{
+				{
+					"hook": map[string]interface{}{
+						"event":   "ON_SUCCESS",
+						"type":    "HTTP",
+						"onError": "IGNORE",
+						"config":  map[string]interface{}{},
+					},
+				},
+			},
+		},
+	})
+	require.NotEmpty(s.T(), resp.Errors)
 }

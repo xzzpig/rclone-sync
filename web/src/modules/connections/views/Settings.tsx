@@ -4,6 +4,7 @@ import {
   ConnectionGetConfigQuery,
   ConnectionUpdateMutation,
 } from '@/api/graphql/queries/connections';
+import { AppConfigQuery } from '@/api/graphql/queries/system';
 import { ProviderGetQuery } from '@/api/graphql/queries/providers';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,9 +25,18 @@ import { Component, Show, createMemo, createSignal } from 'solid-js';
 import IconLoader2 from '~icons/lucide/loader-2';
 import { DynamicConfigForm } from '../components/DynamicConfigForm';
 import { CacheSettingsForm } from '../components/CacheSettingsForm';
+import { HookList } from '../components/HookList';
+import { HookDialog } from '../components/HookDialog';
 import { createEffect } from 'solid-js';
-import type { CacheOptions } from '@/lib/types';
+import type { CacheOptions, HookListItem, HookInput } from '@/lib/types';
 import { Separator } from '@/components/ui/separator';
+import {
+  HookCreateMutation,
+  HookUpdateMutation,
+  HooksListQuery,
+  HookDeleteMutation,
+} from '@/api/graphql/queries/hooks';
+import { hookToHookInput } from '../utils/transformers';
 
 const Settings: Component = () => {
   const params = useParams();
@@ -40,6 +50,15 @@ const Settings: Component = () => {
     pause: () => !connectionId(),
   });
 
+  // Fetch hooks for the connection
+  const [hooksResult] = createQuery({
+    query: HooksListQuery,
+    variables: () => ({ connectionId: connectionId()! }),
+    pause: () => !connectionId(),
+  });
+
+  const hooks = () => hooksResult.data?.hook?.list ?? [];
+
   // Extract connection data
   const connection = () => connectionResult.data?.connection?.get;
   const connectionName = () => connection()?.name ?? connectionId() ?? '';
@@ -52,6 +71,13 @@ const Settings: Component = () => {
     variables: () => ({ name: connectionType()! }),
     pause: () => !connectionType(),
   });
+
+  // Fetch app config for hook enabled status
+  const [appConfigResult] = createQuery({
+    query: AppConfigQuery,
+  });
+
+  const isHookEnabled = () => appConfigResult.data?.appConfig?.hook?.enabled ?? true;
 
   // Extract provider options directly from GraphQL (lowercase property names)
   const providerOptions = () => providerResult.data?.provider?.get?.options ?? [];
@@ -68,14 +94,95 @@ const Settings: Component = () => {
   // Mutations
   const [, executeUpdateConnection] = createMutation(ConnectionUpdateMutation);
   const [, executeDeleteConnection] = createMutation(ConnectionDeleteMutation);
+  const [, executeCreateHook] = createMutation(HookCreateMutation);
+  const [, executeUpdateHook] = createMutation(HookUpdateMutation);
+  const [, executeDeleteHook] = createMutation(HookDeleteMutation);
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = createSignal(false);
   const [isDeleting, setIsDeleting] = createSignal(false);
+  const [hookDialogOpen, setHookDialogOpen] = createSignal(false);
+  const [editingHook, setEditingHook] = createSignal<HookListItem | undefined>(undefined);
   const [cacheOptions, setCacheOptions] = createSignal<CacheOptions>({
     enabled: false,
     infoAge: null,
     changeNotifyPoll: null,
   });
+
+  const handleToggleHookEnabled = async (id: string, enabled: boolean) => {
+    const result = await executeUpdateHook({ id, input: { enabled } });
+    if (result.error) {
+      showToast({
+        title: m.hook_updateFailed(),
+        description: result.error.message,
+        variant: 'destructive',
+      });
+    } else {
+      showToast({
+        title: m.hook_updated(),
+        description: m.hook_updatedDesc(),
+      });
+    }
+  };
+
+  const handleDeleteHook = async (id: string) => {
+    const result = await executeDeleteHook({ id });
+    if (result.error) {
+      showToast({
+        title: m.hook_deleteFailed(),
+        description: result.error.message,
+        variant: 'destructive',
+      });
+    } else {
+      showToast({
+        title: m.hook_deleted(),
+        description: m.hook_deletedDesc(),
+      });
+    }
+  };
+
+  const handleAddHook = () => {
+    setEditingHook(undefined);
+    setHookDialogOpen(true);
+  };
+
+  const handleEditHook = (hook: HookListItem) => {
+    setEditingHook(hook);
+    setHookDialogOpen(true);
+  };
+
+  const handleSaveHook = async (data: HookInput) => {
+    try {
+      const editing = editingHook();
+      if (editing) {
+        const result = await executeUpdateHook({
+          id: editing.id,
+          input: hookToHookInput(data),
+        });
+        if (result.error) throw result.error;
+        showToast({
+          title: m.hook_updated(),
+          description: m.hook_updatedDesc(),
+        });
+      } else {
+        const result = await executeCreateHook({
+          connectionId: connectionId(),
+          input: hookToHookInput(data),
+        });
+        if (result.error) throw result.error;
+        showToast({
+          title: m.hook_created(),
+          description: m.hook_createdDesc(),
+        });
+      }
+    } catch (error) {
+      showToast({
+        title: editingHook() ? m.hook_updateFailed() : m.hook_createFailed(),
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
 
   createEffect(() => {
     const options = connection()?.options?.cache;
@@ -91,7 +198,7 @@ const Settings: Component = () => {
   const handleSave = async (_name: string | undefined, config: Record<string, string>) => {
     const id = connectionId();
     if (!id) {
-      throw new Error('Connection ID is required');
+      throw new Error(m.error_missingParameter({ parameter: 'connectionId' }));
     }
 
     const result = await executeUpdateConnection({
@@ -170,6 +277,33 @@ const Settings: Component = () => {
           </DynamicConfigForm>
         </CardContent>
       </Card>
+
+      <Show when={isHookEnabled()}>
+        <Card>
+          <CardHeader class="flex flex-row items-center justify-between space-y-0">
+            <CardTitle>{m.hook_config()}</CardTitle>
+            <Button variant="outline" size="sm" onClick={handleAddHook}>
+              {m.hook_addHook()}
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <HookList
+              hooks={hooks()}
+              fetching={hooksResult.fetching}
+              onEdit={handleEditHook}
+              onEnabledChange={handleToggleHookEnabled}
+              onDelete={handleDeleteHook}
+            />
+            <HookDialog
+              open={hookDialogOpen()}
+              onOpenChange={setHookDialogOpen}
+              initialData={editingHook()}
+              isEdit={!!editingHook()}
+              onSave={handleSaveHook}
+            />
+          </CardContent>
+        </Card>
+      </Show>
 
       <Card class="border-red-200">
         <CardHeader>

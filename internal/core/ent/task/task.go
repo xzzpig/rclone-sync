@@ -41,6 +41,8 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// EdgeJobs holds the string denoting the jobs edge name in mutations.
 	EdgeJobs = "jobs"
+	// EdgeHooks holds the string denoting the hooks edge name in mutations.
+	EdgeHooks = "hooks"
 	// EdgeConnection holds the string denoting the connection edge name in mutations.
 	EdgeConnection = "connection"
 	// Table holds the table name of the task in the database.
@@ -52,6 +54,13 @@ const (
 	JobsInverseTable = "jobs"
 	// JobsColumn is the table column denoting the jobs relation/edge.
 	JobsColumn = "task_id"
+	// HooksTable is the table that holds the hooks relation/edge.
+	HooksTable = "task_hooks"
+	// HooksInverseTable is the table name for the TaskHook entity.
+	// It exists in this package in order to avoid circular dependency with the "taskhook" package.
+	HooksInverseTable = "task_hooks"
+	// HooksColumn is the table column denoting the hooks relation/edge.
+	HooksColumn = "task_id"
 	// ConnectionTable is the table that holds the connection relation/edge.
 	ConnectionTable = "tasks"
 	// ConnectionInverseTable is the table name for the Connection entity.
@@ -192,6 +201,20 @@ func ByJobs(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByHooksCount orders the results by hooks count.
+func ByHooksCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newHooksStep(), opts...)
+	}
+}
+
+// ByHooks orders the results by hooks terms.
+func ByHooks(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newHooksStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByConnectionField orders the results by connection field.
 func ByConnectionField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -203,6 +226,13 @@ func newJobsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(JobsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, JobsTable, JobsColumn),
+	)
+}
+func newHooksStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(HooksInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, HooksTable, HooksColumn),
 	)
 }
 func newConnectionStep() *sqlgraph.Step {

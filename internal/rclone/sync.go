@@ -3,7 +3,6 @@ package rclone
 import (
 	"context"
 	"errors"
-	"fmt"
 	"path/filepath"
 	"reflect"
 	"sync"
@@ -21,11 +20,17 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/subscription"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/errs"
+	"github.com/xzzpig/rclone-sync/internal/core/hook"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 	"github.com/xzzpig/rclone-sync/internal/core/ports"
 	"github.com/xzzpig/rclone-sync/internal/i18n"
 	"github.com/xzzpig/rclone-sync/internal/utils"
 	"go.uber.org/zap"
+)
+
+var (
+	// ErrUnsupportedSyncDirection is returned when an invalid sync direction is provided.
+	ErrUnsupportedSyncDirection = i18n.NewI18nError(i18n.ErrInvalidInput).WithData(map[string]interface{}{"Reason": "unsupported sync direction"})
 )
 
 // SyncOptions contains configuration options for sync operations.
@@ -51,6 +56,7 @@ type SyncEngine struct {
 	jobQuery            ports.JobQuery
 	jobProgressBus      *subscription.JobProgressBus
 	transferProgressBus *subscription.TransferProgressBus
+	hookExecutor        ports.HookExecutor
 	logger              *zap.Logger
 	workDir             string
 	autoDeleteEmptyJobs bool
@@ -66,7 +72,8 @@ const DefaultTransfers = 4
 // NewSyncEngine creates a new SyncEngine instance.
 // defaultTransfers specifies the global default for parallel transfers (from config).
 // If defaultTransfers is 0 or negative, DefaultTransfers (4) will be used.
-func NewSyncEngine(jobQuery ports.JobQuery, jobProgressBus *subscription.JobProgressBus, transferProgressBus *subscription.TransferProgressBus, dataDir string, autoDeleteEmptyJobs bool, defaultTransfers int) *SyncEngine {
+// hookExecutor is optional and can be nil if hooks are not needed.
+func NewSyncEngine(jobQuery ports.JobQuery, jobProgressBus *subscription.JobProgressBus, transferProgressBus *subscription.TransferProgressBus, dataDir string, autoDeleteEmptyJobs bool, defaultTransfers int, hookExecutor ports.HookExecutor) *SyncEngine {
 	workDir := filepath.Join(dataDir, "bisync_state")
 	if defaultTransfers <= 0 {
 		defaultTransfers = DefaultTransfers
@@ -75,6 +82,7 @@ func NewSyncEngine(jobQuery ports.JobQuery, jobProgressBus *subscription.JobProg
 		jobQuery:            jobQuery,
 		jobProgressBus:      jobProgressBus,
 		transferProgressBus: transferProgressBus,
+		hookExecutor:        hookExecutor,
 		logger:              logger.Named("sync.engine"),
 		workDir:             workDir,
 		autoDeleteEmptyJobs: autoDeleteEmptyJobs,
@@ -159,6 +167,11 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger model.
 		return errors.Join(errs.ErrSystem, errs.ConstError("failed to update job status"), err)
 	}
 
+	// 2.5 Execute on_start hooks (before sync begins)
+	if onStartErr := e.executeOnStartHooks(ctx, task, jobEntity); onStartErr != nil {
+		return onStartErr
+	}
+
 	// 3. Prepare Rclone context with stats group
 	// We use the job ID as the stats group key to isolate stats for this job
 	statsCtx, statsCancel := context.WithCancel(ctx)
@@ -220,7 +233,7 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger model.
 	case model.SyncDirectionDownload:
 		syncErr = e.runOneWay(statsCtx, fDst, fSrc, syncOpts)
 	default:
-		syncErr = i18n.NewI18nError(i18n.ErrInvalidInput).WithCause(fmt.Errorf("unsupported sync direction: %s", task.Direction)) //nolint:err113
+		syncErr = ErrUnsupportedSyncDirection
 	}
 
 	// 9. Wait for poller to finish (it stops when statsCtx is cancelled or done)
@@ -292,6 +305,10 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger model.
 			StartTime:        jobEntity.StartTime,
 			EndTime:          func() *time.Time { t := time.Now(); return &t }(),
 		})
+
+		e.executeHooks(ctx, task, jobEntity, model.HookEventOnFailure, syncErr)
+		e.executeHooks(ctx, task, jobEntity, model.HookEventOnEnd, syncErr)
+
 		return syncErr
 	}
 
@@ -320,6 +337,9 @@ func (e *SyncEngine) RunTask(ctx context.Context, task *ent.Task, trigger model.
 		StartTime:        jobEntity.StartTime,
 		EndTime:          func() *time.Time { t := time.Now(); return &t }(),
 	})
+
+	e.executeHooks(ctx, task, jobEntity, model.HookEventOnSuccess, nil)
+	e.executeHooks(ctx, task, jobEntity, model.HookEventOnEnd, nil)
 
 	e.logger.Info("Sync task completed successfully", zap.Stringer("job_id", jobEntity.ID))
 
@@ -830,6 +850,52 @@ func getStatsInternals(s *accounting.StatsInfo) (*sync.RWMutex, *[]*accounting.T
 	transfers := (*[]*accounting.Transfer)(transfersPtr)
 
 	return mu, transfers, nil
+}
+
+func (e *SyncEngine) executeHooks(ctx context.Context, task *ent.Task, job *ent.Job, event model.HookEvent, syncErr error) {
+	if e.hookExecutor == nil {
+		return
+	}
+	if err := e.hookExecutor.Execute(ctx, task, job, event, syncErr); err != nil {
+		e.logger.Warn("Hook execution failed", zap.String("event", string(event)), zap.Error(err))
+	}
+}
+
+func (e *SyncEngine) executeOnStartHooks(ctx context.Context, task *ent.Task, job *ent.Job) error {
+	if e.hookExecutor == nil {
+		return nil
+	}
+
+	err := e.hookExecutor.Execute(ctx, task, job, model.HookEventOnStart, nil)
+	if err == nil {
+		return nil
+	}
+
+	var cancelErr *hook.CancelError
+	var fatalErr *hook.FatalError
+
+	switch {
+	case errors.As(err, &cancelErr):
+		e.logger.Info("on_start hook requested cancel", zap.Stringer("hook_id", cancelErr.HookID))
+		if _, updateErr := e.jobQuery.UpdateJobStatus(ctx, job.ID, string(model.JobStatusCancelled), cancelErr.Error()); updateErr != nil {
+			e.logger.Error("Failed to update job status to cancelled", zap.Error(updateErr))
+		}
+		e.executeHooks(ctx, task, job, model.HookEventOnEnd, cancelErr)
+		return cancelErr
+
+	case errors.As(err, &fatalErr):
+		e.logger.Error("on_start hook failed fatally", zap.Stringer("hook_id", fatalErr.HookID), zap.Error(fatalErr))
+		if _, updateErr := e.jobQuery.UpdateJobStatus(ctx, job.ID, string(model.JobStatusFailed), fatalErr.Error()); updateErr != nil {
+			e.logger.Error("Failed to update job status to failed", zap.Error(updateErr))
+		}
+		e.executeHooks(ctx, task, job, model.HookEventOnFailure, fatalErr)
+		e.executeHooks(ctx, task, job, model.HookEventOnEnd, fatalErr)
+		return fatalErr
+
+	default:
+		e.logger.Warn("on_start hook execution failed (IGNORE mode)", zap.Error(err))
+		return nil
+	}
 }
 
 var _ ports.SyncEngine = (*SyncEngine)(nil)

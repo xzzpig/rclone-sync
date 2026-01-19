@@ -2,6 +2,7 @@ package rclone
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
+	"github.com/xzzpig/rclone-sync/internal/core/hook"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 )
 
@@ -130,7 +132,7 @@ func TestPollStatsLogic(t *testing.T) {
 	jobID := uuid.New()
 
 	// 2. Setup SyncEngine
-	engine := NewSyncEngine(mockJobQuery, nil, nil, t.TempDir(), false, 0)
+	engine := NewSyncEngine(mockJobQuery, nil, nil, t.TempDir(), false, 0, nil)
 	engine.logger = zap.NewNop() // Setup logger
 
 	// 3. Setup Context with Stats
@@ -159,7 +161,7 @@ func TestPollStatsLogic(t *testing.T) {
 func TestGetJobProgress(t *testing.T) {
 	// Setup
 	mockJobQuery := new(MockJobQuery)
-	engine := NewSyncEngine(mockJobQuery, nil, nil, t.TempDir(), false, 0)
+	engine := NewSyncEngine(mockJobQuery, nil, nil, t.TempDir(), false, 0, nil)
 
 	// Test case 1: Job ID exists in lastEvents
 	jobID1 := uuid.New()
@@ -251,7 +253,7 @@ func TestGetConflictResolutionFromOptions(t *testing.T) {
 // TestFailJob tests the failJob method
 func TestFailJob(t *testing.T) {
 	mockJobQuery := new(MockJobQuery)
-	engine := NewSyncEngine(mockJobQuery, nil, nil, t.TempDir(), false, 0)
+	engine := NewSyncEngine(mockJobQuery, nil, nil, t.TempDir(), false, 0, nil)
 	engine.logger = zap.NewNop()
 
 	jobID := uuid.New()
@@ -670,5 +672,367 @@ func TestIsEmptyJob(t *testing.T) {
 			result := isEmptyJob(job)
 			assert.Equal(t, tt.expected, result)
 		})
+	}
+}
+
+// MockHookExecutor is a mock for ports.HookExecutor
+type MockHookExecutor struct {
+	mock.Mock
+}
+
+func (m *MockHookExecutor) Execute(ctx context.Context, task *ent.Task, job *ent.Job, event model.HookEvent, syncErr error) error {
+	args := m.Called(ctx, task, job, event, syncErr)
+	return args.Error(0)
+}
+
+// TestExecuteHooks tests the executeHooks method of SyncEngine
+func TestExecuteHooks(t *testing.T) {
+	t.Run("hookExecutor nil - does nothing", func(t *testing.T) {
+		mockJobQuery := new(MockJobQuery)
+		engine := NewSyncEngine(mockJobQuery, nil, nil, t.TempDir(), false, 0, nil)
+		engine.logger = zap.NewNop()
+
+		task := createTestTaskForHook()
+		job := createTestJobForHook()
+
+		// Should not panic and return gracefully
+		engine.executeHooks(context.Background(), task, job, model.HookEventOnSuccess, nil)
+	})
+
+	t.Run("hookExecutor executes successfully", func(t *testing.T) {
+		mockJobQuery := new(MockJobQuery)
+		mockHookExecutor := new(MockHookExecutor)
+
+		engine := NewSyncEngine(mockJobQuery, nil, nil, t.TempDir(), false, 0, mockHookExecutor)
+		engine.logger = zap.NewNop()
+
+		task := createTestTaskForHook()
+		job := createTestJobForHook()
+
+		mockHookExecutor.On("Execute", mock.Anything, task, job, model.HookEventOnSuccess, nil).Return(nil).Once()
+
+		engine.executeHooks(context.Background(), task, job, model.HookEventOnSuccess, nil)
+
+		mockHookExecutor.AssertExpectations(t)
+	})
+
+	t.Run("hookExecutor executes with syncErr", func(t *testing.T) {
+		mockJobQuery := new(MockJobQuery)
+		mockHookExecutor := new(MockHookExecutor)
+
+		engine := NewSyncEngine(mockJobQuery, nil, nil, t.TempDir(), false, 0, mockHookExecutor)
+		engine.logger = zap.NewNop()
+
+		task := createTestTaskForHook()
+		job := createTestJobForHook()
+		syncErr := errors.New("sync failed")
+
+		mockHookExecutor.On("Execute", mock.Anything, task, job, model.HookEventOnFailure, syncErr).Return(nil).Once()
+
+		engine.executeHooks(context.Background(), task, job, model.HookEventOnFailure, syncErr)
+
+		mockHookExecutor.AssertExpectations(t)
+	})
+
+	t.Run("hookExecutor returns error - logs warning", func(t *testing.T) {
+		mockJobQuery := new(MockJobQuery)
+		mockHookExecutor := new(MockHookExecutor)
+
+		engine := NewSyncEngine(mockJobQuery, nil, nil, t.TempDir(), false, 0, mockHookExecutor)
+		engine.logger = zap.NewNop()
+
+		task := createTestTaskForHook()
+		job := createTestJobForHook()
+		hookErr := errors.New("hook execution failed")
+
+		mockHookExecutor.On("Execute", mock.Anything, task, job, model.HookEventOnEnd, nil).Return(hookErr).Once()
+
+		// Should not panic, just log warning
+		engine.executeHooks(context.Background(), task, job, model.HookEventOnEnd, nil)
+
+		mockHookExecutor.AssertExpectations(t)
+	})
+
+	t.Run("all hook events are supported", func(t *testing.T) {
+		events := []model.HookEvent{
+			model.HookEventOnStart,
+			model.HookEventOnSuccess,
+			model.HookEventOnFailure,
+			model.HookEventOnEnd,
+		}
+
+		for _, event := range events {
+			t.Run(string(event), func(t *testing.T) {
+				mockJobQuery := new(MockJobQuery)
+				mockHookExecutor := new(MockHookExecutor)
+
+				engine := NewSyncEngine(mockJobQuery, nil, nil, t.TempDir(), false, 0, mockHookExecutor)
+				engine.logger = zap.NewNop()
+
+				task := createTestTaskForHook()
+				job := createTestJobForHook()
+
+				mockHookExecutor.On("Execute", mock.Anything, task, job, event, nil).Return(nil).Once()
+
+				engine.executeHooks(context.Background(), task, job, event, nil)
+
+				mockHookExecutor.AssertExpectations(t)
+			})
+		}
+	})
+}
+
+// TestExecuteOnStartHooks tests the executeOnStartHooks method of SyncEngine
+func TestExecuteOnStartHooks(t *testing.T) {
+	t.Run("hookExecutor nil - returns nil", func(t *testing.T) {
+		mockJobQuery := new(MockJobQuery)
+		engine := NewSyncEngine(mockJobQuery, nil, nil, t.TempDir(), false, 0, nil)
+		engine.logger = zap.NewNop()
+
+		task := createTestTaskForHook()
+		job := createTestJobForHook()
+
+		err := engine.executeOnStartHooks(context.Background(), task, job)
+		assert.NoError(t, err)
+	})
+
+	t.Run("hookExecutor executes successfully - returns nil", func(t *testing.T) {
+		mockJobQuery := new(MockJobQuery)
+		mockHookExecutor := new(MockHookExecutor)
+
+		engine := NewSyncEngine(mockJobQuery, nil, nil, t.TempDir(), false, 0, mockHookExecutor)
+		engine.logger = zap.NewNop()
+
+		task := createTestTaskForHook()
+		job := createTestJobForHook()
+
+		mockHookExecutor.On("Execute", mock.Anything, task, job, model.HookEventOnStart, nil).Return(nil).Once()
+
+		err := engine.executeOnStartHooks(context.Background(), task, job)
+		assert.NoError(t, err)
+		mockHookExecutor.AssertExpectations(t)
+	})
+
+	t.Run("CancelError - updates status to CANCELLED and calls on_end", func(t *testing.T) {
+		mockJobQuery := new(MockJobQuery)
+		mockHookExecutor := new(MockHookExecutor)
+
+		engine := NewSyncEngine(mockJobQuery, nil, nil, t.TempDir(), false, 0, mockHookExecutor)
+		engine.logger = zap.NewNop()
+
+		task := createTestTaskForHook()
+		job := createTestJobForHook()
+
+		hookID := uuid.New()
+		cancelErr := &hook.CancelError{HookID: hookID, Cause: errors.New("pre-condition not met")}
+
+		// First call: on_start returns CancelError
+		mockHookExecutor.On("Execute", mock.Anything, task, job, model.HookEventOnStart, nil).
+			Return(cancelErr).Once()
+
+		// Job status should be updated to CANCELLED
+		mockJobQuery.On("UpdateJobStatus", mock.Anything, job.ID, string(model.JobStatusCancelled), cancelErr.Error()).
+			Return((*ent.Job)(nil), nil).Once()
+
+		// on_end hook should be called with the cancelErr
+		mockHookExecutor.On("Execute", mock.Anything, task, job, model.HookEventOnEnd, cancelErr).
+			Return(nil).Once()
+
+		err := engine.executeOnStartHooks(context.Background(), task, job)
+
+		assert.Error(t, err)
+		var returnedCancelErr *hook.CancelError
+		assert.True(t, errors.As(err, &returnedCancelErr))
+		assert.Equal(t, hookID, returnedCancelErr.HookID)
+
+		mockJobQuery.AssertExpectations(t)
+		mockHookExecutor.AssertExpectations(t)
+	})
+
+	t.Run("FatalError - updates status to FAILED and calls on_failure and on_end", func(t *testing.T) {
+		mockJobQuery := new(MockJobQuery)
+		mockHookExecutor := new(MockHookExecutor)
+
+		engine := NewSyncEngine(mockJobQuery, nil, nil, t.TempDir(), false, 0, mockHookExecutor)
+		engine.logger = zap.NewNop()
+
+		task := createTestTaskForHook()
+		job := createTestJobForHook()
+
+		hookID := uuid.New()
+		fatalErr := &hook.FatalError{HookID: hookID, Cause: errors.New("critical failure")}
+
+		// First call: on_start returns FatalError
+		mockHookExecutor.On("Execute", mock.Anything, task, job, model.HookEventOnStart, nil).
+			Return(fatalErr).Once()
+
+		// Job status should be updated to FAILED
+		mockJobQuery.On("UpdateJobStatus", mock.Anything, job.ID, string(model.JobStatusFailed), fatalErr.Error()).
+			Return((*ent.Job)(nil), nil).Once()
+
+		// on_failure hook should be called with the fatalErr
+		mockHookExecutor.On("Execute", mock.Anything, task, job, model.HookEventOnFailure, fatalErr).
+			Return(nil).Once()
+
+		// on_end hook should be called with the fatalErr
+		mockHookExecutor.On("Execute", mock.Anything, task, job, model.HookEventOnEnd, fatalErr).
+			Return(nil).Once()
+
+		err := engine.executeOnStartHooks(context.Background(), task, job)
+
+		assert.Error(t, err)
+		var returnedFatalErr *hook.FatalError
+		assert.True(t, errors.As(err, &returnedFatalErr))
+		assert.Equal(t, hookID, returnedFatalErr.HookID)
+
+		mockJobQuery.AssertExpectations(t)
+		mockHookExecutor.AssertExpectations(t)
+	})
+
+	t.Run("other error (IGNORE mode) - logs warning and returns nil", func(t *testing.T) {
+		mockJobQuery := new(MockJobQuery)
+		mockHookExecutor := new(MockHookExecutor)
+
+		engine := NewSyncEngine(mockJobQuery, nil, nil, t.TempDir(), false, 0, mockHookExecutor)
+		engine.logger = zap.NewNop()
+
+		task := createTestTaskForHook()
+		job := createTestJobForHook()
+
+		// Return a generic error (not CancelError or FatalError)
+		genericErr := errors.New("transient hook failure")
+
+		mockHookExecutor.On("Execute", mock.Anything, task, job, model.HookEventOnStart, nil).
+			Return(genericErr).Once()
+
+		err := engine.executeOnStartHooks(context.Background(), task, job)
+
+		// Should return nil (IGNORE mode behavior)
+		assert.NoError(t, err)
+
+		// No status update or additional hooks should be called
+		mockJobQuery.AssertNotCalled(t, "UpdateJobStatus")
+		mockHookExecutor.AssertExpectations(t)
+	})
+
+	t.Run("CancelError - UpdateJobStatus fails - still returns CancelError", func(t *testing.T) {
+		mockJobQuery := new(MockJobQuery)
+		mockHookExecutor := new(MockHookExecutor)
+
+		engine := NewSyncEngine(mockJobQuery, nil, nil, t.TempDir(), false, 0, mockHookExecutor)
+		engine.logger = zap.NewNop()
+
+		task := createTestTaskForHook()
+		job := createTestJobForHook()
+
+		hookID := uuid.New()
+		cancelErr := &hook.CancelError{HookID: hookID, Cause: errors.New("cancelled")}
+
+		mockHookExecutor.On("Execute", mock.Anything, task, job, model.HookEventOnStart, nil).
+			Return(cancelErr).Once()
+
+		// UpdateJobStatus fails
+		mockJobQuery.On("UpdateJobStatus", mock.Anything, job.ID, string(model.JobStatusCancelled), cancelErr.Error()).
+			Return((*ent.Job)(nil), errors.New("db error")).Once()
+
+		// on_end should still be called
+		mockHookExecutor.On("Execute", mock.Anything, task, job, model.HookEventOnEnd, cancelErr).
+			Return(nil).Once()
+
+		err := engine.executeOnStartHooks(context.Background(), task, job)
+
+		// Should still return the original cancel error
+		assert.Error(t, err)
+		var returnedCancelErr *hook.CancelError
+		assert.True(t, errors.As(err, &returnedCancelErr))
+
+		mockJobQuery.AssertExpectations(t)
+		mockHookExecutor.AssertExpectations(t)
+	})
+
+	t.Run("FatalError - UpdateJobStatus fails - still returns FatalError", func(t *testing.T) {
+		mockJobQuery := new(MockJobQuery)
+		mockHookExecutor := new(MockHookExecutor)
+
+		engine := NewSyncEngine(mockJobQuery, nil, nil, t.TempDir(), false, 0, mockHookExecutor)
+		engine.logger = zap.NewNop()
+
+		task := createTestTaskForHook()
+		job := createTestJobForHook()
+
+		hookID := uuid.New()
+		fatalErr := &hook.FatalError{HookID: hookID, Cause: errors.New("fatal")}
+
+		mockHookExecutor.On("Execute", mock.Anything, task, job, model.HookEventOnStart, nil).
+			Return(fatalErr).Once()
+
+		// UpdateJobStatus fails
+		mockJobQuery.On("UpdateJobStatus", mock.Anything, job.ID, string(model.JobStatusFailed), fatalErr.Error()).
+			Return((*ent.Job)(nil), errors.New("db error")).Once()
+
+		// on_failure and on_end should still be called
+		mockHookExecutor.On("Execute", mock.Anything, task, job, model.HookEventOnFailure, fatalErr).
+			Return(nil).Once()
+		mockHookExecutor.On("Execute", mock.Anything, task, job, model.HookEventOnEnd, fatalErr).
+			Return(nil).Once()
+
+		err := engine.executeOnStartHooks(context.Background(), task, job)
+
+		// Should still return the original fatal error
+		assert.Error(t, err)
+		var returnedFatalErr *hook.FatalError
+		assert.True(t, errors.As(err, &returnedFatalErr))
+
+		mockJobQuery.AssertExpectations(t)
+		mockHookExecutor.AssertExpectations(t)
+	})
+}
+
+// TestNewSyncEngineWithHookExecutor tests that NewSyncEngine properly initializes with hookExecutor
+func TestNewSyncEngineWithHookExecutor(t *testing.T) {
+	t.Run("hookExecutor nil is allowed", func(t *testing.T) {
+		mockJobQuery := new(MockJobQuery)
+		engine := NewSyncEngine(mockJobQuery, nil, nil, t.TempDir(), false, 4, nil)
+
+		assert.NotNil(t, engine)
+		assert.Nil(t, engine.hookExecutor)
+	})
+
+	t.Run("hookExecutor is stored correctly", func(t *testing.T) {
+		mockJobQuery := new(MockJobQuery)
+		mockHookExecutor := new(MockHookExecutor)
+
+		engine := NewSyncEngine(mockJobQuery, nil, nil, t.TempDir(), false, 4, mockHookExecutor)
+
+		assert.NotNil(t, engine)
+		assert.NotNil(t, engine.hookExecutor)
+		assert.Equal(t, mockHookExecutor, engine.hookExecutor)
+	})
+}
+
+// Helper functions for hook tests
+func createTestTaskForHook() *ent.Task {
+	return &ent.Task{
+		ID:           uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+		Name:         "test-task-hook",
+		SourcePath:   "/local/path",
+		RemotePath:   "remote:backup",
+		Direction:    model.SyncDirectionUpload,
+		ConnectionID: uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+	}
+}
+
+func createTestJobForHook() *ent.Job {
+	return &ent.Job{
+		ID:               uuid.MustParse("cccccccc-cccc-cccc-cccc-cccccccccccc"),
+		TaskID:           uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+		Status:           model.JobStatusRunning,
+		Trigger:          model.JobTriggerManual,
+		StartTime:        time.Date(2026, 1, 17, 10, 0, 0, 0, time.UTC),
+		EndTime:          time.Time{},
+		FilesTransferred: 0,
+		BytesTransferred: 0,
+		FilesDeleted:     0,
+		ErrorCount:       0,
 	}
 }

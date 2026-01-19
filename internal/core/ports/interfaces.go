@@ -77,3 +77,19 @@ type ConnectionQuery interface {
 	DeleteConnectionByName(ctx context.Context, name string) error
 	HasAssociatedTasks(ctx context.Context, connectionID uuid.UUID) (bool, error)
 }
+
+// HookQuery provides operations for managing task hooks.
+type HookQuery interface {
+	GetHook(ctx context.Context, id uuid.UUID) (*ent.TaskHook, error)
+	ListHooks(ctx context.Context, taskID *uuid.UUID, connectionID *uuid.UUID, event *model.HookEvent) ([]*ent.TaskHook, error)
+	CreateHook(ctx context.Context, taskID *uuid.UUID, connectionID *uuid.UUID, input model.HookInput) (*ent.TaskHook, error)
+	UpdateHook(ctx context.Context, id uuid.UUID, input model.UpdateHookInput) (*ent.TaskHook, error)
+	DeleteHook(ctx context.Context, id uuid.UUID) (*ent.TaskHook, error)
+	GetHooksForEvent(ctx context.Context, taskID uuid.UUID, connectionID uuid.UUID, event model.HookEvent) ([]*ent.TaskHook, error)
+}
+
+// HookExecutor handles the execution of task event hooks.
+type HookExecutor interface {
+	// Execute triggers hooks for the given task and event.
+	Execute(ctx context.Context, task *ent.Task, job *ent.Job, event model.HookEvent, syncErr error) error
+}

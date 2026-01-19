@@ -16,6 +16,7 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/ent/connection"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/predicate"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/task"
+	"github.com/xzzpig/rclone-sync/internal/core/ent/taskhook"
 )
 
 // ConnectionUpdate is the builder for updating Connection entities.
@@ -98,6 +99,21 @@ func (_u *ConnectionUpdate) AddTasks(v ...*Task) *ConnectionUpdate {
 	return _u.AddTaskIDs(ids...)
 }
 
+// AddHookIDs adds the "hooks" edge to the TaskHook entity by IDs.
+func (_u *ConnectionUpdate) AddHookIDs(ids ...uuid.UUID) *ConnectionUpdate {
+	_u.mutation.AddHookIDs(ids...)
+	return _u
+}
+
+// AddHooks adds the "hooks" edges to the TaskHook entity.
+func (_u *ConnectionUpdate) AddHooks(v ...*TaskHook) *ConnectionUpdate {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddHookIDs(ids...)
+}
+
 // Mutation returns the ConnectionMutation object of the builder.
 func (_u *ConnectionUpdate) Mutation() *ConnectionMutation {
 	return _u.mutation
@@ -122,6 +138,27 @@ func (_u *ConnectionUpdate) RemoveTasks(v ...*Task) *ConnectionUpdate {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveTaskIDs(ids...)
+}
+
+// ClearHooks clears all "hooks" edges to the TaskHook entity.
+func (_u *ConnectionUpdate) ClearHooks() *ConnectionUpdate {
+	_u.mutation.ClearHooks()
+	return _u
+}
+
+// RemoveHookIDs removes the "hooks" edge to TaskHook entities by IDs.
+func (_u *ConnectionUpdate) RemoveHookIDs(ids ...uuid.UUID) *ConnectionUpdate {
+	_u.mutation.RemoveHookIDs(ids...)
+	return _u
+}
+
+// RemoveHooks removes "hooks" edges to TaskHook entities.
+func (_u *ConnectionUpdate) RemoveHooks(v ...*TaskHook) *ConnectionUpdate {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveHookIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -250,6 +287,51 @@ func (_u *ConnectionUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.HooksCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   connection.HooksTable,
+			Columns: []string{connection.HooksColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(taskhook.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedHooksIDs(); len(nodes) > 0 && !_u.mutation.HooksCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   connection.HooksTable,
+			Columns: []string{connection.HooksColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(taskhook.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.HooksIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   connection.HooksTable,
+			Columns: []string{connection.HooksColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(taskhook.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{connection.Label}
@@ -337,6 +419,21 @@ func (_u *ConnectionUpdateOne) AddTasks(v ...*Task) *ConnectionUpdateOne {
 	return _u.AddTaskIDs(ids...)
 }
 
+// AddHookIDs adds the "hooks" edge to the TaskHook entity by IDs.
+func (_u *ConnectionUpdateOne) AddHookIDs(ids ...uuid.UUID) *ConnectionUpdateOne {
+	_u.mutation.AddHookIDs(ids...)
+	return _u
+}
+
+// AddHooks adds the "hooks" edges to the TaskHook entity.
+func (_u *ConnectionUpdateOne) AddHooks(v ...*TaskHook) *ConnectionUpdateOne {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddHookIDs(ids...)
+}
+
 // Mutation returns the ConnectionMutation object of the builder.
 func (_u *ConnectionUpdateOne) Mutation() *ConnectionMutation {
 	return _u.mutation
@@ -361,6 +458,27 @@ func (_u *ConnectionUpdateOne) RemoveTasks(v ...*Task) *ConnectionUpdateOne {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveTaskIDs(ids...)
+}
+
+// ClearHooks clears all "hooks" edges to the TaskHook entity.
+func (_u *ConnectionUpdateOne) ClearHooks() *ConnectionUpdateOne {
+	_u.mutation.ClearHooks()
+	return _u
+}
+
+// RemoveHookIDs removes the "hooks" edge to TaskHook entities by IDs.
+func (_u *ConnectionUpdateOne) RemoveHookIDs(ids ...uuid.UUID) *ConnectionUpdateOne {
+	_u.mutation.RemoveHookIDs(ids...)
+	return _u
+}
+
+// RemoveHooks removes "hooks" edges to TaskHook entities.
+func (_u *ConnectionUpdateOne) RemoveHooks(v ...*TaskHook) *ConnectionUpdateOne {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveHookIDs(ids...)
 }
 
 // Where appends a list predicates to the ConnectionUpdate builder.
@@ -512,6 +630,51 @@ func (_u *ConnectionUpdateOne) sqlSave(ctx context.Context) (_node *Connection, 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(task.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.HooksCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   connection.HooksTable,
+			Columns: []string{connection.HooksColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(taskhook.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedHooksIDs(); len(nodes) > 0 && !_u.mutation.HooksCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   connection.HooksTable,
+			Columns: []string{connection.HooksColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(taskhook.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.HooksIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   connection.HooksTable,
+			Columns: []string{connection.HooksColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(taskhook.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

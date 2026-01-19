@@ -21,6 +21,7 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/db"
 	"github.com/xzzpig/rclone-sync/internal/core/db/query"
+	"github.com/xzzpig/rclone-sync/internal/core/hook"
 	"github.com/xzzpig/rclone-sync/internal/core/logger"
 	"github.com/xzzpig/rclone-sync/internal/core/runner"
 	"github.com/xzzpig/rclone-sync/internal/core/scheduler"
@@ -72,7 +73,7 @@ var serveCmd = &cobra.Command{
 
 		// 5. Initialize database with configured options
 		dbClient, err := db.InitDB(db.InitDBOptions{
-			DSN:           db.FileSDN(cfg.Database.Path),
+			DSN:           db.FileDSN(cfg.Database.Path),
 			MigrationMode: db.ParseMigrationMode(cfg.Database.MigrationMode),
 			EnableDebug:   logger.GetLevelForName("core.db.query") == zap.DebugLevel,
 			Environment:   cfg.App.Environment,
@@ -112,9 +113,11 @@ var serveCmd = &cobra.Command{
 		// 7. Initialize queries
 		taskSvc := query.NewTaskQuery(dbClient)
 		jobSvc := query.NewJobQuery(dbClient)
+		hookSvc := query.NewHookQuery(dbClient)
 		jobProgressBus := subscription.NewJobProgressBus()
 		transferProgressBus := subscription.NewTransferProgressBus()
-		syncEngine := rclone.NewSyncEngine(jobSvc, jobProgressBus, transferProgressBus, cfg.App.DataDir, cfg.App.Job.AutoDeleteEmptyJobs, cfg.App.Sync.Transfers)
+		hookExecutor := hook.NewExecutor(hookSvc, jobSvc, &cfg.App.Hook.Enabled, cfg.App.Hook.DefaultTimeout)
+		syncEngine := rclone.NewSyncEngine(jobSvc, jobProgressBus, transferProgressBus, cfg.App.DataDir, cfg.App.Job.AutoDeleteEmptyJobs, cfg.App.Sync.Transfers, hookExecutor)
 		taskRunner := runner.NewRunner(syncEngine)
 
 		// Reset any stuck jobs from previous crash/shutdown

@@ -63,6 +63,8 @@ func (Task) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.To("jobs", Job.Type).
 			Annotations(entsql.OnDelete(entsql.Cascade)),
+		edge.To("hooks", TaskHook.Type).
+			Annotations(entsql.OnDelete(entsql.Cascade)),
 		edge.From("connection", Connection.Type).
 			Ref("tasks").
 			Unique().

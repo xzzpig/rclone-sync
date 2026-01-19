@@ -45,6 +45,9 @@ type ResolverRoot interface {
 	ConnectionMutation() ConnectionMutationResolver
 	ConnectionQuery() ConnectionQueryResolver
 	FileQuery() FileQueryResolver
+	Hook() HookResolver
+	HookMutation() HookMutationResolver
+	HookQuery() HookQueryResolver
 	ImportMutation() ImportMutationResolver
 	Job() JobResolver
 	JobLog() JobLogResolver
@@ -63,6 +66,14 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
+	AppConfig struct {
+		Hook func(childComplexity int) int
+	}
+
+	AppHookConfig struct {
+		Enabled func(childComplexity int) int
+	}
+
 	ClearCacheResult struct {
 		ClearedCount func(childComplexity int) int
 		Message      func(childComplexity int) int
@@ -73,6 +84,7 @@ type ComplexityRoot struct {
 		CacheStatus func(childComplexity int) int
 		Config      func(childComplexity int) int
 		CreatedAt   func(childComplexity int) int
+		Hooks       func(childComplexity int) int
 		ID          func(childComplexity int) int
 		LoadError   func(childComplexity int) int
 		LoadStatus  func(childComplexity int) int
@@ -148,6 +160,41 @@ type ComplexityRoot struct {
 
 	FileQuery struct {
 		List func(childComplexity int, connectionID *uuid.UUID, path string, basePath *string, filters []string, includeFiles *bool) int
+	}
+
+	Hook struct {
+		Config     func(childComplexity int) int
+		Connection func(childComplexity int) int
+		CreatedAt  func(childComplexity int) int
+		Enabled    func(childComplexity int) int
+		Event      func(childComplexity int) int
+		ID         func(childComplexity int) int
+		OnError    func(childComplexity int) int
+		Priority   func(childComplexity int) int
+		Task       func(childComplexity int) int
+		Type       func(childComplexity int) int
+		UpdatedAt  func(childComplexity int) int
+	}
+
+	HookConfig struct {
+		Body    func(childComplexity int) int
+		Command func(childComplexity int) int
+		Headers func(childComplexity int) int
+		Method  func(childComplexity int) int
+		Timeout func(childComplexity int) int
+		URL     func(childComplexity int) int
+		WorkDir func(childComplexity int) int
+	}
+
+	HookMutation struct {
+		Create func(childComplexity int, taskID *uuid.UUID, connectionID *uuid.UUID, input model.HookInput) int
+		Delete func(childComplexity int, id uuid.UUID) int
+		Update func(childComplexity int, id uuid.UUID, input model.UpdateHookInput) int
+	}
+
+	HookQuery struct {
+		Get  func(childComplexity int, id uuid.UUID) int
+		List func(childComplexity int, taskID *uuid.UUID, connectionID *uuid.UUID, event *model.HookEvent) int
 	}
 
 	ImportExecuteResult struct {
@@ -236,6 +283,7 @@ type ComplexityRoot struct {
 
 	Mutation struct {
 		Connection func(childComplexity int) int
+		Hook       func(childComplexity int) int
 		Import     func(childComplexity int) int
 		Task       func(childComplexity int) int
 	}
@@ -284,8 +332,10 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
+		AppConfig  func(childComplexity int) int
 		Connection func(childComplexity int) int
 		File       func(childComplexity int) int
+		Hook       func(childComplexity int) int
 		Job        func(childComplexity int) int
 		Log        func(childComplexity int) int
 		Provider   func(childComplexity int) int
@@ -303,6 +353,7 @@ type ComplexityRoot struct {
 		CreatedAt  func(childComplexity int) int
 		Direction  func(childComplexity int) int
 		Enabled    func(childComplexity int) int
+		Hooks      func(childComplexity int) int
 		ID         func(childComplexity int) int
 		Jobs       func(childComplexity int, pagination *model.PaginationInput) int
 		LatestJob  func(childComplexity int) int
@@ -364,6 +415,7 @@ type ConnectionResolver interface {
 	Quota(ctx context.Context, obj *model.Connection) (*model.ConnectionQuota, error)
 
 	CacheStatus(ctx context.Context, obj *model.Connection) (*model.ConnectionCacheStatus, error)
+	Hooks(ctx context.Context, obj *model.Connection) ([]*model.Hook, error)
 }
 type ConnectionMutationResolver interface {
 	Create(ctx context.Context, obj *model.ConnectionMutation, input model.CreateConnectionInput) (*model.Connection, error)
@@ -379,6 +431,19 @@ type ConnectionQueryResolver interface {
 }
 type FileQueryResolver interface {
 	List(ctx context.Context, obj *model.FileQuery, connectionID *uuid.UUID, path string, basePath *string, filters []string, includeFiles *bool) ([]*model.FileEntry, error)
+}
+type HookResolver interface {
+	Task(ctx context.Context, obj *model.Hook) (*model.Task, error)
+	Connection(ctx context.Context, obj *model.Hook) (*model.Connection, error)
+}
+type HookMutationResolver interface {
+	Create(ctx context.Context, obj *model.HookMutation, taskID *uuid.UUID, connectionID *uuid.UUID, input model.HookInput) (*model.Hook, error)
+	Update(ctx context.Context, obj *model.HookMutation, id uuid.UUID, input model.UpdateHookInput) (*model.Hook, error)
+	Delete(ctx context.Context, obj *model.HookMutation, id uuid.UUID) (*model.Hook, error)
+}
+type HookQueryResolver interface {
+	List(ctx context.Context, obj *model.HookQuery, taskID *uuid.UUID, connectionID *uuid.UUID, event *model.HookEvent) ([]*model.Hook, error)
+	Get(ctx context.Context, obj *model.HookQuery, id uuid.UUID) (*model.Hook, error)
 }
 type ImportMutationResolver interface {
 	Parse(ctx context.Context, obj *model.ImportMutation, input model.ImportParseInput) (model.ImportParseResult, error)
@@ -402,6 +467,7 @@ type LogQueryResolver interface {
 }
 type MutationResolver interface {
 	Connection(ctx context.Context) (*model.ConnectionMutation, error)
+	Hook(ctx context.Context) (*model.HookMutation, error)
 	Import(ctx context.Context) (*model.ImportMutation, error)
 	Task(ctx context.Context) (*model.TaskMutation, error)
 }
@@ -410,8 +476,10 @@ type ProviderQueryResolver interface {
 	Get(ctx context.Context, obj *model.ProviderQuery, name string) (*model.Provider, error)
 }
 type QueryResolver interface {
+	AppConfig(ctx context.Context) (*model.AppConfig, error)
 	Connection(ctx context.Context) (*model.ConnectionQuery, error)
 	File(ctx context.Context) (*model.FileQuery, error)
+	Hook(ctx context.Context) (*model.HookQuery, error)
 	Job(ctx context.Context) (*model.JobQuery, error)
 	Log(ctx context.Context) (*model.LogQuery, error)
 	Provider(ctx context.Context) (*model.ProviderQuery, error)
@@ -428,6 +496,7 @@ type TaskResolver interface {
 	Connection(ctx context.Context, obj *model.Task) (*model.Connection, error)
 	Jobs(ctx context.Context, obj *model.Task, pagination *model.PaginationInput) (*model.JobConnection, error)
 	LatestJob(ctx context.Context, obj *model.Task) (*model.Job, error)
+	Hooks(ctx context.Context, obj *model.Task) ([]*model.Hook, error)
 }
 type TaskMutationResolver interface {
 	Create(ctx context.Context, obj *model.TaskMutation, input model.CreateTaskInput) (*model.Task, error)
@@ -458,6 +527,20 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 	ec := executionContext{nil, e, 0, 0, nil}
 	_ = ec
 	switch typeName + "." + field {
+
+	case "AppConfig.hook":
+		if e.complexity.AppConfig.Hook == nil {
+			break
+		}
+
+		return e.complexity.AppConfig.Hook(childComplexity), true
+
+	case "AppHookConfig.enabled":
+		if e.complexity.AppHookConfig.Enabled == nil {
+			break
+		}
+
+		return e.complexity.AppHookConfig.Enabled(childComplexity), true
 
 	case "ClearCacheResult.clearedCount":
 		if e.complexity.ClearCacheResult.ClearedCount == nil {
@@ -496,6 +579,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Connection.CreatedAt(childComplexity), true
+	case "Connection.hooks":
+		if e.complexity.Connection.Hooks == nil {
+			break
+		}
+
+		return e.complexity.Connection.Hooks(childComplexity), true
 	case "Connection.id":
 		if e.complexity.Connection.ID == nil {
 			break
@@ -809,6 +898,173 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.FileQuery.List(childComplexity, args["connectionId"].(*uuid.UUID), args["path"].(string), args["basePath"].(*string), args["filters"].([]string), args["includeFiles"].(*bool)), true
+
+	case "Hook.config":
+		if e.complexity.Hook.Config == nil {
+			break
+		}
+
+		return e.complexity.Hook.Config(childComplexity), true
+	case "Hook.connection":
+		if e.complexity.Hook.Connection == nil {
+			break
+		}
+
+		return e.complexity.Hook.Connection(childComplexity), true
+	case "Hook.createdAt":
+		if e.complexity.Hook.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.Hook.CreatedAt(childComplexity), true
+	case "Hook.enabled":
+		if e.complexity.Hook.Enabled == nil {
+			break
+		}
+
+		return e.complexity.Hook.Enabled(childComplexity), true
+	case "Hook.event":
+		if e.complexity.Hook.Event == nil {
+			break
+		}
+
+		return e.complexity.Hook.Event(childComplexity), true
+	case "Hook.id":
+		if e.complexity.Hook.ID == nil {
+			break
+		}
+
+		return e.complexity.Hook.ID(childComplexity), true
+	case "Hook.onError":
+		if e.complexity.Hook.OnError == nil {
+			break
+		}
+
+		return e.complexity.Hook.OnError(childComplexity), true
+	case "Hook.priority":
+		if e.complexity.Hook.Priority == nil {
+			break
+		}
+
+		return e.complexity.Hook.Priority(childComplexity), true
+	case "Hook.task":
+		if e.complexity.Hook.Task == nil {
+			break
+		}
+
+		return e.complexity.Hook.Task(childComplexity), true
+	case "Hook.type":
+		if e.complexity.Hook.Type == nil {
+			break
+		}
+
+		return e.complexity.Hook.Type(childComplexity), true
+	case "Hook.updatedAt":
+		if e.complexity.Hook.UpdatedAt == nil {
+			break
+		}
+
+		return e.complexity.Hook.UpdatedAt(childComplexity), true
+
+	case "HookConfig.body":
+		if e.complexity.HookConfig.Body == nil {
+			break
+		}
+
+		return e.complexity.HookConfig.Body(childComplexity), true
+	case "HookConfig.command":
+		if e.complexity.HookConfig.Command == nil {
+			break
+		}
+
+		return e.complexity.HookConfig.Command(childComplexity), true
+	case "HookConfig.headers":
+		if e.complexity.HookConfig.Headers == nil {
+			break
+		}
+
+		return e.complexity.HookConfig.Headers(childComplexity), true
+	case "HookConfig.method":
+		if e.complexity.HookConfig.Method == nil {
+			break
+		}
+
+		return e.complexity.HookConfig.Method(childComplexity), true
+	case "HookConfig.timeout":
+		if e.complexity.HookConfig.Timeout == nil {
+			break
+		}
+
+		return e.complexity.HookConfig.Timeout(childComplexity), true
+	case "HookConfig.url":
+		if e.complexity.HookConfig.URL == nil {
+			break
+		}
+
+		return e.complexity.HookConfig.URL(childComplexity), true
+	case "HookConfig.workDir":
+		if e.complexity.HookConfig.WorkDir == nil {
+			break
+		}
+
+		return e.complexity.HookConfig.WorkDir(childComplexity), true
+
+	case "HookMutation.create":
+		if e.complexity.HookMutation.Create == nil {
+			break
+		}
+
+		args, err := ec.field_HookMutation_create_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.HookMutation.Create(childComplexity, args["taskId"].(*uuid.UUID), args["connectionId"].(*uuid.UUID), args["input"].(model.HookInput)), true
+	case "HookMutation.delete":
+		if e.complexity.HookMutation.Delete == nil {
+			break
+		}
+
+		args, err := ec.field_HookMutation_delete_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.HookMutation.Delete(childComplexity, args["id"].(uuid.UUID)), true
+	case "HookMutation.update":
+		if e.complexity.HookMutation.Update == nil {
+			break
+		}
+
+		args, err := ec.field_HookMutation_update_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.HookMutation.Update(childComplexity, args["id"].(uuid.UUID), args["input"].(model.UpdateHookInput)), true
+
+	case "HookQuery.get":
+		if e.complexity.HookQuery.Get == nil {
+			break
+		}
+
+		args, err := ec.field_HookQuery_get_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.HookQuery.Get(childComplexity, args["id"].(uuid.UUID)), true
+	case "HookQuery.list":
+		if e.complexity.HookQuery.List == nil {
+			break
+		}
+
+		args, err := ec.field_HookQuery_list_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.HookQuery.List(childComplexity, args["taskId"].(*uuid.UUID), args["connectionId"].(*uuid.UUID), args["event"].(*model.HookEvent)), true
 
 	case "ImportExecuteResult.connections":
 		if e.complexity.ImportExecuteResult.Connections == nil {
@@ -1168,6 +1424,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.Connection(childComplexity), true
+	case "Mutation.hook":
+		if e.complexity.Mutation.Hook == nil {
+			break
+		}
+
+		return e.complexity.Mutation.Hook(childComplexity), true
 	case "Mutation.import":
 		if e.complexity.Mutation.Import == nil {
 			break
@@ -1342,6 +1604,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.ProviderQuery.List(childComplexity), true
 
+	case "Query.appConfig":
+		if e.complexity.Query.AppConfig == nil {
+			break
+		}
+
+		return e.complexity.Query.AppConfig(childComplexity), true
 	case "Query.connection":
 		if e.complexity.Query.Connection == nil {
 			break
@@ -1354,6 +1622,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.File(childComplexity), true
+	case "Query.hook":
+		if e.complexity.Query.Hook == nil {
+			break
+		}
+
+		return e.complexity.Query.Hook(childComplexity), true
 	case "Query.job":
 		if e.complexity.Query.Job == nil {
 			break
@@ -1437,6 +1711,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Task.Enabled(childComplexity), true
+	case "Task.hooks":
+		if e.complexity.Task.Hooks == nil {
+			break
+		}
+
+		return e.complexity.Task.Hooks(childComplexity), true
 	case "Task.id":
 		if e.complexity.Task.ID == nil {
 			break
@@ -1677,13 +1957,17 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputConnectionOptionsInput,
 		ec.unmarshalInputCreateConnectionInput,
 		ec.unmarshalInputCreateTaskInput,
+		ec.unmarshalInputHookConfigInput,
+		ec.unmarshalInputHookInput,
 		ec.unmarshalInputImportConnectionInput,
 		ec.unmarshalInputImportExecuteInput,
 		ec.unmarshalInputImportParseInput,
+		ec.unmarshalInputNestedUpdateHookInput,
 		ec.unmarshalInputPaginationInput,
 		ec.unmarshalInputTaskSyncOptionsInput,
 		ec.unmarshalInputTestConnectionInput,
 		ec.unmarshalInputUpdateConnectionInput,
+		ec.unmarshalInputUpdateHookInput,
 		ec.unmarshalInputUpdateTaskInput,
 	)
 	first := true
@@ -1799,6 +2083,37 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 }
 
 var sources = []*ast.Source{
+	{Name: "../schema/app.graphql", Input: `# =============================================================================
+# APP CONFIG TYPES
+# =============================================================================
+
+"""
+应用全局配置
+"""
+type AppConfig {
+	"""
+	Hook 相关配置
+	"""
+	hook: AppHookConfig!
+}
+
+"""
+Hook 全局配置
+"""
+type AppHookConfig {
+	"""
+	是否全局启用 Hook 功能
+	"""
+	enabled: Boolean!
+}
+
+extend type Query {
+	"""
+	获取应用全局配置
+	"""
+	appConfig: AppConfig! @goField(forceResolver: true)
+}
+`, BuiltIn: false},
 	{Name: "../schema/connection.graphql", Input: `# GraphQL Schema: Connection 相关类型定义
 
 # =============================================================================
@@ -2282,6 +2597,388 @@ extend type Query {
 	file: FileQuery! @goField(forceResolver: true)
 }
 `, BuiltIn: false},
+	{Name: "../schema/hook.graphql", Input: `# GraphQL Schema: Hook 相关类型定义
+
+# =============================================================================
+# ENUMS
+# =============================================================================
+
+"""
+Hook 触发事件类型
+"""
+enum HookEvent {
+	"""
+	任务开始执行前
+	"""
+	ON_START
+	"""
+	任务成功完成后
+	"""
+	ON_SUCCESS
+	"""
+	任务失败后
+	"""
+	ON_FAILURE
+	"""
+	任务结束后（无论成功或失败，最后触发）
+	"""
+	ON_END
+}
+
+"""
+Hook 类型
+"""
+enum HookType {
+	"""
+	HTTP 请求
+	"""
+	HTTP
+	"""
+	Shell 命令
+	"""
+	COMMAND
+}
+
+"""
+Hook 错误处理行为
+"""
+enum HookOnError {
+	"""
+	忽略错误，继续执行后续 hooks
+	"""
+	IGNORE
+	"""
+	停止任务，Job 标记为 CANCELLED，仅触发 on_end hook
+	"""
+	CANCEL
+	"""
+	停止任务，Job 标记为 FAILED，依次触发 on_failure 和 on_end hook
+	"""
+	FATAL
+}
+
+# =============================================================================
+# TYPES
+# =============================================================================
+
+"""
+Hook 配置
+"""
+type Hook @goExtraField(name: "TaskID", type: "*github.com/google/uuid.UUID") @goExtraField(name: "ConnectionID", type: "*github.com/google/uuid.UUID") {
+	"""
+	UUID 主键
+	"""
+	id: ID!
+	"""
+	是否启用
+	"""
+	enabled: Boolean!
+	"""
+	执行优先级（升序，null 排最后）
+	"""
+	priority: Int
+	"""
+	触发事件类型
+	"""
+	event: HookEvent!
+	"""
+	Hook 类型
+	"""
+	type: HookType!
+	"""
+	错误处理行为
+	"""
+	onError: HookOnError!
+	"""
+	Hook 配置（强类型结构体）
+	"""
+	config: HookConfig!
+	"""
+	关联的任务（与 connection 互斥）
+	"""
+	task: Task @goField(forceResolver: true)
+	"""
+	关联的连接（与 task 互斥）
+	"""
+	connection: Connection @goField(forceResolver: true)
+	"""
+	创建时间
+	"""
+	createdAt: DateTime!
+	"""
+	更新时间
+	"""
+	updatedAt: DateTime!
+}
+
+"""
+Hook 配置（统一结构体，根据 Hook.type 使用不同字段子集）
+"""
+type HookConfig {
+	# HTTP Hook 配置
+	"""
+	请求 URL（支持 Go text/template 语法）- HTTP Hook
+	"""
+	url: String
+	"""
+	HTTP 方法（GET/POST/PUT），默认 POST - HTTP Hook
+	"""
+	method: String
+	"""
+	自定义请求头 - HTTP Hook
+	"""
+	headers: StringMap
+	"""
+	请求体模板（支持 Go text/template 语法）- HTTP Hook
+	"""
+	body: String
+
+	# Command Hook 配置
+	"""
+	Shell 命令（支持 Go text/template 语法）- Command Hook
+	"""
+	command: String
+	"""
+	工作目录 - Command Hook
+	"""
+	workDir: String
+	"""
+	执行超时时间（秒），默认 30 - Command Hook
+	"""
+	timeout: Int
+}
+
+# =============================================================================
+# EXTEND EXISTING TYPES
+# =============================================================================
+
+# 扩展 Task 类型，添加 hooks 字段
+extend type Task {
+	"""
+	关联的 Hooks 列表
+	"""
+	hooks: [Hook!]! @goField(forceResolver: true)
+}
+
+# 扩展 Connection 类型，添加 hooks 字段
+extend type Connection {
+	"""
+	关联的 Hooks 列表（作为共享 Hooks，关联任务触发事件时会被执行）
+	"""
+	hooks: [Hook!]! @goField(forceResolver: true)
+}
+
+# 扩展 LogAction 枚举，添加 HOOK 类型
+extend enum LogAction {
+	"""
+	Hook 执行记录
+	"""
+	HOOK
+}
+
+# =============================================================================
+# INPUT TYPES
+# =============================================================================
+
+"""
+Hook 的核心配置字段
+"""
+input HookInput {
+	"""
+	是否启用，默认 true
+	"""
+	enabled: Boolean = true
+	"""
+	执行优先级（升序，null 排最后）
+	"""
+	priority: Int
+	"""
+	触发事件类型
+	"""
+	event: HookEvent!
+	"""
+	Hook 类型
+	"""
+	type: HookType!
+	"""
+	错误处理行为，默认 IGNORE
+	"""
+	onError: HookOnError = IGNORE
+	"""
+	Hook 配置数据
+	"""
+	config: HookConfigInput!
+}
+
+"""
+任务/连接 更新时嵌套的 Hook 变更列表项
+"""
+input NestedUpdateHookInput {
+	"""
+	Hook ID (为空时表示新增)
+	"""
+	id: ID
+	"""
+	是否删除该 Hook
+	"""
+	delete: Boolean = false
+	"""
+	Hook 配置数据 (当 delete 为 false 时必填)
+	"""
+	hook: HookInput
+}
+
+"""
+Hook 配置输入（统一结构体，根据 Hook.type 填写对应字段）
+"""
+input HookConfigInput {
+	# HTTP Hook 配置
+	"""
+	请求 URL（支持 Go text/template 语法）- HTTP Hook 必填
+	"""
+	url: String
+	"""
+	HTTP 方法（GET/POST/PUT），默认 POST - HTTP Hook
+	"""
+	method: String
+	"""
+	自定义请求头 - HTTP Hook
+	"""
+	headers: StringMap
+	"""
+	请求体模板（支持 Go text/template 语法）- HTTP Hook
+	"""
+	body: String
+
+	# Command Hook 配置
+	"""
+	Shell 命令（支持 Go text/template 语法）- Command Hook 必填
+	"""
+	command: String
+	"""
+	工作目录 - Command Hook
+	"""
+	workDir: String
+	"""
+	执行超时时间（秒），默认 30 - Command Hook
+	"""
+	timeout: Int
+}
+
+"""
+更新 Hook 输入
+"""
+input UpdateHookInput {
+	"""
+	是否启用
+	"""
+	enabled: Boolean
+	"""
+	执行优先级（升序，null 排最后）
+	"""
+	priority: Int
+	"""
+	触发事件类型
+	"""
+	event: HookEvent
+	"""
+	Hook 类型（变更类型时需同时提供对应的配置）
+	"""
+	type: HookType
+	"""
+	错误处理行为
+	"""
+	onError: HookOnError
+	"""
+	Hook 配置（完整替换）
+	"""
+	config: HookConfigInput
+}
+
+# =============================================================================
+# NAMESPACED TYPES
+# =============================================================================
+
+"""
+Hook 查询命名空间
+"""
+type HookQuery {
+	"""
+	获取 Hook 列表
+	- taskId: 按任务 ID 过滤
+	- connectionId: 按连接 ID 过滤
+	- event: 按事件类型过滤
+	至少需要提供 taskId 或 connectionId 之一
+	"""
+	list(
+		"""
+		按任务 ID 过滤
+		"""
+		taskId: ID
+		"""
+		按连接 ID 过滤
+		"""
+		connectionId: ID
+		"""
+		按事件类型过滤
+		"""
+		event: HookEvent
+	): [Hook!]! @goField(forceResolver: true)
+	"""
+	获取单个 Hook
+	"""
+	get(id: ID!): Hook @goField(forceResolver: true)
+}
+
+"""
+Hook 变更命名空间
+"""
+type HookMutation {
+	"""
+	创建 Hook。taskId 和 connectionId 作为内联参数（二选一），配置数据通过 input 传递。
+	"""
+	create(
+		"""
+		关联的任务 ID（与 connectionId 互斥）
+		"""
+		taskId: ID
+		"""
+		关联的连接 ID（与 taskId 互斥）
+		"""
+		connectionId: ID
+		"""
+		Hook 配置数据
+		"""
+		input: HookInput!
+	): Hook! @goField(forceResolver: true)
+	"""
+	更新 Hook（失败抛出 GraphQL error）
+	"""
+	update(id: ID!, input: UpdateHookInput!): Hook! @goField(forceResolver: true)
+	"""
+	删除 Hook（失败抛出 GraphQL error）
+	"""
+	delete(id: ID!): Hook! @goField(forceResolver: true)
+}
+
+# =============================================================================
+# EXTEND ROOT TYPES
+# =============================================================================
+
+extend type Query {
+	"""
+	Hook 相关查询（命名空间）
+	"""
+	hook: HookQuery! @goField(forceResolver: true)
+}
+
+extend type Mutation {
+	"""
+	Hook 相关变更（命名空间）
+	"""
+	hook: HookMutation! @goField(forceResolver: true)
+}
+`, BuiltIn: false},
 	{Name: "../schema/import.graphql", Input: `# GraphQL Schema: Import 相关类型定义
 
 # =============================================================================
@@ -2619,6 +3316,7 @@ type JobLog @goExtraField(name: "JobID", type: "github.com/google/uuid.UUID") {
 	what: LogAction!
 	"""
 	文件大小（字节）
+	注意：当 what = HOOK 时，此字段表示 hook 执行耗时（毫秒）
 	"""
 	size: BigInt!
 	"""
@@ -3352,6 +4050,10 @@ input CreateTaskInput {
 	同步选项
 	"""
 	options: TaskSyncOptionsInput
+	"""
+	关联的 Hooks
+	"""
+	hooks: [HookInput!]
 }
 
 """
@@ -3369,7 +4071,7 @@ input UpdateTaskInput {
 	"""
 	关联连接 ID
 	"""
-	connectionId: ID
+	connectionID: ID
 	"""
 	远程目标路径
 	"""
@@ -3394,6 +4096,10 @@ input UpdateTaskInput {
 	同步选项
 	"""
 	options: TaskSyncOptionsInput
+	"""
+	关联的 Hooks 变更列表
+	"""
+	hooks: [NestedUpdateHookInput!]
 }
 
 # =============================================================================
@@ -3593,6 +4299,86 @@ func (ec *executionContext) field_FileQuery_list_args(ctx context.Context, rawAr
 		return nil, err
 	}
 	args["includeFiles"] = arg4
+	return args, nil
+}
+
+func (ec *executionContext) field_HookMutation_create_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "taskId", ec.unmarshalOID2ᚖgithubᚗcomᚋgoogleᚋuuidᚐUUID)
+	if err != nil {
+		return nil, err
+	}
+	args["taskId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "connectionId", ec.unmarshalOID2ᚖgithubᚗcomᚋgoogleᚋuuidᚐUUID)
+	if err != nil {
+		return nil, err
+	}
+	args["connectionId"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNHookInput2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookInput)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_HookMutation_delete_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_HookMutation_update_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNUpdateHookInput2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐUpdateHookInput)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_HookQuery_get_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_HookQuery_list_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "taskId", ec.unmarshalOID2ᚖgithubᚗcomᚋgoogleᚋuuidᚐUUID)
+	if err != nil {
+		return nil, err
+	}
+	args["taskId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "connectionId", ec.unmarshalOID2ᚖgithubᚗcomᚋgoogleᚋuuidᚐUUID)
+	if err != nil {
+		return nil, err
+	}
+	args["connectionId"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "event", ec.unmarshalOHookEvent2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookEvent)
+	if err != nil {
+		return nil, err
+	}
+	args["event"] = arg2
 	return args, nil
 }
 
@@ -3906,6 +4692,68 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 // endregion ************************** directives.gotpl **************************
 
 // region    **************************** field.gotpl *****************************
+
+func (ec *executionContext) _AppConfig_hook(ctx context.Context, field graphql.CollectedField, obj *model.AppConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AppConfig_hook,
+		func(ctx context.Context) (any, error) {
+			return obj.Hook, nil
+		},
+		nil,
+		ec.marshalNAppHookConfig2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐAppHookConfig,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AppConfig_hook(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AppConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "enabled":
+				return ec.fieldContext_AppHookConfig_enabled(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AppHookConfig", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AppHookConfig_enabled(ctx context.Context, field graphql.CollectedField, obj *model.AppHookConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AppHookConfig_enabled,
+		func(ctx context.Context) (any, error) {
+			return obj.Enabled, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AppHookConfig_enabled(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AppHookConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
 
 func (ec *executionContext) _ClearCacheResult_success(ctx context.Context, field graphql.CollectedField, obj *model.ClearCacheResult) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
@@ -4394,6 +5242,59 @@ func (ec *executionContext) fieldContext_Connection_cacheStatus(_ context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _Connection_hooks(ctx context.Context, field graphql.CollectedField, obj *model.Connection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Connection_hooks,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Connection().Hooks(ctx, obj)
+		},
+		nil,
+		ec.marshalNHook2ᚕᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Connection_hooks(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Connection",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Hook_id(ctx, field)
+			case "enabled":
+				return ec.fieldContext_Hook_enabled(ctx, field)
+			case "priority":
+				return ec.fieldContext_Hook_priority(ctx, field)
+			case "event":
+				return ec.fieldContext_Hook_event(ctx, field)
+			case "type":
+				return ec.fieldContext_Hook_type(ctx, field)
+			case "onError":
+				return ec.fieldContext_Hook_onError(ctx, field)
+			case "config":
+				return ec.fieldContext_Hook_config(ctx, field)
+			case "task":
+				return ec.fieldContext_Hook_task(ctx, field)
+			case "connection":
+				return ec.fieldContext_Hook_connection(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Hook_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Hook_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Hook", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ConnectionCacheOptions_enabled(ctx context.Context, field graphql.CollectedField, obj *model.ConnectionCacheOptions) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4703,6 +5604,8 @@ func (ec *executionContext) fieldContext_ConnectionConnection_items(_ context.Co
 				return ec.fieldContext_Connection_options(ctx, field)
 			case "cacheStatus":
 				return ec.fieldContext_Connection_cacheStatus(ctx, field)
+			case "hooks":
+				return ec.fieldContext_Connection_hooks(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Connection", field.Name)
 		},
@@ -4827,6 +5730,8 @@ func (ec *executionContext) fieldContext_ConnectionMutation_create(ctx context.C
 				return ec.fieldContext_Connection_options(ctx, field)
 			case "cacheStatus":
 				return ec.fieldContext_Connection_cacheStatus(ctx, field)
+			case "hooks":
+				return ec.fieldContext_Connection_hooks(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Connection", field.Name)
 		},
@@ -4894,6 +5799,8 @@ func (ec *executionContext) fieldContext_ConnectionMutation_update(ctx context.C
 				return ec.fieldContext_Connection_options(ctx, field)
 			case "cacheStatus":
 				return ec.fieldContext_Connection_cacheStatus(ctx, field)
+			case "hooks":
+				return ec.fieldContext_Connection_hooks(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Connection", field.Name)
 		},
@@ -4961,6 +5868,8 @@ func (ec *executionContext) fieldContext_ConnectionMutation_delete(ctx context.C
 				return ec.fieldContext_Connection_options(ctx, field)
 			case "cacheStatus":
 				return ec.fieldContext_Connection_cacheStatus(ctx, field)
+			case "hooks":
+				return ec.fieldContext_Connection_hooks(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Connection", field.Name)
 		},
@@ -5245,6 +6154,8 @@ func (ec *executionContext) fieldContext_ConnectionQuery_get(ctx context.Context
 				return ec.fieldContext_Connection_options(ctx, field)
 			case "cacheStatus":
 				return ec.fieldContext_Connection_cacheStatus(ctx, field)
+			case "hooks":
+				return ec.fieldContext_Connection_hooks(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Connection", field.Name)
 		},
@@ -5631,6 +6542,929 @@ func (ec *executionContext) fieldContext_FileQuery_list(ctx context.Context, fie
 	return fc, nil
 }
 
+func (ec *executionContext) _Hook_id(ctx context.Context, field graphql.CollectedField, obj *model.Hook) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Hook_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Hook_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Hook",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Hook_enabled(ctx context.Context, field graphql.CollectedField, obj *model.Hook) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Hook_enabled,
+		func(ctx context.Context) (any, error) {
+			return obj.Enabled, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Hook_enabled(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Hook",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Hook_priority(ctx context.Context, field graphql.CollectedField, obj *model.Hook) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Hook_priority,
+		func(ctx context.Context) (any, error) {
+			return obj.Priority, nil
+		},
+		nil,
+		ec.marshalOInt2ᚖint,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Hook_priority(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Hook",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Hook_event(ctx context.Context, field graphql.CollectedField, obj *model.Hook) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Hook_event,
+		func(ctx context.Context) (any, error) {
+			return obj.Event, nil
+		},
+		nil,
+		ec.marshalNHookEvent2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookEvent,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Hook_event(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Hook",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type HookEvent does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Hook_type(ctx context.Context, field graphql.CollectedField, obj *model.Hook) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Hook_type,
+		func(ctx context.Context) (any, error) {
+			return obj.Type, nil
+		},
+		nil,
+		ec.marshalNHookType2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookType,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Hook_type(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Hook",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type HookType does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Hook_onError(ctx context.Context, field graphql.CollectedField, obj *model.Hook) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Hook_onError,
+		func(ctx context.Context) (any, error) {
+			return obj.OnError, nil
+		},
+		nil,
+		ec.marshalNHookOnError2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookOnError,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Hook_onError(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Hook",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type HookOnError does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Hook_config(ctx context.Context, field graphql.CollectedField, obj *model.Hook) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Hook_config,
+		func(ctx context.Context) (any, error) {
+			return obj.Config, nil
+		},
+		nil,
+		ec.marshalNHookConfig2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookConfig,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Hook_config(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Hook",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "url":
+				return ec.fieldContext_HookConfig_url(ctx, field)
+			case "method":
+				return ec.fieldContext_HookConfig_method(ctx, field)
+			case "headers":
+				return ec.fieldContext_HookConfig_headers(ctx, field)
+			case "body":
+				return ec.fieldContext_HookConfig_body(ctx, field)
+			case "command":
+				return ec.fieldContext_HookConfig_command(ctx, field)
+			case "workDir":
+				return ec.fieldContext_HookConfig_workDir(ctx, field)
+			case "timeout":
+				return ec.fieldContext_HookConfig_timeout(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type HookConfig", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Hook_task(ctx context.Context, field graphql.CollectedField, obj *model.Hook) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Hook_task,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Hook().Task(ctx, obj)
+		},
+		nil,
+		ec.marshalOTask2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐTask,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Hook_task(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Hook",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Task_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Task_name(ctx, field)
+			case "sourcePath":
+				return ec.fieldContext_Task_sourcePath(ctx, field)
+			case "remotePath":
+				return ec.fieldContext_Task_remotePath(ctx, field)
+			case "direction":
+				return ec.fieldContext_Task_direction(ctx, field)
+			case "schedule":
+				return ec.fieldContext_Task_schedule(ctx, field)
+			case "realtime":
+				return ec.fieldContext_Task_realtime(ctx, field)
+			case "enabled":
+				return ec.fieldContext_Task_enabled(ctx, field)
+			case "options":
+				return ec.fieldContext_Task_options(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Task_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Task_updatedAt(ctx, field)
+			case "connection":
+				return ec.fieldContext_Task_connection(ctx, field)
+			case "jobs":
+				return ec.fieldContext_Task_jobs(ctx, field)
+			case "latestJob":
+				return ec.fieldContext_Task_latestJob(ctx, field)
+			case "hooks":
+				return ec.fieldContext_Task_hooks(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Task", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Hook_connection(ctx context.Context, field graphql.CollectedField, obj *model.Hook) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Hook_connection,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Hook().Connection(ctx, obj)
+		},
+		nil,
+		ec.marshalOConnection2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐConnection,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Hook_connection(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Hook",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Connection_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Connection_name(ctx, field)
+			case "type":
+				return ec.fieldContext_Connection_type(ctx, field)
+			case "config":
+				return ec.fieldContext_Connection_config(ctx, field)
+			case "loadStatus":
+				return ec.fieldContext_Connection_loadStatus(ctx, field)
+			case "loadError":
+				return ec.fieldContext_Connection_loadError(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Connection_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Connection_updatedAt(ctx, field)
+			case "tasks":
+				return ec.fieldContext_Connection_tasks(ctx, field)
+			case "quota":
+				return ec.fieldContext_Connection_quota(ctx, field)
+			case "options":
+				return ec.fieldContext_Connection_options(ctx, field)
+			case "cacheStatus":
+				return ec.fieldContext_Connection_cacheStatus(ctx, field)
+			case "hooks":
+				return ec.fieldContext_Connection_hooks(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Connection", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Hook_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.Hook) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Hook_createdAt,
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		ec.marshalNDateTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Hook_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Hook",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Hook_updatedAt(ctx context.Context, field graphql.CollectedField, obj *model.Hook) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Hook_updatedAt,
+		func(ctx context.Context) (any, error) {
+			return obj.UpdatedAt, nil
+		},
+		nil,
+		ec.marshalNDateTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Hook_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Hook",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HookConfig_url(ctx context.Context, field graphql.CollectedField, obj *model.HookConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HookConfig_url,
+		func(ctx context.Context) (any, error) {
+			return obj.URL, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_HookConfig_url(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HookConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HookConfig_method(ctx context.Context, field graphql.CollectedField, obj *model.HookConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HookConfig_method,
+		func(ctx context.Context) (any, error) {
+			return obj.Method, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_HookConfig_method(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HookConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HookConfig_headers(ctx context.Context, field graphql.CollectedField, obj *model.HookConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HookConfig_headers,
+		func(ctx context.Context) (any, error) {
+			return obj.Headers, nil
+		},
+		nil,
+		ec.marshalOStringMap2map,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_HookConfig_headers(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HookConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type StringMap does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HookConfig_body(ctx context.Context, field graphql.CollectedField, obj *model.HookConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HookConfig_body,
+		func(ctx context.Context) (any, error) {
+			return obj.Body, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_HookConfig_body(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HookConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HookConfig_command(ctx context.Context, field graphql.CollectedField, obj *model.HookConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HookConfig_command,
+		func(ctx context.Context) (any, error) {
+			return obj.Command, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_HookConfig_command(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HookConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HookConfig_workDir(ctx context.Context, field graphql.CollectedField, obj *model.HookConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HookConfig_workDir,
+		func(ctx context.Context) (any, error) {
+			return obj.WorkDir, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_HookConfig_workDir(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HookConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HookConfig_timeout(ctx context.Context, field graphql.CollectedField, obj *model.HookConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HookConfig_timeout,
+		func(ctx context.Context) (any, error) {
+			return obj.Timeout, nil
+		},
+		nil,
+		ec.marshalOInt2ᚖint,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_HookConfig_timeout(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HookConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HookMutation_create(ctx context.Context, field graphql.CollectedField, obj *model.HookMutation) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HookMutation_create,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.HookMutation().Create(ctx, obj, fc.Args["taskId"].(*uuid.UUID), fc.Args["connectionId"].(*uuid.UUID), fc.Args["input"].(model.HookInput))
+		},
+		nil,
+		ec.marshalNHook2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHook,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_HookMutation_create(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HookMutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Hook_id(ctx, field)
+			case "enabled":
+				return ec.fieldContext_Hook_enabled(ctx, field)
+			case "priority":
+				return ec.fieldContext_Hook_priority(ctx, field)
+			case "event":
+				return ec.fieldContext_Hook_event(ctx, field)
+			case "type":
+				return ec.fieldContext_Hook_type(ctx, field)
+			case "onError":
+				return ec.fieldContext_Hook_onError(ctx, field)
+			case "config":
+				return ec.fieldContext_Hook_config(ctx, field)
+			case "task":
+				return ec.fieldContext_Hook_task(ctx, field)
+			case "connection":
+				return ec.fieldContext_Hook_connection(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Hook_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Hook_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Hook", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_HookMutation_create_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HookMutation_update(ctx context.Context, field graphql.CollectedField, obj *model.HookMutation) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HookMutation_update,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.HookMutation().Update(ctx, obj, fc.Args["id"].(uuid.UUID), fc.Args["input"].(model.UpdateHookInput))
+		},
+		nil,
+		ec.marshalNHook2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHook,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_HookMutation_update(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HookMutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Hook_id(ctx, field)
+			case "enabled":
+				return ec.fieldContext_Hook_enabled(ctx, field)
+			case "priority":
+				return ec.fieldContext_Hook_priority(ctx, field)
+			case "event":
+				return ec.fieldContext_Hook_event(ctx, field)
+			case "type":
+				return ec.fieldContext_Hook_type(ctx, field)
+			case "onError":
+				return ec.fieldContext_Hook_onError(ctx, field)
+			case "config":
+				return ec.fieldContext_Hook_config(ctx, field)
+			case "task":
+				return ec.fieldContext_Hook_task(ctx, field)
+			case "connection":
+				return ec.fieldContext_Hook_connection(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Hook_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Hook_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Hook", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_HookMutation_update_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HookMutation_delete(ctx context.Context, field graphql.CollectedField, obj *model.HookMutation) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HookMutation_delete,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.HookMutation().Delete(ctx, obj, fc.Args["id"].(uuid.UUID))
+		},
+		nil,
+		ec.marshalNHook2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHook,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_HookMutation_delete(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HookMutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Hook_id(ctx, field)
+			case "enabled":
+				return ec.fieldContext_Hook_enabled(ctx, field)
+			case "priority":
+				return ec.fieldContext_Hook_priority(ctx, field)
+			case "event":
+				return ec.fieldContext_Hook_event(ctx, field)
+			case "type":
+				return ec.fieldContext_Hook_type(ctx, field)
+			case "onError":
+				return ec.fieldContext_Hook_onError(ctx, field)
+			case "config":
+				return ec.fieldContext_Hook_config(ctx, field)
+			case "task":
+				return ec.fieldContext_Hook_task(ctx, field)
+			case "connection":
+				return ec.fieldContext_Hook_connection(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Hook_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Hook_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Hook", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_HookMutation_delete_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HookQuery_list(ctx context.Context, field graphql.CollectedField, obj *model.HookQuery) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HookQuery_list,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.HookQuery().List(ctx, obj, fc.Args["taskId"].(*uuid.UUID), fc.Args["connectionId"].(*uuid.UUID), fc.Args["event"].(*model.HookEvent))
+		},
+		nil,
+		ec.marshalNHook2ᚕᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_HookQuery_list(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HookQuery",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Hook_id(ctx, field)
+			case "enabled":
+				return ec.fieldContext_Hook_enabled(ctx, field)
+			case "priority":
+				return ec.fieldContext_Hook_priority(ctx, field)
+			case "event":
+				return ec.fieldContext_Hook_event(ctx, field)
+			case "type":
+				return ec.fieldContext_Hook_type(ctx, field)
+			case "onError":
+				return ec.fieldContext_Hook_onError(ctx, field)
+			case "config":
+				return ec.fieldContext_Hook_config(ctx, field)
+			case "task":
+				return ec.fieldContext_Hook_task(ctx, field)
+			case "connection":
+				return ec.fieldContext_Hook_connection(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Hook_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Hook_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Hook", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_HookQuery_list_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HookQuery_get(ctx context.Context, field graphql.CollectedField, obj *model.HookQuery) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HookQuery_get,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.HookQuery().Get(ctx, obj, fc.Args["id"].(uuid.UUID))
+		},
+		nil,
+		ec.marshalOHook2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHook,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_HookQuery_get(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HookQuery",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Hook_id(ctx, field)
+			case "enabled":
+				return ec.fieldContext_Hook_enabled(ctx, field)
+			case "priority":
+				return ec.fieldContext_Hook_priority(ctx, field)
+			case "event":
+				return ec.fieldContext_Hook_event(ctx, field)
+			case "type":
+				return ec.fieldContext_Hook_type(ctx, field)
+			case "onError":
+				return ec.fieldContext_Hook_onError(ctx, field)
+			case "config":
+				return ec.fieldContext_Hook_config(ctx, field)
+			case "task":
+				return ec.fieldContext_Hook_task(ctx, field)
+			case "connection":
+				return ec.fieldContext_Hook_connection(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Hook_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Hook_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Hook", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_HookQuery_get_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ImportExecuteResult_connections(ctx context.Context, field graphql.CollectedField, obj *model.ImportExecuteResult) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5679,6 +7513,8 @@ func (ec *executionContext) fieldContext_ImportExecuteResult_connections(_ conte
 				return ec.fieldContext_Connection_options(ctx, field)
 			case "cacheStatus":
 				return ec.fieldContext_Connection_cacheStatus(ctx, field)
+			case "hooks":
+				return ec.fieldContext_Connection_hooks(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Connection", field.Name)
 		},
@@ -6271,6 +8107,8 @@ func (ec *executionContext) fieldContext_Job_task(_ context.Context, field graph
 				return ec.fieldContext_Task_jobs(ctx, field)
 			case "latestJob":
 				return ec.fieldContext_Task_latestJob(ctx, field)
+			case "hooks":
+				return ec.fieldContext_Task_hooks(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Task", field.Name)
 		},
@@ -7508,6 +9346,43 @@ func (ec *executionContext) fieldContext_Mutation_connection(_ context.Context, 
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_hook(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_hook,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Mutation().Hook(ctx)
+		},
+		nil,
+		ec.marshalNHookMutation2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookMutation,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_hook(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "create":
+				return ec.fieldContext_HookMutation_create(ctx, field)
+			case "update":
+				return ec.fieldContext_HookMutation_update(ctx, field)
+			case "delete":
+				return ec.fieldContext_HookMutation_delete(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type HookMutation", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_import(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -8367,6 +10242,39 @@ func (ec *executionContext) fieldContext_ProviderQuery_get(ctx context.Context, 
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_appConfig(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_appConfig,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Query().AppConfig(ctx)
+		},
+		nil,
+		ec.marshalNAppConfig2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐAppConfig,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_appConfig(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "hook":
+				return ec.fieldContext_AppConfig_hook(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AppConfig", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_connection(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -8430,6 +10338,41 @@ func (ec *executionContext) fieldContext_Query_file(_ context.Context, field gra
 				return ec.fieldContext_FileQuery_list(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FileQuery", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_hook(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_hook,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Query().Hook(ctx)
+		},
+		nil,
+		ec.marshalNHookQuery2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookQuery,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_hook(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "list":
+				return ec.fieldContext_HookQuery_list(ctx, field)
+			case "get":
+				return ec.fieldContext_HookQuery_get(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type HookQuery", field.Name)
 		},
 	}
 	return fc, nil
@@ -9235,6 +11178,8 @@ func (ec *executionContext) fieldContext_Task_connection(_ context.Context, fiel
 				return ec.fieldContext_Connection_options(ctx, field)
 			case "cacheStatus":
 				return ec.fieldContext_Connection_cacheStatus(ctx, field)
+			case "hooks":
+				return ec.fieldContext_Connection_hooks(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Connection", field.Name)
 		},
@@ -9348,6 +11293,59 @@ func (ec *executionContext) fieldContext_Task_latestJob(_ context.Context, field
 	return fc, nil
 }
 
+func (ec *executionContext) _Task_hooks(ctx context.Context, field graphql.CollectedField, obj *model.Task) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Task_hooks,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Task().Hooks(ctx, obj)
+		},
+		nil,
+		ec.marshalNHook2ᚕᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Task_hooks(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Task",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Hook_id(ctx, field)
+			case "enabled":
+				return ec.fieldContext_Hook_enabled(ctx, field)
+			case "priority":
+				return ec.fieldContext_Hook_priority(ctx, field)
+			case "event":
+				return ec.fieldContext_Hook_event(ctx, field)
+			case "type":
+				return ec.fieldContext_Hook_type(ctx, field)
+			case "onError":
+				return ec.fieldContext_Hook_onError(ctx, field)
+			case "config":
+				return ec.fieldContext_Hook_config(ctx, field)
+			case "task":
+				return ec.fieldContext_Hook_task(ctx, field)
+			case "connection":
+				return ec.fieldContext_Hook_connection(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Hook_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Hook_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Hook", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _TaskConnection_items(ctx context.Context, field graphql.CollectedField, obj *model.TaskConnection) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -9400,6 +11398,8 @@ func (ec *executionContext) fieldContext_TaskConnection_items(_ context.Context,
 				return ec.fieldContext_Task_jobs(ctx, field)
 			case "latestJob":
 				return ec.fieldContext_Task_latestJob(ctx, field)
+			case "hooks":
+				return ec.fieldContext_Task_hooks(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Task", field.Name)
 		},
@@ -9528,6 +11528,8 @@ func (ec *executionContext) fieldContext_TaskMutation_create(ctx context.Context
 				return ec.fieldContext_Task_jobs(ctx, field)
 			case "latestJob":
 				return ec.fieldContext_Task_latestJob(ctx, field)
+			case "hooks":
+				return ec.fieldContext_Task_hooks(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Task", field.Name)
 		},
@@ -9599,6 +11601,8 @@ func (ec *executionContext) fieldContext_TaskMutation_update(ctx context.Context
 				return ec.fieldContext_Task_jobs(ctx, field)
 			case "latestJob":
 				return ec.fieldContext_Task_latestJob(ctx, field)
+			case "hooks":
+				return ec.fieldContext_Task_hooks(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Task", field.Name)
 		},
@@ -9670,6 +11674,8 @@ func (ec *executionContext) fieldContext_TaskMutation_delete(ctx context.Context
 				return ec.fieldContext_Task_jobs(ctx, field)
 			case "latestJob":
 				return ec.fieldContext_Task_latestJob(ctx, field)
+			case "hooks":
+				return ec.fieldContext_Task_hooks(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Task", field.Name)
 		},
@@ -9859,6 +11865,8 @@ func (ec *executionContext) fieldContext_TaskQuery_get(ctx context.Context, fiel
 				return ec.fieldContext_Task_jobs(ctx, field)
 			case "latestJob":
 				return ec.fieldContext_Task_latestJob(ctx, field)
+			case "hooks":
+				return ec.fieldContext_Task_hooks(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Task", field.Name)
 		},
@@ -11811,7 +13819,7 @@ func (ec *executionContext) unmarshalInputCreateTaskInput(ctx context.Context, o
 		asMap["enabled"] = true
 	}
 
-	fieldsInOrder := [...]string{"name", "sourcePath", "connectionId", "remotePath", "direction", "schedule", "realtime", "enabled", "options"}
+	fieldsInOrder := [...]string{"name", "sourcePath", "connectionId", "remotePath", "direction", "schedule", "realtime", "enabled", "options", "hooks"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -11881,6 +13889,151 @@ func (ec *executionContext) unmarshalInputCreateTaskInput(ctx context.Context, o
 				return it, err
 			}
 			it.Options = data
+		case "hooks":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("hooks"))
+			data, err := ec.unmarshalOHookInput2ᚕᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Hooks = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputHookConfigInput(ctx context.Context, obj any) (model.HookConfigInput, error) {
+	var it model.HookConfigInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"url", "method", "headers", "body", "command", "workDir", "timeout"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "url":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("url"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.URL = data
+		case "method":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("method"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Method = data
+		case "headers":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("headers"))
+			data, err := ec.unmarshalOStringMap2map(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Headers = data
+		case "body":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("body"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Body = data
+		case "command":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("command"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Command = data
+		case "workDir":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("workDir"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.WorkDir = data
+		case "timeout":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("timeout"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Timeout = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputHookInput(ctx context.Context, obj any) (model.HookInput, error) {
+	var it model.HookInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	if _, present := asMap["enabled"]; !present {
+		asMap["enabled"] = true
+	}
+	if _, present := asMap["onError"]; !present {
+		asMap["onError"] = "IGNORE"
+	}
+
+	fieldsInOrder := [...]string{"enabled", "priority", "event", "type", "onError", "config"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "enabled":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("enabled"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Enabled = data
+		case "priority":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("priority"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Priority = data
+		case "event":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("event"))
+			data, err := ec.unmarshalNHookEvent2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookEvent(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Event = data
+		case "type":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("type"))
+			data, err := ec.unmarshalNHookType2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookType(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Type = data
+		case "onError":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("onError"))
+			data, err := ec.unmarshalOHookOnError2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookOnError(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.OnError = data
+		case "config":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("config"))
+			data, err := ec.unmarshalNHookConfigInput2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookConfigInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Config = data
 		}
 	}
 
@@ -11987,6 +14140,51 @@ func (ec *executionContext) unmarshalInputImportParseInput(ctx context.Context, 
 				return it, err
 			}
 			it.Content = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputNestedUpdateHookInput(ctx context.Context, obj any) (model.NestedUpdateHookInput, error) {
+	var it model.NestedUpdateHookInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	if _, present := asMap["delete"]; !present {
+		asMap["delete"] = false
+	}
+
+	fieldsInOrder := [...]string{"id", "delete", "hook"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "id":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+			data, err := ec.unmarshalOID2ᚖgithubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ID = data
+		case "delete":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("delete"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Delete = data
+		case "hook":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("hook"))
+			data, err := ec.unmarshalOHookInput2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Hook = data
 		}
 	}
 
@@ -12157,6 +14355,68 @@ func (ec *executionContext) unmarshalInputUpdateConnectionInput(ctx context.Cont
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputUpdateHookInput(ctx context.Context, obj any) (model.UpdateHookInput, error) {
+	var it model.UpdateHookInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"enabled", "priority", "event", "type", "onError", "config"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "enabled":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("enabled"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Enabled = data
+		case "priority":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("priority"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Priority = data
+		case "event":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("event"))
+			data, err := ec.unmarshalOHookEvent2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookEvent(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Event = data
+		case "type":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("type"))
+			data, err := ec.unmarshalOHookType2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookType(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Type = data
+		case "onError":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("onError"))
+			data, err := ec.unmarshalOHookOnError2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookOnError(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.OnError = data
+		case "config":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("config"))
+			data, err := ec.unmarshalOHookConfigInput2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookConfigInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Config = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputUpdateTaskInput(ctx context.Context, obj any) (model.UpdateTaskInput, error) {
 	var it model.UpdateTaskInput
 	asMap := map[string]any{}
@@ -12164,7 +14424,7 @@ func (ec *executionContext) unmarshalInputUpdateTaskInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"name", "sourcePath", "connectionId", "remotePath", "direction", "schedule", "realtime", "enabled", "options"}
+	fieldsInOrder := [...]string{"name", "sourcePath", "connectionID", "remotePath", "direction", "schedule", "realtime", "enabled", "options", "hooks"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -12185,8 +14445,8 @@ func (ec *executionContext) unmarshalInputUpdateTaskInput(ctx context.Context, o
 				return it, err
 			}
 			it.SourcePath = data
-		case "connectionId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("connectionId"))
+		case "connectionID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("connectionID"))
 			data, err := ec.unmarshalOID2ᚖgithubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
 			if err != nil {
 				return it, err
@@ -12234,6 +14494,13 @@ func (ec *executionContext) unmarshalInputUpdateTaskInput(ctx context.Context, o
 				return it, err
 			}
 			it.Options = data
+		case "hooks":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("hooks"))
+			data, err := ec.unmarshalONestedUpdateHookInput2ᚕᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐNestedUpdateHookInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Hooks = data
 		}
 	}
 
@@ -12301,6 +14568,84 @@ func (ec *executionContext) _TestConnectionResult(ctx context.Context, sel ast.S
 // endregion ************************** interface.gotpl ***************************
 
 // region    **************************** object.gotpl ****************************
+
+var appConfigImplementors = []string{"AppConfig"}
+
+func (ec *executionContext) _AppConfig(ctx context.Context, sel ast.SelectionSet, obj *model.AppConfig) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, appConfigImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AppConfig")
+		case "hook":
+			out.Values[i] = ec._AppConfig_hook(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var appHookConfigImplementors = []string{"AppHookConfig"}
+
+func (ec *executionContext) _AppHookConfig(ctx context.Context, sel ast.SelectionSet, obj *model.AppHookConfig) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, appHookConfigImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AppHookConfig")
+		case "enabled":
+			out.Values[i] = ec._AppHookConfig_enabled(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
 
 var clearCacheResultImplementors = []string{"ClearCacheResult"}
 
@@ -12573,6 +14918,42 @@ func (ec *executionContext) _Connection(ctx context.Context, sel ast.SelectionSe
 					}
 				}()
 				res = ec._Connection_cacheStatus(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "hooks":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Connection_hooks(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
 				return res
 			}
 
@@ -13355,6 +15736,441 @@ func (ec *executionContext) _FileQuery(ctx context.Context, sel ast.SelectionSet
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var hookImplementors = []string{"Hook"}
+
+func (ec *executionContext) _Hook(ctx context.Context, sel ast.SelectionSet, obj *model.Hook) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, hookImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Hook")
+		case "id":
+			out.Values[i] = ec._Hook_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "enabled":
+			out.Values[i] = ec._Hook_enabled(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "priority":
+			out.Values[i] = ec._Hook_priority(ctx, field, obj)
+		case "event":
+			out.Values[i] = ec._Hook_event(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "type":
+			out.Values[i] = ec._Hook_type(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "onError":
+			out.Values[i] = ec._Hook_onError(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "config":
+			out.Values[i] = ec._Hook_config(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "task":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Hook_task(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "connection":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Hook_connection(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "createdAt":
+			out.Values[i] = ec._Hook_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "updatedAt":
+			out.Values[i] = ec._Hook_updatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var hookConfigImplementors = []string{"HookConfig"}
+
+func (ec *executionContext) _HookConfig(ctx context.Context, sel ast.SelectionSet, obj *model.HookConfig) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, hookConfigImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("HookConfig")
+		case "url":
+			out.Values[i] = ec._HookConfig_url(ctx, field, obj)
+		case "method":
+			out.Values[i] = ec._HookConfig_method(ctx, field, obj)
+		case "headers":
+			out.Values[i] = ec._HookConfig_headers(ctx, field, obj)
+		case "body":
+			out.Values[i] = ec._HookConfig_body(ctx, field, obj)
+		case "command":
+			out.Values[i] = ec._HookConfig_command(ctx, field, obj)
+		case "workDir":
+			out.Values[i] = ec._HookConfig_workDir(ctx, field, obj)
+		case "timeout":
+			out.Values[i] = ec._HookConfig_timeout(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var hookMutationImplementors = []string{"HookMutation"}
+
+func (ec *executionContext) _HookMutation(ctx context.Context, sel ast.SelectionSet, obj *model.HookMutation) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, hookMutationImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("HookMutation")
+		case "create":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._HookMutation_create(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "update":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._HookMutation_update(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "delete":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._HookMutation_delete(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var hookQueryImplementors = []string{"HookQuery"}
+
+func (ec *executionContext) _HookQuery(ctx context.Context, sel ast.SelectionSet, obj *model.HookQuery) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, hookQueryImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("HookQuery")
+		case "list":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._HookQuery_list(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "get":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._HookQuery_get(ctx, field, obj)
 				return res
 			}
 
@@ -14314,6 +17130,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "hook":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_hook(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "import":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_import(ctx, field)
@@ -14746,6 +17569,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Query")
+		case "appConfig":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_appConfig(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "connection":
 			field := field
 
@@ -14778,6 +17623,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_file(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "hook":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_hook(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -15106,6 +17973,42 @@ func (ec *executionContext) _Task(ctx context.Context, sel ast.SelectionSet, obj
 					}
 				}()
 				res = ec._Task_latestJob(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "hooks":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Task_hooks(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
 				return res
 			}
 
@@ -15967,6 +18870,30 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 
 // region    ***************************** type.gotpl *****************************
 
+func (ec *executionContext) marshalNAppConfig2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐAppConfig(ctx context.Context, sel ast.SelectionSet, v model.AppConfig) graphql.Marshaler {
+	return ec._AppConfig(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNAppConfig2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐAppConfig(ctx context.Context, sel ast.SelectionSet, v *model.AppConfig) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._AppConfig(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNAppHookConfig2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐAppHookConfig(ctx context.Context, sel ast.SelectionSet, v *model.AppHookConfig) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._AppHookConfig(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNBigInt2int64(ctx context.Context, v any) (int64, error) {
 	res, err := graphql.UnmarshalInt64(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -16229,6 +19156,147 @@ func (ec *executionContext) marshalNFileQuery2ᚖgithubᚗcomᚋxzzpigᚋrclone�
 		return graphql.Null
 	}
 	return ec._FileQuery(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNHook2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHook(ctx context.Context, sel ast.SelectionSet, v model.Hook) graphql.Marshaler {
+	return ec._Hook(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNHook2ᚕᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Hook) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNHook2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHook(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNHook2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHook(ctx context.Context, sel ast.SelectionSet, v *model.Hook) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._Hook(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNHookConfig2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookConfig(ctx context.Context, sel ast.SelectionSet, v *model.HookConfig) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._HookConfig(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNHookConfigInput2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookConfigInput(ctx context.Context, v any) (*model.HookConfigInput, error) {
+	res, err := ec.unmarshalInputHookConfigInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNHookEvent2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookEvent(ctx context.Context, v any) (model.HookEvent, error) {
+	var res model.HookEvent
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNHookEvent2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookEvent(ctx context.Context, sel ast.SelectionSet, v model.HookEvent) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) unmarshalNHookInput2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookInput(ctx context.Context, v any) (model.HookInput, error) {
+	res, err := ec.unmarshalInputHookInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNHookInput2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookInput(ctx context.Context, v any) (*model.HookInput, error) {
+	res, err := ec.unmarshalInputHookInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNHookMutation2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookMutation(ctx context.Context, sel ast.SelectionSet, v model.HookMutation) graphql.Marshaler {
+	return ec._HookMutation(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNHookMutation2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookMutation(ctx context.Context, sel ast.SelectionSet, v *model.HookMutation) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._HookMutation(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNHookOnError2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookOnError(ctx context.Context, v any) (model.HookOnError, error) {
+	var res model.HookOnError
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNHookOnError2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookOnError(ctx context.Context, sel ast.SelectionSet, v model.HookOnError) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) marshalNHookQuery2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookQuery(ctx context.Context, sel ast.SelectionSet, v model.HookQuery) graphql.Marshaler {
+	return ec._HookQuery(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNHookQuery2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookQuery(ctx context.Context, sel ast.SelectionSet, v *model.HookQuery) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._HookQuery(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNHookType2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookType(ctx context.Context, v any) (model.HookType, error) {
+	var res model.HookType
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNHookType2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookType(ctx context.Context, sel ast.SelectionSet, v model.HookType) graphql.Marshaler {
+	return v
 }
 
 func (ec *executionContext) unmarshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx context.Context, v any) (uuid.UUID, error) {
@@ -16551,6 +19619,11 @@ func (ec *executionContext) marshalNLogQuery2ᚖgithubᚗcomᚋxzzpigᚋrclone�
 		return graphql.Null
 	}
 	return ec._LogQuery(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNNestedUpdateHookInput2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐNestedUpdateHookInput(ctx context.Context, v any) (*model.NestedUpdateHookInput, error) {
+	res, err := ec.unmarshalInputNestedUpdateHookInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalNOffsetPageInfo2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐOffsetPageInfo(ctx context.Context, sel ast.SelectionSet, v *model.OffsetPageInfo) graphql.Marshaler {
@@ -16995,6 +20068,11 @@ func (ec *executionContext) unmarshalNUpdateConnectionInput2githubᚗcomᚋxzzpi
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNUpdateHookInput2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐUpdateHookInput(ctx context.Context, v any) (model.UpdateHookInput, error) {
+	res, err := ec.unmarshalInputUpdateHookInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNUpdateTaskInput2githubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐUpdateTaskInput(ctx context.Context, v any) (model.UpdateTaskInput, error) {
 	res, err := ec.unmarshalInputUpdateTaskInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -17386,6 +20464,95 @@ func (ec *executionContext) marshalODateTime2ᚖtimeᚐTime(ctx context.Context,
 	return res
 }
 
+func (ec *executionContext) marshalOHook2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHook(ctx context.Context, sel ast.SelectionSet, v *model.Hook) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Hook(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOHookConfigInput2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookConfigInput(ctx context.Context, v any) (*model.HookConfigInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputHookConfigInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalOHookEvent2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookEvent(ctx context.Context, v any) (*model.HookEvent, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(model.HookEvent)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOHookEvent2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookEvent(ctx context.Context, sel ast.SelectionSet, v *model.HookEvent) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
+}
+
+func (ec *executionContext) unmarshalOHookInput2ᚕᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookInputᚄ(ctx context.Context, v any) ([]*model.HookInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []any
+	vSlice = graphql.CoerceList(v)
+	var err error
+	res := make([]*model.HookInput, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNHookInput2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookInput(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) unmarshalOHookInput2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookInput(ctx context.Context, v any) (*model.HookInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputHookInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalOHookOnError2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookOnError(ctx context.Context, v any) (*model.HookOnError, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(model.HookOnError)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOHookOnError2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookOnError(ctx context.Context, sel ast.SelectionSet, v *model.HookOnError) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
+}
+
+func (ec *executionContext) unmarshalOHookType2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookType(ctx context.Context, v any) (*model.HookType, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(model.HookType)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOHookType2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐHookType(ctx context.Context, sel ast.SelectionSet, v *model.HookType) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
+}
+
 func (ec *executionContext) unmarshalOID2ᚖgithubᚗcomᚋgoogleᚋuuidᚐUUID(ctx context.Context, v any) (*uuid.UUID, error) {
 	if v == nil {
 		return nil, nil
@@ -17450,6 +20617,24 @@ func (ec *executionContext) marshalOLogLevel2ᚖgithubᚗcomᚋxzzpigᚋrclone�
 		return graphql.Null
 	}
 	return v
+}
+
+func (ec *executionContext) unmarshalONestedUpdateHookInput2ᚕᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐNestedUpdateHookInputᚄ(ctx context.Context, v any) ([]*model.NestedUpdateHookInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []any
+	vSlice = graphql.CoerceList(v)
+	var err error
+	res := make([]*model.NestedUpdateHookInput, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNNestedUpdateHookInput2ᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐNestedUpdateHookInput(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
 }
 
 func (ec *executionContext) marshalOOptionExample2ᚕᚖgithubᚗcomᚋxzzpigᚋrcloneᚑsyncᚋinternalᚋapiᚋgraphqlᚋmodelᚐOptionExampleᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.OptionExample) graphql.Marshaler {

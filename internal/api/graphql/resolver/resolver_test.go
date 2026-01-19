@@ -40,6 +40,7 @@ type TestEnv struct {
 	Deps            *resolver.Dependencies
 	TaskQuery       *query.TaskQuery
 	JobQuery        *query.JobQuery
+	HookQuery       *query.HookQuery
 	ConnectionQuery *query.ConnectionQuery
 	Runner          ports.Runner
 	Cleanup         func()
@@ -69,6 +70,7 @@ func NewTestEnv(t *testing.T) *TestEnv {
 	// Initialize queries
 	jobQuery := query.NewJobQuery(client)
 	taskQuery := query.NewTaskQuery(client)
+	hookQuery := query.NewHookQuery(client)
 
 	// Initialize encryption for ConnectionQuery
 	encryptor, err := crypto.NewEncryptor("test-encryption-key-32-bytes!!")
@@ -79,7 +81,7 @@ func NewTestEnv(t *testing.T) *TestEnv {
 	storage := rclone.NewDBStorage(connectionQuery, appDataDir)
 	storage.Install()
 
-	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, appDataDir, false, 0)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, appDataDir, false, 0, nil)
 	runnerInstance := runner.NewRunner(syncEngine)
 
 	// Create mock watcher and scheduler for testing
@@ -95,6 +97,7 @@ func NewTestEnv(t *testing.T) *TestEnv {
 
 	// Create dependencies
 	deps := &resolver.Dependencies{
+		Client:              client,
 		SyncEngine:          syncEngine,
 		Runner:              runnerInstance,
 		JobQuery:            jobQuery,
@@ -102,6 +105,7 @@ func NewTestEnv(t *testing.T) *TestEnv {
 		Scheduler:           mockScheduler,
 		TaskQuery:           taskQuery,
 		ConnectionQuery:     connectionQuery,
+		HookQuery:           hookQuery,
 		Encryptor:           encryptor,
 		JobProgressBus:      jobProgressBus,
 		TransferProgressBus: transferProgressBus,
@@ -133,6 +137,7 @@ func NewTestEnv(t *testing.T) *TestEnv {
 		Deps:            deps,
 		TaskQuery:       taskQuery,
 		JobQuery:        jobQuery,
+		HookQuery:       hookQuery,
 		ConnectionQuery: connectionQuery,
 		Runner:          runnerInstance,
 		Cleanup:         cleanup,

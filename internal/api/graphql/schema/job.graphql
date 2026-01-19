@@ -189,6 +189,7 @@ type JobLog @goExtraField(name: "JobID", type: "github.com/google/uuid.UUID") {
 	what: LogAction!
 	"""
 	文件大小（字节）
+	注意：当 what = HOOK 时，此字段表示 hook 执行耗时（毫秒）
 	"""
 	size: BigInt!
 	"""

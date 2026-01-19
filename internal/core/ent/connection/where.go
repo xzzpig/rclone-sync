@@ -364,6 +364,29 @@ func HasTasksWith(preds ...predicate.Task) predicate.Connection {
 	})
 }
 
+// HasHooks applies the HasEdge predicate on the "hooks" edge.
+func HasHooks() predicate.Connection {
+	return predicate.Connection(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, HooksTable, HooksColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasHooksWith applies the HasEdge predicate on the "hooks" edge with a given conditions (other predicates).
+func HasHooksWith(preds ...predicate.TaskHook) predicate.Connection {
+	return predicate.Connection(func(s *sql.Selector) {
+		step := newHooksStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.Connection) predicate.Connection {
 	return predicate.Connection(sql.AndPredicates(predicates...))

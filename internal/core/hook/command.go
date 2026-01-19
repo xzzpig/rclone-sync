@@ -39,6 +39,9 @@ func (e *executor) executeCommand(ctx context.Context, h *ent.TaskHook, hookCtx 
 	// #nosec G204
 	cmd := exec.CommandContext(execCtx, "sh", "-c", renderedCmd)
 
+	// Set process group so we can kill all child processes on timeout (Unix only)
+	setupProcessGroup(cmd)
+
 	if cfg.WorkDir != nil && *cfg.WorkDir != "" {
 		cmd.Dir = *cfg.WorkDir
 	}

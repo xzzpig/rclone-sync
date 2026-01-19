@@ -2,6 +2,7 @@ import { client } from '@/api/graphql/client';
 import {
   TaskCreateMutation,
   TaskDeleteMutation,
+  TaskGetQuery,
   TaskRunMutation,
   TaskUpdateMutation,
   TasksListQuery,
@@ -33,6 +34,7 @@ const initialState: TaskState = {
 
 interface TaskActions {
   loadTasks: (connectionId?: string) => Promise<void>;
+  loadTaskDetail: (id: string) => Promise<void>;
   getTaskStatus: (connectionId?: string) => StatusType;
   runTask: (id: string) => Promise<void>;
   createTask: (input: CreateTaskInput) => Promise<void>;
@@ -144,6 +146,37 @@ export const TaskProvider: ParentComponent = (props) => {
       } catch (err) {
         setState('error', err);
         console.error('Failed to fetch tasks:', err);
+      } finally {
+        setState('isLoading', false);
+      }
+    },
+    loadTaskDetail: async (id: string) => {
+      setState('isLoading', true);
+      try {
+        const result = await client.query(TaskGetQuery, { id });
+        if (result.error) {
+          throw new Error(result.error.message);
+        }
+
+        const taskDetail = result.data?.task?.get;
+        if (taskDetail) {
+          setState(
+            produce((s) => {
+              const index = s.tasks.findIndex((t) => t.id === id);
+              if (index !== -1) {
+                s.tasks[index] = {
+                  ...s.tasks[index],
+                  ...taskDetail,
+                };
+              } else {
+                s.tasks.push(taskDetail as unknown as TaskListItem);
+              }
+            })
+          );
+        }
+      } catch (err) {
+        console.error('Failed to fetch task detail:', err);
+        throw err;
       } finally {
         setState('isLoading', false);
       }

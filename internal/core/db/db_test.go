@@ -20,7 +20,7 @@ func TestFileSDN_WALMode(t *testing.T) {
 	dbPath := filepath.Join(tmpDir, "test_wal.db")
 
 	// Build DSN using FileSDN function
-	dsn := FileSDN(dbPath)
+	dsn := FileDSN(dbPath)
 
 	// Open database connection
 	db, err := sql.Open("sqlite3", dsn)
@@ -63,7 +63,7 @@ func TestFileSDN_BusyTimeout(t *testing.T) {
 	dbPath := filepath.Join(tmpDir, "test_busy.db")
 
 	// Build DSN using FileSDN function
-	dsn := FileSDN(dbPath)
+	dsn := FileDSN(dbPath)
 
 	// Open database connection
 	db, err := sql.Open("sqlite3", dsn)
@@ -87,7 +87,7 @@ func TestFileSDN_BusyTimeoutBehavior(t *testing.T) {
 	dbPath := filepath.Join(tmpDir, "test_busy_behavior.db")
 
 	// Build DSN using FileSDN function
-	dsn := FileSDN(dbPath)
+	dsn := FileDSN(dbPath)
 
 	// Open first database connection
 	db1, err := sql.Open("sqlite3", dsn)
@@ -231,7 +231,7 @@ func TestFileSDN_SynchronousMode(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test_sync.db")
 
-	dsn := FileSDN(dbPath)
+	dsn := FileDSN(dbPath)
 
 	db, err := sql.Open("sqlite3", dsn)
 	require.NoError(t, err)
@@ -251,7 +251,7 @@ func TestFileSDN_ForeignKeysEnabled(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test_fk.db")
 
-	dsn := FileSDN(dbPath)
+	dsn := FileDSN(dbPath)
 
 	db, err := sql.Open("sqlite3", dsn)
 	require.NoError(t, err)
@@ -271,7 +271,7 @@ func TestInitDB_WithAutoMigration(t *testing.T) {
 	dbPath := filepath.Join(tmpDir, "test_init.db")
 
 	client, err := InitDB(InitDBOptions{
-		DSN:           FileSDN(dbPath),
+		DSN:           FileDSN(dbPath),
 		MigrationMode: MigrationModeAuto,
 		EnableDebug:   false,
 		Environment:   "test",
@@ -290,7 +290,7 @@ func TestInitDB_WithVersionedMigration(t *testing.T) {
 	dbPath := filepath.Join(tmpDir, "test_init.db")
 
 	client, err := InitDB(InitDBOptions{
-		DSN:           FileSDN(dbPath),
+		DSN:           FileDSN(dbPath),
 		MigrationMode: MigrationModeVersioned,
 		EnableDebug:   false,
 		Environment:   "test",
@@ -317,7 +317,7 @@ func TestFileSDN_ConcurrentWrites(t *testing.T) {
 	dbPath := filepath.Join(tmpDir, "test_concurrent.db")
 
 	// Build DSN using FileSDN function
-	dsn := FileSDN(dbPath)
+	dsn := FileDSN(dbPath)
 
 	// Open multiple database connections (simulating multiple writers)
 	numConnections := 5
@@ -409,7 +409,7 @@ func TestFileSDN_ConcurrentReadWrite(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test_concurrent_rw.db")
 
-	dsn := FileSDN(dbPath)
+	dsn := FileDSN(dbPath)
 
 	// Open two connections - one for writing, one for reading
 	writerDB, err := sql.Open("sqlite3", dsn)

@@ -18,6 +18,7 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/ent/joblog"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/predicate"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/task"
+	"github.com/xzzpig/rclone-sync/internal/core/ent/taskhook"
 )
 
 const (
@@ -33,6 +34,7 @@ const (
 	TypeJob        = "Job"
 	TypeJobLog     = "JobLog"
 	TypeTask       = "Task"
+	TypeTaskHook   = "TaskHook"
 )
 
 // ConnectionMutation represents an operation that mutates the Connection nodes in the graph.
@@ -51,6 +53,9 @@ type ConnectionMutation struct {
 	tasks            map[uuid.UUID]struct{}
 	removedtasks     map[uuid.UUID]struct{}
 	clearedtasks     bool
+	_hooks           map[uuid.UUID]struct{}
+	removed_hooks    map[uuid.UUID]struct{}
+	cleared_hooks    bool
 	done             bool
 	oldValue         func(context.Context) (*Connection, error)
 	predicates       []predicate.Connection
@@ -443,6 +448,60 @@ func (m *ConnectionMutation) ResetTasks() {
 	m.removedtasks = nil
 }
 
+// AddHookIDs adds the "hooks" edge to the TaskHook entity by ids.
+func (m *ConnectionMutation) AddHookIDs(ids ...uuid.UUID) {
+	if m._hooks == nil {
+		m._hooks = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		m._hooks[ids[i]] = struct{}{}
+	}
+}
+
+// ClearHooks clears the "hooks" edge to the TaskHook entity.
+func (m *ConnectionMutation) ClearHooks() {
+	m.cleared_hooks = true
+}
+
+// HooksCleared reports if the "hooks" edge to the TaskHook entity was cleared.
+func (m *ConnectionMutation) HooksCleared() bool {
+	return m.cleared_hooks
+}
+
+// RemoveHookIDs removes the "hooks" edge to the TaskHook entity by IDs.
+func (m *ConnectionMutation) RemoveHookIDs(ids ...uuid.UUID) {
+	if m.removed_hooks == nil {
+		m.removed_hooks = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		delete(m._hooks, ids[i])
+		m.removed_hooks[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedHooks returns the removed IDs of the "hooks" edge to the TaskHook entity.
+func (m *ConnectionMutation) RemovedHooksIDs() (ids []uuid.UUID) {
+	for id := range m.removed_hooks {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// HooksIDs returns the "hooks" edge IDs in the mutation.
+func (m *ConnectionMutation) HooksIDs() (ids []uuid.UUID) {
+	for id := range m._hooks {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetHooks resets all changes to the "hooks" edge.
+func (m *ConnectionMutation) ResetHooks() {
+	m._hooks = nil
+	m.cleared_hooks = false
+	m.removed_hooks = nil
+}
+
 // Where appends a list predicates to the ConnectionMutation builder.
 func (m *ConnectionMutation) Where(ps ...predicate.Connection) {
 	m.predicates = append(m.predicates, ps...)
@@ -670,9 +729,12 @@ func (m *ConnectionMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *ConnectionMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.tasks != nil {
 		edges = append(edges, connection.EdgeTasks)
+	}
+	if m._hooks != nil {
+		edges = append(edges, connection.EdgeHooks)
 	}
 	return edges
 }
@@ -687,15 +749,24 @@ func (m *ConnectionMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case connection.EdgeHooks:
+		ids := make([]ent.Value, 0, len(m._hooks))
+		for id := range m._hooks {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *ConnectionMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.removedtasks != nil {
 		edges = append(edges, connection.EdgeTasks)
+	}
+	if m.removed_hooks != nil {
+		edges = append(edges, connection.EdgeHooks)
 	}
 	return edges
 }
@@ -710,15 +781,24 @@ func (m *ConnectionMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case connection.EdgeHooks:
+		ids := make([]ent.Value, 0, len(m.removed_hooks))
+		for id := range m.removed_hooks {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *ConnectionMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.clearedtasks {
 		edges = append(edges, connection.EdgeTasks)
+	}
+	if m.cleared_hooks {
+		edges = append(edges, connection.EdgeHooks)
 	}
 	return edges
 }
@@ -729,6 +809,8 @@ func (m *ConnectionMutation) EdgeCleared(name string) bool {
 	switch name {
 	case connection.EdgeTasks:
 		return m.clearedtasks
+	case connection.EdgeHooks:
+		return m.cleared_hooks
 	}
 	return false
 }
@@ -747,6 +829,9 @@ func (m *ConnectionMutation) ResetEdge(name string) error {
 	switch name {
 	case connection.EdgeTasks:
 		m.ResetTasks()
+		return nil
+	case connection.EdgeHooks:
+		m.ResetHooks()
 		return nil
 	}
 	return fmt.Errorf("unknown Connection edge %s", name)
@@ -2633,6 +2718,9 @@ type TaskMutation struct {
 	jobs              map[uuid.UUID]struct{}
 	removedjobs       map[uuid.UUID]struct{}
 	clearedjobs       bool
+	_hooks            map[uuid.UUID]struct{}
+	removed_hooks     map[uuid.UUID]struct{}
+	cleared_hooks     bool
 	connection        *uuid.UUID
 	clearedconnection bool
 	done              bool
@@ -3233,6 +3321,60 @@ func (m *TaskMutation) ResetJobs() {
 	m.removedjobs = nil
 }
 
+// AddHookIDs adds the "hooks" edge to the TaskHook entity by ids.
+func (m *TaskMutation) AddHookIDs(ids ...uuid.UUID) {
+	if m._hooks == nil {
+		m._hooks = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		m._hooks[ids[i]] = struct{}{}
+	}
+}
+
+// ClearHooks clears the "hooks" edge to the TaskHook entity.
+func (m *TaskMutation) ClearHooks() {
+	m.cleared_hooks = true
+}
+
+// HooksCleared reports if the "hooks" edge to the TaskHook entity was cleared.
+func (m *TaskMutation) HooksCleared() bool {
+	return m.cleared_hooks
+}
+
+// RemoveHookIDs removes the "hooks" edge to the TaskHook entity by IDs.
+func (m *TaskMutation) RemoveHookIDs(ids ...uuid.UUID) {
+	if m.removed_hooks == nil {
+		m.removed_hooks = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		delete(m._hooks, ids[i])
+		m.removed_hooks[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedHooks returns the removed IDs of the "hooks" edge to the TaskHook entity.
+func (m *TaskMutation) RemovedHooksIDs() (ids []uuid.UUID) {
+	for id := range m.removed_hooks {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// HooksIDs returns the "hooks" edge IDs in the mutation.
+func (m *TaskMutation) HooksIDs() (ids []uuid.UUID) {
+	for id := range m._hooks {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetHooks resets all changes to the "hooks" edge.
+func (m *TaskMutation) ResetHooks() {
+	m._hooks = nil
+	m.cleared_hooks = false
+	m.removed_hooks = nil
+}
+
 // ClearConnection clears the "connection" edge to the Connection entity.
 func (m *TaskMutation) ClearConnection() {
 	m.clearedconnection = true
@@ -3584,9 +3726,12 @@ func (m *TaskMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *TaskMutation) AddedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.jobs != nil {
 		edges = append(edges, task.EdgeJobs)
+	}
+	if m._hooks != nil {
+		edges = append(edges, task.EdgeHooks)
 	}
 	if m.connection != nil {
 		edges = append(edges, task.EdgeConnection)
@@ -3604,6 +3749,12 @@ func (m *TaskMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case task.EdgeHooks:
+		ids := make([]ent.Value, 0, len(m._hooks))
+		for id := range m._hooks {
+			ids = append(ids, id)
+		}
+		return ids
 	case task.EdgeConnection:
 		if id := m.connection; id != nil {
 			return []ent.Value{*id}
@@ -3614,9 +3765,12 @@ func (m *TaskMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *TaskMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.removedjobs != nil {
 		edges = append(edges, task.EdgeJobs)
+	}
+	if m.removed_hooks != nil {
+		edges = append(edges, task.EdgeHooks)
 	}
 	return edges
 }
@@ -3631,15 +3785,24 @@ func (m *TaskMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case task.EdgeHooks:
+		ids := make([]ent.Value, 0, len(m.removed_hooks))
+		for id := range m.removed_hooks {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *TaskMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.clearedjobs {
 		edges = append(edges, task.EdgeJobs)
+	}
+	if m.cleared_hooks {
+		edges = append(edges, task.EdgeHooks)
 	}
 	if m.clearedconnection {
 		edges = append(edges, task.EdgeConnection)
@@ -3653,6 +3816,8 @@ func (m *TaskMutation) EdgeCleared(name string) bool {
 	switch name {
 	case task.EdgeJobs:
 		return m.clearedjobs
+	case task.EdgeHooks:
+		return m.cleared_hooks
 	case task.EdgeConnection:
 		return m.clearedconnection
 	}
@@ -3677,9 +3842,1027 @@ func (m *TaskMutation) ResetEdge(name string) error {
 	case task.EdgeJobs:
 		m.ResetJobs()
 		return nil
+	case task.EdgeHooks:
+		m.ResetHooks()
+		return nil
 	case task.EdgeConnection:
 		m.ResetConnection()
 		return nil
 	}
 	return fmt.Errorf("unknown Task edge %s", name)
+}
+
+// TaskHookMutation represents an operation that mutates the TaskHook nodes in the graph.
+type TaskHookMutation struct {
+	config
+	op                Op
+	typ               string
+	id                *uuid.UUID
+	enabled           *bool
+	priority          *int
+	addpriority       *int
+	event             *model.HookEvent
+	_type             *model.HookType
+	on_error          *model.HookOnError
+	_config           **model.HookConfig
+	created_at        *time.Time
+	updated_at        *time.Time
+	clearedFields     map[string]struct{}
+	task              *uuid.UUID
+	clearedtask       bool
+	connection        *uuid.UUID
+	clearedconnection bool
+	done              bool
+	oldValue          func(context.Context) (*TaskHook, error)
+	predicates        []predicate.TaskHook
+}
+
+var _ ent.Mutation = (*TaskHookMutation)(nil)
+
+// taskhookOption allows management of the mutation configuration using functional options.
+type taskhookOption func(*TaskHookMutation)
+
+// newTaskHookMutation creates new mutation for the TaskHook entity.
+func newTaskHookMutation(c config, op Op, opts ...taskhookOption) *TaskHookMutation {
+	m := &TaskHookMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeTaskHook,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withTaskHookID sets the ID field of the mutation.
+func withTaskHookID(id uuid.UUID) taskhookOption {
+	return func(m *TaskHookMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *TaskHook
+		)
+		m.oldValue = func(ctx context.Context) (*TaskHook, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().TaskHook.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withTaskHook sets the old TaskHook of the mutation.
+func withTaskHook(node *TaskHook) taskhookOption {
+	return func(m *TaskHookMutation) {
+		m.oldValue = func(context.Context) (*TaskHook, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m TaskHookMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m TaskHookMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of TaskHook entities.
+func (m *TaskHookMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *TaskHookMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *TaskHookMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().TaskHook.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetEnabled sets the "enabled" field.
+func (m *TaskHookMutation) SetEnabled(b bool) {
+	m.enabled = &b
+}
+
+// Enabled returns the value of the "enabled" field in the mutation.
+func (m *TaskHookMutation) Enabled() (r bool, exists bool) {
+	v := m.enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnabled returns the old "enabled" field's value of the TaskHook entity.
+// If the TaskHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TaskHookMutation) OldEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnabled: %w", err)
+	}
+	return oldValue.Enabled, nil
+}
+
+// ResetEnabled resets all changes to the "enabled" field.
+func (m *TaskHookMutation) ResetEnabled() {
+	m.enabled = nil
+}
+
+// SetPriority sets the "priority" field.
+func (m *TaskHookMutation) SetPriority(i int) {
+	m.priority = &i
+	m.addpriority = nil
+}
+
+// Priority returns the value of the "priority" field in the mutation.
+func (m *TaskHookMutation) Priority() (r int, exists bool) {
+	v := m.priority
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPriority returns the old "priority" field's value of the TaskHook entity.
+// If the TaskHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TaskHookMutation) OldPriority(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPriority is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPriority requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPriority: %w", err)
+	}
+	return oldValue.Priority, nil
+}
+
+// AddPriority adds i to the "priority" field.
+func (m *TaskHookMutation) AddPriority(i int) {
+	if m.addpriority != nil {
+		*m.addpriority += i
+	} else {
+		m.addpriority = &i
+	}
+}
+
+// AddedPriority returns the value that was added to the "priority" field in this mutation.
+func (m *TaskHookMutation) AddedPriority() (r int, exists bool) {
+	v := m.addpriority
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearPriority clears the value of the "priority" field.
+func (m *TaskHookMutation) ClearPriority() {
+	m.priority = nil
+	m.addpriority = nil
+	m.clearedFields[taskhook.FieldPriority] = struct{}{}
+}
+
+// PriorityCleared returns if the "priority" field was cleared in this mutation.
+func (m *TaskHookMutation) PriorityCleared() bool {
+	_, ok := m.clearedFields[taskhook.FieldPriority]
+	return ok
+}
+
+// ResetPriority resets all changes to the "priority" field.
+func (m *TaskHookMutation) ResetPriority() {
+	m.priority = nil
+	m.addpriority = nil
+	delete(m.clearedFields, taskhook.FieldPriority)
+}
+
+// SetEvent sets the "event" field.
+func (m *TaskHookMutation) SetEvent(me model.HookEvent) {
+	m.event = &me
+}
+
+// Event returns the value of the "event" field in the mutation.
+func (m *TaskHookMutation) Event() (r model.HookEvent, exists bool) {
+	v := m.event
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEvent returns the old "event" field's value of the TaskHook entity.
+// If the TaskHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TaskHookMutation) OldEvent(ctx context.Context) (v model.HookEvent, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEvent is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEvent requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEvent: %w", err)
+	}
+	return oldValue.Event, nil
+}
+
+// ResetEvent resets all changes to the "event" field.
+func (m *TaskHookMutation) ResetEvent() {
+	m.event = nil
+}
+
+// SetType sets the "type" field.
+func (m *TaskHookMutation) SetType(mt model.HookType) {
+	m._type = &mt
+}
+
+// GetType returns the value of the "type" field in the mutation.
+func (m *TaskHookMutation) GetType() (r model.HookType, exists bool) {
+	v := m._type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldType returns the old "type" field's value of the TaskHook entity.
+// If the TaskHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TaskHookMutation) OldType(ctx context.Context) (v model.HookType, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldType: %w", err)
+	}
+	return oldValue.Type, nil
+}
+
+// ResetType resets all changes to the "type" field.
+func (m *TaskHookMutation) ResetType() {
+	m._type = nil
+}
+
+// SetOnError sets the "on_error" field.
+func (m *TaskHookMutation) SetOnError(moe model.HookOnError) {
+	m.on_error = &moe
+}
+
+// OnError returns the value of the "on_error" field in the mutation.
+func (m *TaskHookMutation) OnError() (r model.HookOnError, exists bool) {
+	v := m.on_error
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOnError returns the old "on_error" field's value of the TaskHook entity.
+// If the TaskHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TaskHookMutation) OldOnError(ctx context.Context) (v model.HookOnError, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOnError is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOnError requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOnError: %w", err)
+	}
+	return oldValue.OnError, nil
+}
+
+// ResetOnError resets all changes to the "on_error" field.
+func (m *TaskHookMutation) ResetOnError() {
+	m.on_error = nil
+}
+
+// SetConfig sets the "config" field.
+func (m *TaskHookMutation) SetConfig(mc *model.HookConfig) {
+	m._config = &mc
+}
+
+// Config returns the value of the "config" field in the mutation.
+func (m *TaskHookMutation) Config() (r *model.HookConfig, exists bool) {
+	v := m._config
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConfig returns the old "config" field's value of the TaskHook entity.
+// If the TaskHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TaskHookMutation) OldConfig(ctx context.Context) (v *model.HookConfig, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConfig is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConfig requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConfig: %w", err)
+	}
+	return oldValue.Config, nil
+}
+
+// ResetConfig resets all changes to the "config" field.
+func (m *TaskHookMutation) ResetConfig() {
+	m._config = nil
+}
+
+// SetTaskID sets the "task_id" field.
+func (m *TaskHookMutation) SetTaskID(u uuid.UUID) {
+	m.task = &u
+}
+
+// TaskID returns the value of the "task_id" field in the mutation.
+func (m *TaskHookMutation) TaskID() (r uuid.UUID, exists bool) {
+	v := m.task
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTaskID returns the old "task_id" field's value of the TaskHook entity.
+// If the TaskHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TaskHookMutation) OldTaskID(ctx context.Context) (v *uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTaskID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTaskID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTaskID: %w", err)
+	}
+	return oldValue.TaskID, nil
+}
+
+// ClearTaskID clears the value of the "task_id" field.
+func (m *TaskHookMutation) ClearTaskID() {
+	m.task = nil
+	m.clearedFields[taskhook.FieldTaskID] = struct{}{}
+}
+
+// TaskIDCleared returns if the "task_id" field was cleared in this mutation.
+func (m *TaskHookMutation) TaskIDCleared() bool {
+	_, ok := m.clearedFields[taskhook.FieldTaskID]
+	return ok
+}
+
+// ResetTaskID resets all changes to the "task_id" field.
+func (m *TaskHookMutation) ResetTaskID() {
+	m.task = nil
+	delete(m.clearedFields, taskhook.FieldTaskID)
+}
+
+// SetConnectionID sets the "connection_id" field.
+func (m *TaskHookMutation) SetConnectionID(u uuid.UUID) {
+	m.connection = &u
+}
+
+// ConnectionID returns the value of the "connection_id" field in the mutation.
+func (m *TaskHookMutation) ConnectionID() (r uuid.UUID, exists bool) {
+	v := m.connection
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConnectionID returns the old "connection_id" field's value of the TaskHook entity.
+// If the TaskHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TaskHookMutation) OldConnectionID(ctx context.Context) (v *uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConnectionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConnectionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConnectionID: %w", err)
+	}
+	return oldValue.ConnectionID, nil
+}
+
+// ClearConnectionID clears the value of the "connection_id" field.
+func (m *TaskHookMutation) ClearConnectionID() {
+	m.connection = nil
+	m.clearedFields[taskhook.FieldConnectionID] = struct{}{}
+}
+
+// ConnectionIDCleared returns if the "connection_id" field was cleared in this mutation.
+func (m *TaskHookMutation) ConnectionIDCleared() bool {
+	_, ok := m.clearedFields[taskhook.FieldConnectionID]
+	return ok
+}
+
+// ResetConnectionID resets all changes to the "connection_id" field.
+func (m *TaskHookMutation) ResetConnectionID() {
+	m.connection = nil
+	delete(m.clearedFields, taskhook.FieldConnectionID)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *TaskHookMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *TaskHookMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the TaskHook entity.
+// If the TaskHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TaskHookMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *TaskHookMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *TaskHookMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *TaskHookMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the TaskHook entity.
+// If the TaskHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TaskHookMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *TaskHookMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// ClearTask clears the "task" edge to the Task entity.
+func (m *TaskHookMutation) ClearTask() {
+	m.clearedtask = true
+	m.clearedFields[taskhook.FieldTaskID] = struct{}{}
+}
+
+// TaskCleared reports if the "task" edge to the Task entity was cleared.
+func (m *TaskHookMutation) TaskCleared() bool {
+	return m.TaskIDCleared() || m.clearedtask
+}
+
+// TaskIDs returns the "task" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// TaskID instead. It exists only for internal usage by the builders.
+func (m *TaskHookMutation) TaskIDs() (ids []uuid.UUID) {
+	if id := m.task; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetTask resets all changes to the "task" edge.
+func (m *TaskHookMutation) ResetTask() {
+	m.task = nil
+	m.clearedtask = false
+}
+
+// ClearConnection clears the "connection" edge to the Connection entity.
+func (m *TaskHookMutation) ClearConnection() {
+	m.clearedconnection = true
+	m.clearedFields[taskhook.FieldConnectionID] = struct{}{}
+}
+
+// ConnectionCleared reports if the "connection" edge to the Connection entity was cleared.
+func (m *TaskHookMutation) ConnectionCleared() bool {
+	return m.ConnectionIDCleared() || m.clearedconnection
+}
+
+// ConnectionIDs returns the "connection" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ConnectionID instead. It exists only for internal usage by the builders.
+func (m *TaskHookMutation) ConnectionIDs() (ids []uuid.UUID) {
+	if id := m.connection; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetConnection resets all changes to the "connection" edge.
+func (m *TaskHookMutation) ResetConnection() {
+	m.connection = nil
+	m.clearedconnection = false
+}
+
+// Where appends a list predicates to the TaskHookMutation builder.
+func (m *TaskHookMutation) Where(ps ...predicate.TaskHook) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the TaskHookMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *TaskHookMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.TaskHook, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *TaskHookMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *TaskHookMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (TaskHook).
+func (m *TaskHookMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *TaskHookMutation) Fields() []string {
+	fields := make([]string, 0, 10)
+	if m.enabled != nil {
+		fields = append(fields, taskhook.FieldEnabled)
+	}
+	if m.priority != nil {
+		fields = append(fields, taskhook.FieldPriority)
+	}
+	if m.event != nil {
+		fields = append(fields, taskhook.FieldEvent)
+	}
+	if m._type != nil {
+		fields = append(fields, taskhook.FieldType)
+	}
+	if m.on_error != nil {
+		fields = append(fields, taskhook.FieldOnError)
+	}
+	if m._config != nil {
+		fields = append(fields, taskhook.FieldConfig)
+	}
+	if m.task != nil {
+		fields = append(fields, taskhook.FieldTaskID)
+	}
+	if m.connection != nil {
+		fields = append(fields, taskhook.FieldConnectionID)
+	}
+	if m.created_at != nil {
+		fields = append(fields, taskhook.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, taskhook.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *TaskHookMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case taskhook.FieldEnabled:
+		return m.Enabled()
+	case taskhook.FieldPriority:
+		return m.Priority()
+	case taskhook.FieldEvent:
+		return m.Event()
+	case taskhook.FieldType:
+		return m.GetType()
+	case taskhook.FieldOnError:
+		return m.OnError()
+	case taskhook.FieldConfig:
+		return m.Config()
+	case taskhook.FieldTaskID:
+		return m.TaskID()
+	case taskhook.FieldConnectionID:
+		return m.ConnectionID()
+	case taskhook.FieldCreatedAt:
+		return m.CreatedAt()
+	case taskhook.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *TaskHookMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case taskhook.FieldEnabled:
+		return m.OldEnabled(ctx)
+	case taskhook.FieldPriority:
+		return m.OldPriority(ctx)
+	case taskhook.FieldEvent:
+		return m.OldEvent(ctx)
+	case taskhook.FieldType:
+		return m.OldType(ctx)
+	case taskhook.FieldOnError:
+		return m.OldOnError(ctx)
+	case taskhook.FieldConfig:
+		return m.OldConfig(ctx)
+	case taskhook.FieldTaskID:
+		return m.OldTaskID(ctx)
+	case taskhook.FieldConnectionID:
+		return m.OldConnectionID(ctx)
+	case taskhook.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case taskhook.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown TaskHook field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *TaskHookMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case taskhook.FieldEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnabled(v)
+		return nil
+	case taskhook.FieldPriority:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPriority(v)
+		return nil
+	case taskhook.FieldEvent:
+		v, ok := value.(model.HookEvent)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEvent(v)
+		return nil
+	case taskhook.FieldType:
+		v, ok := value.(model.HookType)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetType(v)
+		return nil
+	case taskhook.FieldOnError:
+		v, ok := value.(model.HookOnError)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOnError(v)
+		return nil
+	case taskhook.FieldConfig:
+		v, ok := value.(*model.HookConfig)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConfig(v)
+		return nil
+	case taskhook.FieldTaskID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTaskID(v)
+		return nil
+	case taskhook.FieldConnectionID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConnectionID(v)
+		return nil
+	case taskhook.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case taskhook.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown TaskHook field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *TaskHookMutation) AddedFields() []string {
+	var fields []string
+	if m.addpriority != nil {
+		fields = append(fields, taskhook.FieldPriority)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *TaskHookMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case taskhook.FieldPriority:
+		return m.AddedPriority()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *TaskHookMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case taskhook.FieldPriority:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPriority(v)
+		return nil
+	}
+	return fmt.Errorf("unknown TaskHook numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *TaskHookMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(taskhook.FieldPriority) {
+		fields = append(fields, taskhook.FieldPriority)
+	}
+	if m.FieldCleared(taskhook.FieldTaskID) {
+		fields = append(fields, taskhook.FieldTaskID)
+	}
+	if m.FieldCleared(taskhook.FieldConnectionID) {
+		fields = append(fields, taskhook.FieldConnectionID)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *TaskHookMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *TaskHookMutation) ClearField(name string) error {
+	switch name {
+	case taskhook.FieldPriority:
+		m.ClearPriority()
+		return nil
+	case taskhook.FieldTaskID:
+		m.ClearTaskID()
+		return nil
+	case taskhook.FieldConnectionID:
+		m.ClearConnectionID()
+		return nil
+	}
+	return fmt.Errorf("unknown TaskHook nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *TaskHookMutation) ResetField(name string) error {
+	switch name {
+	case taskhook.FieldEnabled:
+		m.ResetEnabled()
+		return nil
+	case taskhook.FieldPriority:
+		m.ResetPriority()
+		return nil
+	case taskhook.FieldEvent:
+		m.ResetEvent()
+		return nil
+	case taskhook.FieldType:
+		m.ResetType()
+		return nil
+	case taskhook.FieldOnError:
+		m.ResetOnError()
+		return nil
+	case taskhook.FieldConfig:
+		m.ResetConfig()
+		return nil
+	case taskhook.FieldTaskID:
+		m.ResetTaskID()
+		return nil
+	case taskhook.FieldConnectionID:
+		m.ResetConnectionID()
+		return nil
+	case taskhook.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case taskhook.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown TaskHook field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *TaskHookMutation) AddedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.task != nil {
+		edges = append(edges, taskhook.EdgeTask)
+	}
+	if m.connection != nil {
+		edges = append(edges, taskhook.EdgeConnection)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *TaskHookMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case taskhook.EdgeTask:
+		if id := m.task; id != nil {
+			return []ent.Value{*id}
+		}
+	case taskhook.EdgeConnection:
+		if id := m.connection; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *TaskHookMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 2)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *TaskHookMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *TaskHookMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.clearedtask {
+		edges = append(edges, taskhook.EdgeTask)
+	}
+	if m.clearedconnection {
+		edges = append(edges, taskhook.EdgeConnection)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *TaskHookMutation) EdgeCleared(name string) bool {
+	switch name {
+	case taskhook.EdgeTask:
+		return m.clearedtask
+	case taskhook.EdgeConnection:
+		return m.clearedconnection
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *TaskHookMutation) ClearEdge(name string) error {
+	switch name {
+	case taskhook.EdgeTask:
+		m.ClearTask()
+		return nil
+	case taskhook.EdgeConnection:
+		m.ClearConnection()
+		return nil
+	}
+	return fmt.Errorf("unknown TaskHook unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *TaskHookMutation) ResetEdge(name string) error {
+	switch name {
+	case taskhook.EdgeTask:
+		m.ResetTask()
+		return nil
+	case taskhook.EdgeConnection:
+		m.ResetConnection()
+		return nil
+	}
+	return fmt.Errorf("unknown TaskHook edge %s", name)
 }

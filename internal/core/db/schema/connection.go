@@ -58,5 +58,7 @@ func (Connection) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.To("tasks", Task.Type).
 			Annotations(entsql.OnDelete(entsql.Cascade)),
+		edge.To("hooks", TaskHook.Type).
+			Annotations(entsql.OnDelete(entsql.Cascade)),
 	}
 }

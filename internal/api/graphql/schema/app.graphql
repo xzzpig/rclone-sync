@@ -1,0 +1,30 @@
+# =============================================================================
+# APP CONFIG TYPES
+# =============================================================================
+
+"""
+应用全局配置
+"""
+type AppConfig {
+	"""
+	Hook 相关配置
+	"""
+	hook: AppHookConfig!
+}
+
+"""
+Hook 全局配置
+"""
+type AppHookConfig {
+	"""
+	是否全局启用 Hook 功能
+	"""
+	enabled: Boolean!
+}
+
+extend type Query {
+	"""
+	获取应用全局配置
+	"""
+	appConfig: AppConfig! @goField(forceResolver: true)
+}

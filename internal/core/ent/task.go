@@ -53,11 +53,13 @@ type Task struct {
 type TaskEdges struct {
 	// Jobs holds the value of the jobs edge.
 	Jobs []*Job `json:"jobs,omitempty"`
+	// Hooks holds the value of the hooks edge.
+	Hooks []*TaskHook `json:"hooks,omitempty"`
 	// Connection holds the value of the connection edge.
 	Connection *Connection `json:"connection,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [3]bool
 }
 
 // JobsOrErr returns the Jobs value or an error if the edge
@@ -69,12 +71,21 @@ func (e TaskEdges) JobsOrErr() ([]*Job, error) {
 	return nil, &NotLoadedError{edge: "jobs"}
 }
 
+// HooksOrErr returns the Hooks value or an error if the edge
+// was not loaded in eager-loading.
+func (e TaskEdges) HooksOrErr() ([]*TaskHook, error) {
+	if e.loadedTypes[1] {
+		return e.Hooks, nil
+	}
+	return nil, &NotLoadedError{edge: "hooks"}
+}
+
 // ConnectionOrErr returns the Connection value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
 func (e TaskEdges) ConnectionOrErr() (*Connection, error) {
 	if e.Connection != nil {
 		return e.Connection, nil
-	} else if e.loadedTypes[1] {
+	} else if e.loadedTypes[2] {
 		return nil, &NotFoundError{label: connection.Label}
 	}
 	return nil, &NotLoadedError{edge: "connection"}
@@ -200,6 +211,11 @@ func (_m *Task) Value(name string) (ent.Value, error) {
 // QueryJobs queries the "jobs" edge of the Task entity.
 func (_m *Task) QueryJobs() *JobQuery {
 	return NewTaskClient(_m.config).QueryJobs(_m)
+}
+
+// QueryHooks queries the "hooks" edge of the Task entity.
+func (_m *Task) QueryHooks() *TaskHookQuery {
+	return NewTaskClient(_m.config).QueryHooks(_m)
 }
 
 // QueryConnection queries the "connection" edge of the Task entity.

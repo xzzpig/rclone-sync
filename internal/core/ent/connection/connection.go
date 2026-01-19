@@ -29,6 +29,8 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// EdgeTasks holds the string denoting the tasks edge name in mutations.
 	EdgeTasks = "tasks"
+	// EdgeHooks holds the string denoting the hooks edge name in mutations.
+	EdgeHooks = "hooks"
 	// Table holds the table name of the connection in the database.
 	Table = "connections"
 	// TasksTable is the table that holds the tasks relation/edge.
@@ -38,6 +40,13 @@ const (
 	TasksInverseTable = "tasks"
 	// TasksColumn is the table column denoting the tasks relation/edge.
 	TasksColumn = "connection_id"
+	// HooksTable is the table that holds the hooks relation/edge.
+	HooksTable = "task_hooks"
+	// HooksInverseTable is the table name for the TaskHook entity.
+	// It exists in this package in order to avoid circular dependency with the "taskhook" package.
+	HooksInverseTable = "task_hooks"
+	// HooksColumn is the table column denoting the hooks relation/edge.
+	HooksColumn = "connection_id"
 )
 
 // Columns holds all SQL columns for connection fields.
@@ -117,10 +126,31 @@ func ByTasks(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newTasksStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByHooksCount orders the results by hooks count.
+func ByHooksCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newHooksStep(), opts...)
+	}
+}
+
+// ByHooks orders the results by hooks terms.
+func ByHooks(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newHooksStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newTasksStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(TasksInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, TasksTable, TasksColumn),
+	)
+}
+func newHooksStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(HooksInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, HooksTable, HooksColumn),
 	)
 }

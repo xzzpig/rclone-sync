@@ -16,6 +16,7 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/ent/connection"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/predicate"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/task"
+	"github.com/xzzpig/rclone-sync/internal/core/ent/taskhook"
 )
 
 // ConnectionQuery is the builder for querying Connection entities.
@@ -26,6 +27,7 @@ type ConnectionQuery struct {
 	inters     []Interceptor
 	predicates []predicate.Connection
 	withTasks  *TaskQuery
+	withHooks  *TaskHookQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -77,6 +79,28 @@ func (_q *ConnectionQuery) QueryTasks() *TaskQuery {
 			sqlgraph.From(connection.Table, connection.FieldID, selector),
 			sqlgraph.To(task.Table, task.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, connection.TasksTable, connection.TasksColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryHooks chains the current query on the "hooks" edge.
+func (_q *ConnectionQuery) QueryHooks() *TaskHookQuery {
+	query := (&TaskHookClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(connection.Table, connection.FieldID, selector),
+			sqlgraph.To(taskhook.Table, taskhook.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, connection.HooksTable, connection.HooksColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -277,6 +301,7 @@ func (_q *ConnectionQuery) Clone() *ConnectionQuery {
 		inters:     append([]Interceptor{}, _q.inters...),
 		predicates: append([]predicate.Connection{}, _q.predicates...),
 		withTasks:  _q.withTasks.Clone(),
+		withHooks:  _q.withHooks.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -291,6 +316,17 @@ func (_q *ConnectionQuery) WithTasks(opts ...func(*TaskQuery)) *ConnectionQuery 
 		opt(query)
 	}
 	_q.withTasks = query
+	return _q
+}
+
+// WithHooks tells the query-builder to eager-load the nodes that are connected to
+// the "hooks" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ConnectionQuery) WithHooks(opts ...func(*TaskHookQuery)) *ConnectionQuery {
+	query := (&TaskHookClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withHooks = query
 	return _q
 }
 
@@ -372,8 +408,9 @@ func (_q *ConnectionQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*C
 	var (
 		nodes       = []*Connection{}
 		_spec       = _q.querySpec()
-		loadedTypes = [1]bool{
+		loadedTypes = [2]bool{
 			_q.withTasks != nil,
+			_q.withHooks != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -398,6 +435,13 @@ func (_q *ConnectionQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*C
 		if err := _q.loadTasks(ctx, query, nodes,
 			func(n *Connection) { n.Edges.Tasks = []*Task{} },
 			func(n *Connection, e *Task) { n.Edges.Tasks = append(n.Edges.Tasks, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withHooks; query != nil {
+		if err := _q.loadHooks(ctx, query, nodes,
+			func(n *Connection) { n.Edges.Hooks = []*TaskHook{} },
+			func(n *Connection, e *TaskHook) { n.Edges.Hooks = append(n.Edges.Hooks, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -429,6 +473,39 @@ func (_q *ConnectionQuery) loadTasks(ctx context.Context, query *TaskQuery, node
 		node, ok := nodeids[fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "connection_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *ConnectionQuery) loadHooks(ctx context.Context, query *TaskHookQuery, nodes []*Connection, init func(*Connection), assign func(*Connection, *TaskHook)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[uuid.UUID]*Connection)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(taskhook.FieldConnectionID)
+	}
+	query.Where(predicate.TaskHook(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(connection.HooksColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ConnectionID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "connection_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "connection_id" returned %v for node %v`, *fk, n.ID)
 		}
 		assign(node, n)
 	}

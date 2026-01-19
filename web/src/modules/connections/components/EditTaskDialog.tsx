@@ -7,13 +7,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { showToast } from '@/components/ui/toast';
-import { type Task, type UpdateTaskInput } from '@/lib/types';
+import { type TaskDetail, type UpdateTaskInput } from '@/lib/types';
 import * as m from '@/paraglide/messages.js';
 import { createEffect, createSignal } from 'solid-js';
-import { TaskSettingsForm, taskToUpdateInput } from './TaskSettingsForm';
+import { TaskSettingsForm } from './TaskSettingsForm';
+import { taskToUpdateTaskInput, toUpdateTaskInput } from '../utils/transformers';
 
 interface EditTaskDialogProps {
-  task: Task | null;
+  task: TaskDetail | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (id: string, updates: UpdateTaskInput) => Promise<void>;
@@ -26,14 +27,32 @@ export function EditTaskDialog(props: EditTaskDialogProps) {
     schedule: '',
     realtime: false,
     options: {},
+    hooks: [],
   });
   const [isSubmitting, setIsSubmitting] = createSignal(false);
+  const [initializedTaskId, setInitializedTaskId] = createSignal<string | null>(null);
 
-  // Populate form when task changes
   createEffect(() => {
     const task = props.task;
-    if (task) {
-      setFormData(taskToUpdateInput(task));
+    if (props.open && task && initializedTaskId() !== task.id) {
+      setFormData(taskToUpdateTaskInput(task));
+      setInitializedTaskId(task.id);
+    } else if (!props.open) {
+      setInitializedTaskId(null);
+    }
+  });
+
+  createEffect(() => {
+    const task = props.task;
+    if (props.open && task?.hooks && task.hooks.length > 0) {
+      const currentHooks = formData().hooks ?? [];
+      if (currentHooks.length === 0) {
+        const fullInput = taskToUpdateTaskInput(task);
+        setFormData((prev) => ({
+          ...prev,
+          hooks: fullInput.hooks,
+        }));
+      }
     }
   });
 
@@ -43,7 +62,7 @@ export function EditTaskDialog(props: EditTaskDialogProps) {
 
     setIsSubmitting(true);
     try {
-      await props.onSave(task.id, formData());
+      await props.onSave(task.id, toUpdateTaskInput(formData()));
       showToast({
         title: m.toast_taskUpdated(),
         description: m.toast_taskUpdatedDesc({ name: formData().name ?? '' }),
@@ -70,6 +89,7 @@ export function EditTaskDialog(props: EditTaskDialogProps) {
           <TaskSettingsForm
             value={formData()}
             onChange={setFormData}
+            taskId={props.task?.id}
             connectionId={props.task?.connection?.id}
             remotePath={props.task?.remotePath}
             sourcePath={props.task?.sourcePath}

@@ -33,3 +33,18 @@ func (LogAction) Values() []string {
 func (SyncDirection) Values() []string {
 	return toStrings(AllSyncDirection)
 }
+
+// Values returns all valid values for HookEvent enum.
+func (HookEvent) Values() []string {
+	return toStrings(AllHookEvent)
+}
+
+// Values returns all valid values for HookType enum.
+func (HookType) Values() []string {
+	return toStrings(AllHookType)
+}
+
+// Values returns all valid values for HookOnError enum.
+func (HookOnError) Values() []string {
+	return toStrings(AllHookOnError)
+}

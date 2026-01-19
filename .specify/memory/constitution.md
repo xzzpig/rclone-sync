@@ -1,9 +1,12 @@
 <!--
 SYNC IMPACT REPORT
-Version change: 1.5.0 -> 1.6.0
+Version change: 1.7.0 -> 1.7.1
 Modified principles: None
-Added sections: Principle XI - Database Index Strategy
+Added sections: None
 Removed sections: None
+Modified workflow: Code Quality - i18n key sorting and verification now use skills instead of scripts
+  - Frontend: sort-i18n-keys skill (replaces scripts/sort-i18n-keys.js)
+  - Backend: check-i18n skill (replaces scripts/check_i18n.go)
 Templates requiring updates: ✅ None
 Follow-up TODOs: None
 -->
@@ -46,7 +49,7 @@ The interface MUST implement Optimistic UI patterns for mutations to ensure perc
 
 ### IX. Internationalization (i18n) Standards
 
-All user-visible text MUST be externalized into translation resource files—hardcoded strings are prohibited. The system MUST support Chinese (zh-CN) and English (en) with an extensible architecture for future languages. Frontend MUST use Paraglide for compile-time type-safe translations; Backend MUST use go-i18n with embedded TOML locale files. Language detection MUST follow priority: user preference (localStorage) > Accept-Language header > English fallback. Translation keys MUST be organized hierarchically by feature/module namespace. Missing translations MUST fall back to English gracefully—never display raw keys to users. All API error messages MUST be translatable via I18nError pattern. Date, time, and number formatting MUST respect the user's locale settings.
+All user-visible text MUST be externalized into translation resource files—hardcoded strings are prohibited. The system MUST support Chinese (zh-CN) and English (en) with an extensible architecture for future languages. Frontend MUST use Paraglide for compile-time type-safe translations; Backend MUST use go-i18n with embedded TOML locale files. Key consistency between `internal/i18n/keys.go` and TOML files MUST be maintained and verified using automated checks. Language detection MUST follow priority: user preference (localStorage) > Accept-Language header > English fallback. Translation keys MUST be organized hierarchically by feature/module namespace. Missing translations MUST fall back to English gracefully—never display raw keys to users. All API error messages MUST be translatable via I18nError pattern. Date, time, and number formatting MUST respect the user's locale settings.
 
 ### X. Schema-First API Contract
 
@@ -103,7 +106,8 @@ Index additions MUST be implemented via migration files using golang-migrate. Ov
 - Frontend code MUST pass ESLint and Prettier checks
 - All PRs require review and passing tests
 - Documentation updates required for API changes
-- Translation keys MUST be sorted alphabetically (use scripts/sort-i18n-keys.js)
+- Frontend translation keys MUST be sorted alphabetically (use `/sort-i18n-keys` skill)
+- Backend i18n keys MUST be verified for consistency between code and TOML files (use `/check-i18n` skill)
 
 ### Testing Strategy
 
@@ -118,4 +122,4 @@ Index additions MUST be implemented via migration files using golang-migrate. Ov
 
 This constitution supersedes all other development practices. Amendments REQUIRE documentation, team approval, and migration plan. Versioning follows Semantic Versioning (MAJOR.MINOR.PATCH). All code reviews MUST verify compliance with these principles. Complexity MUST be justified with clear business value.
 
-**Version**: 1.6.0 | **Ratified**: 2025-12-04 | **Last Amended**: 2025-12-30
+**Version**: 1.7.1 | **Ratified**: 2025-12-04 | **Last Amended**: 2026-01-19

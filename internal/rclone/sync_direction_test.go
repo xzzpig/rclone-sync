@@ -51,7 +51,7 @@ func TestSyncEngine_RunTask_Upload(t *testing.T) {
 
 	// 3. Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0, nil)
 
 	// 4. Reload task with Connection edge before running
 	testTask, err = taskQuery.GetTaskWithConnection(ctx, testTask.ID)
@@ -121,7 +121,7 @@ func TestSyncEngine_RunTask_Download(t *testing.T) {
 
 	// 3. Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0, nil)
 
 	// 4. Reload task with Connection edge before running
 	testTask, err = taskQuery.GetTaskWithConnection(ctx, testTask.ID)
@@ -185,7 +185,7 @@ func TestSyncEngine_RunTask_Bidirectional(t *testing.T) {
 
 	// 3. Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0, nil)
 
 	// 4. Reload task with Connection edge before running
 	testTask, err = taskQuery.GetTaskWithConnection(ctx, testTask.ID)

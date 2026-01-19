@@ -62,6 +62,7 @@ export const TaskGetQuery = graphql(`
         realtime
         createdAt
         updatedAt
+        enabled
         connection {
           id
           name
@@ -78,6 +79,25 @@ export const TaskGetQuery = graphql(`
           status
           startTime
           endTime
+          filesTransferred
+          bytesTransferred
+        }
+        hooks {
+          id
+          enabled
+          priority
+          event
+          type
+          onError
+          config {
+            url
+            method
+            headers
+            body
+            command
+            workDir
+            timeout
+          }
         }
       }
     }
@@ -100,6 +120,23 @@ export const TaskCreateMutation = graphql(`
         realtime
         createdAt
         updatedAt
+        hooks {
+          id
+          enabled
+          priority
+          event
+          type
+          onError
+          config {
+            url
+            method
+            headers
+            body
+            command
+            workDir
+            timeout
+          }
+        }
       }
     }
   }
@@ -121,6 +158,23 @@ export const TaskUpdateMutation = graphql(`
         realtime
         createdAt
         updatedAt
+        hooks {
+          id
+          enabled
+          priority
+          event
+          type
+          onError
+          config {
+            url
+            method
+            headers
+            body
+            command
+            workDir
+            timeout
+          }
+        }
       }
     }
   }

@@ -60,6 +60,23 @@ export const ConnectionGetConfigQuery = graphql(`
           dbSizeBytes
           lastNotifyTime
         }
+        hooks {
+          id
+          enabled
+          priority
+          event
+          type
+          onError
+          config {
+            url
+            method
+            headers
+            body
+            command
+            workDir
+            timeout
+          }
+        }
       }
     }
   }

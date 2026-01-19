@@ -220,6 +220,10 @@ input CreateTaskInput {
 	同步选项
 	"""
 	options: TaskSyncOptionsInput
+	"""
+	关联的 Hooks
+	"""
+	hooks: [HookInput!]
 }
 
 """
@@ -237,7 +241,7 @@ input UpdateTaskInput {
 	"""
 	关联连接 ID
 	"""
-	connectionId: ID
+	connectionID: ID
 	"""
 	远程目标路径
 	"""
@@ -262,6 +266,10 @@ input UpdateTaskInput {
 	同步选项
 	"""
 	options: TaskSyncOptionsInput
+	"""
+	关联的 Hooks 变更列表
+	"""
+	hooks: [NestedUpdateHookInput!]
 }
 
 # =============================================================================

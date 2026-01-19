@@ -137,7 +137,7 @@ func NewCacheStore(dbPath string) (*CacheStore, error) {
 	}
 
 	// Use db.FileSDN for consistent SQLite connection parameters
-	dsn := db.FileSDN(dbPath)
+	dsn := db.FileDSN(dbPath)
 
 	// Open database with WAL mode
 	sqlDB, err := sql.Open("sqlite3", dsn)

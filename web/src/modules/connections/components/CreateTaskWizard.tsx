@@ -12,13 +12,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { showToast } from '@/components/ui/toast';
-import type { CreateTaskInput, UpdateTaskInput } from '@/lib/types';
+import { type CreateTaskInput, type HookInput, type UpdateTaskInput } from '@/lib/types';
 import * as m from '@/paraglide/messages.js';
 import { createQuery } from '@urql/solid';
 import { Component, createSignal, Show } from 'solid-js';
 import IconChevronLeft from '~icons/lucide/chevron-left';
 import IconChevronRight from '~icons/lucide/chevron-right';
 import IconHardDrive from '~icons/lucide/hard-drive';
+import { toUpdateTaskInput } from '../utils/transformers';
 import { TaskSettingsForm } from './TaskSettingsForm';
 
 type TaskSettingsFormData = UpdateTaskInput;
@@ -113,7 +114,8 @@ export const CreateTaskWizard: Component<CreateTaskWizardProps> = (props) => {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      const data = formData();
+      const data = toUpdateTaskInput(formData());
+
       await props.onSubmit({
         name: data.name ?? `task-${new Date().getTime()}`,
         sourcePath: sourcePath(),
@@ -123,6 +125,9 @@ export const CreateTaskWizard: Component<CreateTaskWizardProps> = (props) => {
         schedule: data.schedule,
         realtime: data.realtime,
         options: data.options,
+        hooks: (data.hooks ?? [])
+          .map((h) => h.hook)
+          .filter((h): h is HookInput => h !== undefined && h !== null),
       });
 
       handleClose();

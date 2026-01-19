@@ -2,9 +2,12 @@ package rclone_test
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,6 +21,7 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/db"
 	"github.com/xzzpig/rclone-sync/internal/core/db/query"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/enttest"
+	"github.com/xzzpig/rclone-sync/internal/core/hook"
 	"github.com/xzzpig/rclone-sync/internal/rclone"
 	"github.com/xzzpig/rclone-sync/internal/rclone/testutil"
 
@@ -82,7 +86,7 @@ func TestSyncEngine_RunTask_Integration(t *testing.T) {
 
 	// 3. Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0, nil)
 
 	// 4. Reload task with Connection edge before running
 	testTask, err = taskQuery.GetTaskWithConnection(ctx, testTask.ID)
@@ -187,7 +191,7 @@ func TestSyncEngine_RunTask_AutoDeleteEmptyJob(t *testing.T) {
 			require.NoError(t, err)
 
 			dataDir := t.TempDir()
-			syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, tt.autoDeleteEmptyJobs, 0)
+			syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, tt.autoDeleteEmptyJobs, 0, nil)
 
 			testTask, err = taskQuery.GetTaskWithConnection(ctx, testTask.ID)
 			require.NoError(t, err)
@@ -245,7 +249,7 @@ func TestSyncEngine_RunTask_Failure(t *testing.T) {
 
 	// 3. Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0, nil)
 
 	// 4. Reload task with Connection edge before running
 	testTask, err = taskQuery.GetTaskWithConnection(ctx, testTask.ID)
@@ -297,7 +301,7 @@ func TestSyncEngine_RunTask_Cancel(t *testing.T) {
 
 	// 3. Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0, nil)
 
 	// 4. Reload task with Connection edge before running
 	testTask, err = taskQuery.GetTaskWithConnection(ctx, testTask.ID)
@@ -367,7 +371,7 @@ func TestSyncEngine_RunTask_CancelDuringSync(t *testing.T) {
 
 	// 6. Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0, nil)
 
 	// 7. Create cancellable context
 	taskCtx, cancel := context.WithCancel(context.Background())
@@ -491,7 +495,7 @@ func TestSyncEngine_RunTask_NoDelete(t *testing.T) {
 
 			// 3. Setup SyncEngine
 			dataDir := t.TempDir()
-			syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0)
+			syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0, nil)
 
 			// 4. Reload task with Connection edge
 			testTask, err = taskQuery.GetTaskWithConnection(ctx, testTask.ID)
@@ -618,7 +622,7 @@ func TestSyncEngine_RunTask_ProgressEvents(t *testing.T) {
 
 	// 6. Setup SyncEngine with real buses
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobQuery, jobProgressBus, transferProgressBus, dataDir, false, 0)
+	syncEngine := rclone.NewSyncEngine(jobQuery, jobProgressBus, transferProgressBus, dataDir, false, 0, nil)
 
 	// 7. Reload task with Connection edge before running
 	testTask, err = taskQuery.GetTaskWithConnection(ctx, testTask.ID)
@@ -749,7 +753,7 @@ func TestSyncEngine_RunTask_MetacacheIntegration(t *testing.T) {
 
 	// 4. Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0, nil)
 
 	// 5. Initial sync: create file in source and sync to remote
 	testFilePath := filepath.Join(sourceDir, "sync-test.txt")
@@ -799,4 +803,614 @@ func TestSyncEngine_RunTask_MetacacheIntegration(t *testing.T) {
 	for _, job := range jobs {
 		assert.Equal(t, string(model.JobStatusSuccess), string(job.Status), "Job should be successful")
 	}
+}
+
+// setupIntegrationTestWithHook initializes test environment including hook query and executor.
+func setupIntegrationTestWithHook(t *testing.T) (*query.ConnectionQuery, *query.TaskQuery, *query.JobQuery, *query.HookQuery, *rclone.DBStorage) {
+	t.Helper()
+
+	client := enttest.Open(t, "sqlite3", db.InMemoryDSN())
+	t.Cleanup(func() { client.Close() })
+
+	encryptor, err := crypto.NewEncryptor("")
+	require.NoError(t, err)
+
+	connQuery := query.NewConnectionQuery(client, encryptor)
+	taskQuery := query.NewTaskQuery(client)
+	jobQuery := query.NewJobQuery(client)
+	hookQuery := query.NewHookQuery(client)
+
+	storage := rclone.NewDBStorage(connQuery, t.TempDir())
+	storage.Install()
+
+	return connQuery, taskQuery, jobQuery, hookQuery, storage
+}
+
+// TestSyncEngine_RunTask_Hook_OnSuccess tests that ON_SUCCESS hooks are triggered on successful sync.
+func TestSyncEngine_RunTask_Hook_OnSuccess(t *testing.T) {
+	connQuery, taskQuery, jobQuery, hookQuery, _ := setupIntegrationTestWithHook(t)
+	ctx := context.Background()
+
+	sourceDir := t.TempDir()
+	destDir := t.TempDir()
+
+	err := os.WriteFile(filepath.Join(sourceDir, "test.txt"), []byte("hello"), 0644)
+	require.NoError(t, err)
+
+	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"}, nil)
+	require.NoError(t, err)
+
+	testTask, err := taskQuery.CreateTask(ctx,
+		"TestHookOnSuccess",
+		sourceDir,
+		testConn.ID,
+		destDir,
+		string(model.SyncDirectionUpload),
+		"",
+		false,
+		true,
+		nil,
+	)
+	require.NoError(t, err)
+
+	var hookCalled atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hookCalled.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	_, err = hookQuery.CreateHook(ctx, &testTask.ID, nil, model.HookInput{
+		Event:   model.HookEventOnSuccess,
+		Type:    model.HookTypeHTTP,
+		Enabled: func() *bool { v := true; return &v }(),
+		Config: &model.HookConfigInput{
+			URL: &server.URL,
+		},
+	})
+	require.NoError(t, err)
+
+	dataDir := t.TempDir()
+	enabled := true
+	hookExecutor := hook.NewExecutor(hookQuery, jobQuery, &enabled, 30)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0, hookExecutor)
+
+	testTask, err = taskQuery.GetTaskWithConnection(ctx, testTask.ID)
+	require.NoError(t, err)
+
+	err = syncEngine.RunTask(ctx, testTask, model.JobTriggerManual)
+	require.NoError(t, err)
+
+	time.Sleep(100 * time.Millisecond)
+	assert.Equal(t, int32(1), hookCalled.Load(), "ON_SUCCESS hook should be called exactly once")
+
+	jobs, err := jobQuery.ListJobs(ctx, &testTask.ID, nil, 10, 0)
+	require.NoError(t, err)
+	require.Len(t, jobs, 1)
+	assert.Equal(t, string(model.JobStatusSuccess), string(jobs[0].Status))
+
+	jobWithLogs, err := jobQuery.GetJobWithLogs(ctx, jobs[0].ID)
+	require.NoError(t, err)
+	foundHookLog := false
+	for _, log := range jobWithLogs.Edges.Logs {
+		if log.What == model.LogActionHook {
+			foundHookLog = true
+			assert.Equal(t, model.LogLevelInfo, log.Level)
+			break
+		}
+	}
+	assert.True(t, foundHookLog, "Should have a HOOK log entry")
+}
+
+// TestSyncEngine_RunTask_Hook_OnFailure tests that ON_FAILURE hooks are triggered on sync failure.
+func TestSyncEngine_RunTask_Hook_OnFailure(t *testing.T) {
+	connQuery, taskQuery, jobQuery, hookQuery, _ := setupIntegrationTestWithHook(t)
+	ctx := context.Background()
+
+	sourceDir := filepath.Join(t.TempDir(), "non_existent")
+	destDir := t.TempDir()
+
+	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"}, nil)
+	require.NoError(t, err)
+
+	testTask, err := taskQuery.CreateTask(ctx,
+		"TestHookOnFailure",
+		sourceDir,
+		testConn.ID,
+		destDir,
+		string(model.SyncDirectionUpload),
+		"",
+		false,
+		true,
+		nil,
+	)
+	require.NoError(t, err)
+
+	var hookCalled atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hookCalled.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	_, err = hookQuery.CreateHook(ctx, &testTask.ID, nil, model.HookInput{
+		Event:   model.HookEventOnFailure,
+		Type:    model.HookTypeHTTP,
+		Enabled: func() *bool { v := true; return &v }(),
+		Config: &model.HookConfigInput{
+			URL: &server.URL,
+		},
+	})
+	require.NoError(t, err)
+
+	dataDir := t.TempDir()
+	enabled := true
+	hookExecutor := hook.NewExecutor(hookQuery, jobQuery, &enabled, 30)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0, hookExecutor)
+
+	testTask, err = taskQuery.GetTaskWithConnection(ctx, testTask.ID)
+	require.NoError(t, err)
+
+	err = syncEngine.RunTask(ctx, testTask, model.JobTriggerManual)
+	assert.Error(t, err, "RunTask should return error for non-existent source")
+
+	time.Sleep(100 * time.Millisecond)
+	assert.Equal(t, int32(1), hookCalled.Load(), "ON_FAILURE hook should be called exactly once")
+
+	jobs, err := jobQuery.ListJobs(ctx, &testTask.ID, nil, 10, 0)
+	require.NoError(t, err)
+	require.Len(t, jobs, 1)
+	assert.Equal(t, string(model.JobStatusFailed), string(jobs[0].Status))
+}
+
+// TestSyncEngine_RunTask_Hook_OnEnd tests that ON_END hooks are triggered regardless of outcome.
+func TestSyncEngine_RunTask_Hook_OnEnd(t *testing.T) {
+	tests := []struct {
+		name           string
+		sourceExists   bool
+		expectedStatus model.JobStatus
+	}{
+		{"success triggers ON_END", true, model.JobStatusSuccess},
+		{"failure triggers ON_END", false, model.JobStatusFailed},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			connQuery, taskQuery, jobQuery, hookQuery, _ := setupIntegrationTestWithHook(t)
+			ctx := context.Background()
+
+			var sourceDir string
+			if tt.sourceExists {
+				sourceDir = t.TempDir()
+				err := os.WriteFile(filepath.Join(sourceDir, "test.txt"), []byte("data"), 0644)
+				require.NoError(t, err)
+			} else {
+				sourceDir = filepath.Join(t.TempDir(), "non_existent")
+			}
+			destDir := t.TempDir()
+
+			testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"}, nil)
+			require.NoError(t, err)
+
+			testTask, err := taskQuery.CreateTask(ctx,
+				tt.name,
+				sourceDir,
+				testConn.ID,
+				destDir,
+				string(model.SyncDirectionUpload),
+				"",
+				false,
+				true,
+				nil,
+			)
+			require.NoError(t, err)
+
+			var hookCalled atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				hookCalled.Add(1)
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			_, err = hookQuery.CreateHook(ctx, &testTask.ID, nil, model.HookInput{
+				Event:   model.HookEventOnEnd,
+				Type:    model.HookTypeHTTP,
+				Enabled: func() *bool { v := true; return &v }(),
+				Config: &model.HookConfigInput{
+					URL: &server.URL,
+				},
+			})
+			require.NoError(t, err)
+
+			dataDir := t.TempDir()
+			enabled := true
+			hookExecutor := hook.NewExecutor(hookQuery, jobQuery, &enabled, 30)
+			syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0, hookExecutor)
+
+			testTask, err = taskQuery.GetTaskWithConnection(ctx, testTask.ID)
+			require.NoError(t, err)
+
+			_ = syncEngine.RunTask(ctx, testTask, model.JobTriggerManual)
+
+			time.Sleep(100 * time.Millisecond)
+			assert.Equal(t, int32(1), hookCalled.Load(), "ON_END hook should be called exactly once")
+
+			jobs, err := jobQuery.ListJobs(ctx, &testTask.ID, nil, 10, 0)
+			require.NoError(t, err)
+			require.Len(t, jobs, 1)
+			assert.Equal(t, string(tt.expectedStatus), string(jobs[0].Status))
+		})
+	}
+}
+
+// TestSyncEngine_RunTask_Hook_OnStart_Cancel tests ON_START hook with CANCEL behavior.
+func TestSyncEngine_RunTask_Hook_OnStart_Cancel(t *testing.T) {
+	connQuery, taskQuery, jobQuery, hookQuery, _ := setupIntegrationTestWithHook(t)
+	ctx := context.Background()
+
+	sourceDir := t.TempDir()
+	destDir := t.TempDir()
+	err := os.WriteFile(filepath.Join(sourceDir, "test.txt"), []byte("data"), 0644)
+	require.NoError(t, err)
+
+	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"}, nil)
+	require.NoError(t, err)
+
+	testTask, err := taskQuery.CreateTask(ctx,
+		"TestHookOnStartCancel",
+		sourceDir,
+		testConn.ID,
+		destDir,
+		string(model.SyncDirectionUpload),
+		"",
+		false,
+		true,
+		nil,
+	)
+	require.NoError(t, err)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	_, err = hookQuery.CreateHook(ctx, &testTask.ID, nil, model.HookInput{
+		Event:   model.HookEventOnStart,
+		Type:    model.HookTypeHTTP,
+		OnError: func() *model.HookOnError { v := model.HookOnErrorCancel; return &v }(),
+		Enabled: func() *bool { v := true; return &v }(),
+		Config: &model.HookConfigInput{
+			URL: &server.URL,
+		},
+	})
+	require.NoError(t, err)
+
+	dataDir := t.TempDir()
+	enabled := true
+	hookExecutor := hook.NewExecutor(hookQuery, jobQuery, &enabled, 30)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0, hookExecutor)
+
+	testTask, err = taskQuery.GetTaskWithConnection(ctx, testTask.ID)
+	require.NoError(t, err)
+
+	err = syncEngine.RunTask(ctx, testTask, model.JobTriggerManual)
+	assert.Error(t, err, "RunTask should return error when ON_START hook cancels")
+
+	var cancelErr *hook.CancelError
+	assert.ErrorAs(t, err, &cancelErr, "Error should be CancelError")
+
+	jobs, err := jobQuery.ListJobs(ctx, &testTask.ID, nil, 10, 0)
+	require.NoError(t, err)
+	require.Len(t, jobs, 1)
+	assert.Equal(t, string(model.JobStatusCancelled), string(jobs[0].Status))
+
+	destFilePath := filepath.Join(destDir, "test.txt")
+	_, err = os.Stat(destFilePath)
+	assert.True(t, os.IsNotExist(err), "File should NOT be synced when ON_START cancels")
+}
+
+// TestSyncEngine_RunTask_Hook_OnStart_Fatal tests ON_START hook with FATAL behavior.
+func TestSyncEngine_RunTask_Hook_OnStart_Fatal(t *testing.T) {
+	connQuery, taskQuery, jobQuery, hookQuery, _ := setupIntegrationTestWithHook(t)
+	ctx := context.Background()
+
+	sourceDir := t.TempDir()
+	destDir := t.TempDir()
+	err := os.WriteFile(filepath.Join(sourceDir, "test.txt"), []byte("data"), 0644)
+	require.NoError(t, err)
+
+	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"}, nil)
+	require.NoError(t, err)
+
+	testTask, err := taskQuery.CreateTask(ctx,
+		"TestHookOnStartFatal",
+		sourceDir,
+		testConn.ID,
+		destDir,
+		string(model.SyncDirectionUpload),
+		"",
+		false,
+		true,
+		nil,
+	)
+	require.NoError(t, err)
+
+	var onFailureCalled atomic.Int32
+	var onEndCalled atomic.Int32
+	failureServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		onFailureCalled.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer failureServer.Close()
+
+	endServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		onEndCalled.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer endServer.Close()
+
+	fatalServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer fatalServer.Close()
+
+	_, err = hookQuery.CreateHook(ctx, &testTask.ID, nil, model.HookInput{
+		Event:    model.HookEventOnStart,
+		Type:     model.HookTypeHTTP,
+		OnError:  func() *model.HookOnError { v := model.HookOnErrorFatal; return &v }(),
+		Priority: func() *int { v := 0; return &v }(),
+		Enabled:  func() *bool { v := true; return &v }(),
+		Config:   &model.HookConfigInput{URL: &fatalServer.URL},
+	})
+	require.NoError(t, err)
+
+	_, err = hookQuery.CreateHook(ctx, &testTask.ID, nil, model.HookInput{
+		Event:   model.HookEventOnFailure,
+		Type:    model.HookTypeHTTP,
+		Enabled: func() *bool { v := true; return &v }(),
+		Config:  &model.HookConfigInput{URL: &failureServer.URL},
+	})
+	require.NoError(t, err)
+
+	_, err = hookQuery.CreateHook(ctx, &testTask.ID, nil, model.HookInput{
+		Event:   model.HookEventOnEnd,
+		Type:    model.HookTypeHTTP,
+		Enabled: func() *bool { v := true; return &v }(),
+		Config:  &model.HookConfigInput{URL: &endServer.URL},
+	})
+	require.NoError(t, err)
+
+	dataDir := t.TempDir()
+	enabled := true
+	hookExecutor := hook.NewExecutor(hookQuery, jobQuery, &enabled, 30)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0, hookExecutor)
+
+	testTask, err = taskQuery.GetTaskWithConnection(ctx, testTask.ID)
+	require.NoError(t, err)
+
+	err = syncEngine.RunTask(ctx, testTask, model.JobTriggerManual)
+	assert.Error(t, err, "RunTask should return error when ON_START hook fails fatally")
+
+	var fatalErr *hook.FatalError
+	assert.ErrorAs(t, err, &fatalErr, "Error should be FatalError")
+
+	time.Sleep(100 * time.Millisecond)
+
+	jobs, err := jobQuery.ListJobs(ctx, &testTask.ID, nil, 10, 0)
+	require.NoError(t, err)
+	require.Len(t, jobs, 1)
+	assert.Equal(t, string(model.JobStatusFailed), string(jobs[0].Status))
+
+	assert.Equal(t, int32(1), onFailureCalled.Load(), "ON_FAILURE should be called for fatal ON_START")
+	assert.Equal(t, int32(1), onEndCalled.Load(), "ON_END should be called for fatal ON_START")
+
+	destFilePath := filepath.Join(destDir, "test.txt")
+	_, err = os.Stat(destFilePath)
+	assert.True(t, os.IsNotExist(err), "File should NOT be synced when ON_START fails fatally")
+}
+
+// TestSyncEngine_RunTask_Hook_ConnectionLevel tests that connection-level hooks are triggered.
+func TestSyncEngine_RunTask_Hook_ConnectionLevel(t *testing.T) {
+	connQuery, taskQuery, jobQuery, hookQuery, _ := setupIntegrationTestWithHook(t)
+	ctx := context.Background()
+
+	sourceDir := t.TempDir()
+	destDir := t.TempDir()
+	err := os.WriteFile(filepath.Join(sourceDir, "test.txt"), []byte("data"), 0644)
+	require.NoError(t, err)
+
+	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"}, nil)
+	require.NoError(t, err)
+
+	testTask, err := taskQuery.CreateTask(ctx,
+		"TestHookConnectionLevel",
+		sourceDir,
+		testConn.ID,
+		destDir,
+		string(model.SyncDirectionUpload),
+		"",
+		false,
+		true,
+		nil,
+	)
+	require.NoError(t, err)
+
+	var hookCalled atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hookCalled.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	_, err = hookQuery.CreateHook(ctx, nil, &testConn.ID, model.HookInput{
+		Event:   model.HookEventOnSuccess,
+		Type:    model.HookTypeHTTP,
+		Enabled: func() *bool { v := true; return &v }(),
+		Config:  &model.HookConfigInput{URL: &server.URL},
+	})
+	require.NoError(t, err)
+
+	dataDir := t.TempDir()
+	enabled := true
+	hookExecutor := hook.NewExecutor(hookQuery, jobQuery, &enabled, 30)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0, hookExecutor)
+
+	testTask, err = taskQuery.GetTaskWithConnection(ctx, testTask.ID)
+	require.NoError(t, err)
+
+	err = syncEngine.RunTask(ctx, testTask, model.JobTriggerManual)
+	require.NoError(t, err)
+
+	time.Sleep(100 * time.Millisecond)
+	assert.Equal(t, int32(1), hookCalled.Load(), "Connection-level hook should be called")
+}
+
+// TestSyncEngine_RunTask_Hook_Disabled tests that hooks are not executed when globally disabled.
+func TestSyncEngine_RunTask_Hook_Disabled(t *testing.T) {
+	connQuery, taskQuery, jobQuery, hookQuery, _ := setupIntegrationTestWithHook(t)
+	ctx := context.Background()
+
+	sourceDir := t.TempDir()
+	destDir := t.TempDir()
+	err := os.WriteFile(filepath.Join(sourceDir, "test.txt"), []byte("data"), 0644)
+	require.NoError(t, err)
+
+	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"}, nil)
+	require.NoError(t, err)
+
+	testTask, err := taskQuery.CreateTask(ctx,
+		"TestHookDisabled",
+		sourceDir,
+		testConn.ID,
+		destDir,
+		string(model.SyncDirectionUpload),
+		"",
+		false,
+		true,
+		nil,
+	)
+	require.NoError(t, err)
+
+	var hookCalled atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hookCalled.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	_, err = hookQuery.CreateHook(ctx, &testTask.ID, nil, model.HookInput{
+		Event:   model.HookEventOnSuccess,
+		Type:    model.HookTypeHTTP,
+		Enabled: func() *bool { v := true; return &v }(),
+		Config:  &model.HookConfigInput{URL: &server.URL},
+	})
+	require.NoError(t, err)
+
+	dataDir := t.TempDir()
+	enabled := false
+	hookExecutor := hook.NewExecutor(hookQuery, jobQuery, &enabled, 30)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0, hookExecutor)
+
+	testTask, err = taskQuery.GetTaskWithConnection(ctx, testTask.ID)
+	require.NoError(t, err)
+
+	err = syncEngine.RunTask(ctx, testTask, model.JobTriggerManual)
+	require.NoError(t, err)
+
+	time.Sleep(100 * time.Millisecond)
+	assert.Equal(t, int32(0), hookCalled.Load(), "Hook should NOT be called when globally disabled")
+}
+
+// TestSyncEngine_RunTask_Hook_MultipleHooks tests execution order of multiple hooks.
+func TestSyncEngine_RunTask_Hook_MultipleHooks(t *testing.T) {
+	connQuery, taskQuery, jobQuery, hookQuery, _ := setupIntegrationTestWithHook(t)
+	ctx := context.Background()
+
+	sourceDir := t.TempDir()
+	destDir := t.TempDir()
+	err := os.WriteFile(filepath.Join(sourceDir, "test.txt"), []byte("data"), 0644)
+	require.NoError(t, err)
+
+	testConn, err := connQuery.CreateConnection(ctx, "local", "local", map[string]string{"type": "local"}, nil)
+	require.NoError(t, err)
+
+	testTask, err := taskQuery.CreateTask(ctx,
+		"TestHookMultiple",
+		sourceDir,
+		testConn.ID,
+		destDir,
+		string(model.SyncDirectionUpload),
+		"",
+		false,
+		true,
+		nil,
+	)
+	require.NoError(t, err)
+
+	var callOrder []int
+	var mu sync.Mutex
+
+	createServer := func(id int) *httptest.Server {
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mu.Lock()
+			callOrder = append(callOrder, id)
+			mu.Unlock()
+			w.WriteHeader(http.StatusOK)
+		}))
+	}
+
+	server1 := createServer(1)
+	defer server1.Close()
+	server2 := createServer(2)
+	defer server2.Close()
+	server3 := createServer(3)
+	defer server3.Close()
+
+	_, err = hookQuery.CreateHook(ctx, &testTask.ID, nil, model.HookInput{
+		Event:    model.HookEventOnSuccess,
+		Type:     model.HookTypeHTTP,
+		Priority: func() *int { v := 2; return &v }(),
+		Enabled:  func() *bool { v := true; return &v }(),
+		Config:   &model.HookConfigInput{URL: &server2.URL},
+	})
+	require.NoError(t, err)
+
+	_, err = hookQuery.CreateHook(ctx, &testTask.ID, nil, model.HookInput{
+		Event:    model.HookEventOnSuccess,
+		Type:     model.HookTypeHTTP,
+		Priority: func() *int { v := 0; return &v }(),
+		Enabled:  func() *bool { v := true; return &v }(),
+		Config:   &model.HookConfigInput{URL: &server1.URL},
+	})
+	require.NoError(t, err)
+
+	_, err = hookQuery.CreateHook(ctx, &testTask.ID, nil, model.HookInput{
+		Event:    model.HookEventOnSuccess,
+		Type:     model.HookTypeHTTP,
+		Priority: func() *int { v := 5; return &v }(),
+		Enabled:  func() *bool { v := true; return &v }(),
+		Config:   &model.HookConfigInput{URL: &server3.URL},
+	})
+	require.NoError(t, err)
+
+	dataDir := t.TempDir()
+	enabled := true
+	hookExecutor := hook.NewExecutor(hookQuery, jobQuery, &enabled, 30)
+	syncEngine := rclone.NewSyncEngine(jobQuery, nil, nil, dataDir, false, 0, hookExecutor)
+
+	testTask, err = taskQuery.GetTaskWithConnection(ctx, testTask.ID)
+	require.NoError(t, err)
+
+	err = syncEngine.RunTask(ctx, testTask, model.JobTriggerManual)
+	require.NoError(t, err)
+
+	time.Sleep(200 * time.Millisecond)
+
+	mu.Lock()
+	orderCopy := make([]int, len(callOrder))
+	copy(orderCopy, callOrder)
+	mu.Unlock()
+
+	assert.Len(t, orderCopy, 3, "All three hooks should be called")
+	assert.Equal(t, []int{1, 2, 3}, orderCopy, "Hooks should be called in priority order (0, 2, 5)")
 }

@@ -3,11 +3,16 @@
 package resolver
 
 import (
+	"errors"
 	"time"
 
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
 	"github.com/xzzpig/rclone-sync/internal/core/ent"
 )
+
+var errMutualExclusiveFields = errors.New("taskId and connectionId are mutually exclusive, exactly one must be provided")
+
+var errAtLeastOneRequired = errors.New("at least one of taskId or connectionId must be provided")
 
 // entConnectionToModel converts an ent Connection to a GraphQL model Connection.
 func entConnectionToModel(c *ent.Connection) *model.Connection {
@@ -105,4 +110,20 @@ func buildOptions(input *model.TaskSyncOptionsInput) *model.TaskSyncOptions {
 	}
 
 	return options
+}
+
+func entHookToModel(h *ent.TaskHook) *model.Hook {
+	return &model.Hook{
+		ID:           h.ID,
+		Enabled:      h.Enabled,
+		Priority:     h.Priority,
+		Event:        h.Event,
+		Type:         h.Type,
+		OnError:      h.OnError,
+		Config:       h.Config,
+		TaskID:       h.TaskID,
+		ConnectionID: h.ConnectionID,
+		CreatedAt:    h.CreatedAt,
+		UpdatedAt:    h.UpdatedAt,
+	}
 }

@@ -24,7 +24,15 @@ import type {
   TaskCreateMutation,
   TasksListQuery,
   TaskUpdateMutation,
+  TaskGetQuery,
 } from '@/api/graphql/queries/tasks';
+import type {
+  HookCreateMutation,
+  HookGetQuery,
+  HooksListQuery,
+  HookUpdateMutation,
+} from '@/api/graphql/queries/hooks';
+import type { AppConfigQuery } from '@/api/graphql/queries/system';
 
 // ============================================================================
 // GraphQL Derived Types from Queries
@@ -152,12 +160,47 @@ export type Connection = ConnectionListItem;
 export type ConnectionFull = ConnectionDetail;
 export type Task = TaskListItem;
 export type TaskWithConnection = TaskListItem;
+export type TaskDetail = NonNullable<NonNullable<ResultOf<typeof TaskGetQuery>['task']>['get']>;
 export type Job = JobListItem;
 export type JobWithTask = JobListItem;
 export type JobLog = JobLogListItem;
 export type RcloneProvider = ProviderListItem;
 export type RcloneOption = ProviderOption;
 export type RemoteQuota = ConnectionQuota;
+
+// ============================================================================
+// Hook Types (from Hook queries)
+// ============================================================================
+
+// Hook list item type (from HooksListQuery)
+export type HookListQueryItem = NonNullable<
+  NonNullable<ResultOf<typeof HooksListQuery>['hook']>['list']
+>[number];
+
+// Local Hook type (derived from HookListItem, but without audit fields)
+export type HookListItem = Omit<HookListQueryItem, 'createdAt' | 'updatedAt'>;
+
+// Hook detail type (from HookGetQuery)
+export type HookDetail = NonNullable<NonNullable<ResultOf<typeof HookGetQuery>['hook']>['get']>;
+
+// Hook types
+export type HookEvent = HookListQueryItem['event'];
+export type HookType = HookListQueryItem['type'];
+export type HookOnError = HookListQueryItem['onError'];
+export type HookConfigInput = HookInput['config'];
+
+// Hook mutation input types
+export type HookInput = VariablesOf<typeof HookCreateMutation>['input'];
+export type UpdateHookInput = VariablesOf<typeof HookUpdateMutation>['input'];
+
+// Nested Update Hook Input
+export type NestedUpdateHookInput = NonNullable<UpdateTaskInput['hooks']>[number];
+
+// Hook config type
+export type HookConfig = HookListQueryItem['config'];
+
+// App config type (from AppConfigQuery)
+export type AppConfig = NonNullable<ResultOf<typeof AppConfigQuery>['appConfig']>;
 
 // ============================================================================
 // Frontend Local Types (not from GraphQL)

@@ -42,9 +42,11 @@ type Connection struct {
 type ConnectionEdges struct {
 	// Tasks holds the value of the tasks edge.
 	Tasks []*Task `json:"tasks,omitempty"`
+	// Hooks holds the value of the hooks edge.
+	Hooks []*TaskHook `json:"hooks,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [2]bool
 }
 
 // TasksOrErr returns the Tasks value or an error if the edge
@@ -54,6 +56,15 @@ func (e ConnectionEdges) TasksOrErr() ([]*Task, error) {
 		return e.Tasks, nil
 	}
 	return nil, &NotLoadedError{edge: "tasks"}
+}
+
+// HooksOrErr returns the Hooks value or an error if the edge
+// was not loaded in eager-loading.
+func (e ConnectionEdges) HooksOrErr() ([]*TaskHook, error) {
+	if e.loadedTypes[1] {
+		return e.Hooks, nil
+	}
+	return nil, &NotLoadedError{edge: "hooks"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -144,6 +155,11 @@ func (_m *Connection) Value(name string) (ent.Value, error) {
 // QueryTasks queries the "tasks" edge of the Connection entity.
 func (_m *Connection) QueryTasks() *TaskQuery {
 	return NewConnectionClient(_m.config).QueryTasks(_m)
+}
+
+// QueryHooks queries the "hooks" edge of the Connection entity.
+func (_m *Connection) QueryHooks() *TaskHookQuery {
+	return NewConnectionClient(_m.config).QueryHooks(_m)
 }
 
 // Update returns a builder for updating this Connection.

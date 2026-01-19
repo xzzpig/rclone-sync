@@ -20,6 +20,7 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/joblog"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/task"
+	"github.com/xzzpig/rclone-sync/internal/core/ent/taskhook"
 )
 
 // Client is the client that holds all ent builders.
@@ -35,6 +36,8 @@ type Client struct {
 	JobLog *JobLogClient
 	// Task is the client for interacting with the Task builders.
 	Task *TaskClient
+	// TaskHook is the client for interacting with the TaskHook builders.
+	TaskHook *TaskHookClient
 }
 
 // NewClient creates a new client configured with the given options.
@@ -50,6 +53,7 @@ func (c *Client) init() {
 	c.Job = NewJobClient(c.config)
 	c.JobLog = NewJobLogClient(c.config)
 	c.Task = NewTaskClient(c.config)
+	c.TaskHook = NewTaskHookClient(c.config)
 }
 
 type (
@@ -146,6 +150,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Job:        NewJobClient(cfg),
 		JobLog:     NewJobLogClient(cfg),
 		Task:       NewTaskClient(cfg),
+		TaskHook:   NewTaskHookClient(cfg),
 	}, nil
 }
 
@@ -169,6 +174,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Job:        NewJobClient(cfg),
 		JobLog:     NewJobLogClient(cfg),
 		Task:       NewTaskClient(cfg),
+		TaskHook:   NewTaskHookClient(cfg),
 	}, nil
 }
 
@@ -201,6 +207,7 @@ func (c *Client) Use(hooks ...Hook) {
 	c.Job.Use(hooks...)
 	c.JobLog.Use(hooks...)
 	c.Task.Use(hooks...)
+	c.TaskHook.Use(hooks...)
 }
 
 // Intercept adds the query interceptors to all the entity clients.
@@ -210,6 +217,7 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 	c.Job.Intercept(interceptors...)
 	c.JobLog.Intercept(interceptors...)
 	c.Task.Intercept(interceptors...)
+	c.TaskHook.Intercept(interceptors...)
 }
 
 // Mutate implements the ent.Mutator interface.
@@ -223,6 +231,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.JobLog.mutate(ctx, m)
 	case *TaskMutation:
 		return c.Task.mutate(ctx, m)
+	case *TaskHookMutation:
+		return c.TaskHook.mutate(ctx, m)
 	default:
 		return nil, fmt.Errorf("ent: unknown mutation type %T", m)
 	}
@@ -345,6 +355,22 @@ func (c *ConnectionClient) QueryTasks(_m *Connection) *TaskQuery {
 			sqlgraph.From(connection.Table, connection.FieldID, id),
 			sqlgraph.To(task.Table, task.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, connection.TasksTable, connection.TasksColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryHooks queries the hooks edge of a Connection.
+func (c *ConnectionClient) QueryHooks(_m *Connection) *TaskHookQuery {
+	query := (&TaskHookClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(connection.Table, connection.FieldID, id),
+			sqlgraph.To(taskhook.Table, taskhook.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, connection.HooksTable, connection.HooksColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -815,6 +841,22 @@ func (c *TaskClient) QueryJobs(_m *Task) *JobQuery {
 	return query
 }
 
+// QueryHooks queries the hooks edge of a Task.
+func (c *TaskClient) QueryHooks(_m *Task) *TaskHookQuery {
+	query := (&TaskHookClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(task.Table, task.FieldID, id),
+			sqlgraph.To(taskhook.Table, taskhook.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, task.HooksTable, task.HooksColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryConnection queries the connection edge of a Task.
 func (c *TaskClient) QueryConnection(_m *Task) *ConnectionQuery {
 	query := (&ConnectionClient{config: c.config}).Query()
@@ -856,12 +898,177 @@ func (c *TaskClient) mutate(ctx context.Context, m *TaskMutation) (Value, error)
 	}
 }
 
+// TaskHookClient is a client for the TaskHook schema.
+type TaskHookClient struct {
+	config
+}
+
+// NewTaskHookClient returns a client for the TaskHook from the given config.
+func NewTaskHookClient(c config) *TaskHookClient {
+	return &TaskHookClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `taskhook.Hooks(f(g(h())))`.
+func (c *TaskHookClient) Use(hooks ...Hook) {
+	c.hooks.TaskHook = append(c.hooks.TaskHook, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `taskhook.Intercept(f(g(h())))`.
+func (c *TaskHookClient) Intercept(interceptors ...Interceptor) {
+	c.inters.TaskHook = append(c.inters.TaskHook, interceptors...)
+}
+
+// Create returns a builder for creating a TaskHook entity.
+func (c *TaskHookClient) Create() *TaskHookCreate {
+	mutation := newTaskHookMutation(c.config, OpCreate)
+	return &TaskHookCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of TaskHook entities.
+func (c *TaskHookClient) CreateBulk(builders ...*TaskHookCreate) *TaskHookCreateBulk {
+	return &TaskHookCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *TaskHookClient) MapCreateBulk(slice any, setFunc func(*TaskHookCreate, int)) *TaskHookCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &TaskHookCreateBulk{err: fmt.Errorf("calling to TaskHookClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*TaskHookCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &TaskHookCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for TaskHook.
+func (c *TaskHookClient) Update() *TaskHookUpdate {
+	mutation := newTaskHookMutation(c.config, OpUpdate)
+	return &TaskHookUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *TaskHookClient) UpdateOne(_m *TaskHook) *TaskHookUpdateOne {
+	mutation := newTaskHookMutation(c.config, OpUpdateOne, withTaskHook(_m))
+	return &TaskHookUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *TaskHookClient) UpdateOneID(id uuid.UUID) *TaskHookUpdateOne {
+	mutation := newTaskHookMutation(c.config, OpUpdateOne, withTaskHookID(id))
+	return &TaskHookUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for TaskHook.
+func (c *TaskHookClient) Delete() *TaskHookDelete {
+	mutation := newTaskHookMutation(c.config, OpDelete)
+	return &TaskHookDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *TaskHookClient) DeleteOne(_m *TaskHook) *TaskHookDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *TaskHookClient) DeleteOneID(id uuid.UUID) *TaskHookDeleteOne {
+	builder := c.Delete().Where(taskhook.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &TaskHookDeleteOne{builder}
+}
+
+// Query returns a query builder for TaskHook.
+func (c *TaskHookClient) Query() *TaskHookQuery {
+	return &TaskHookQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeTaskHook},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a TaskHook entity by its id.
+func (c *TaskHookClient) Get(ctx context.Context, id uuid.UUID) (*TaskHook, error) {
+	return c.Query().Where(taskhook.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *TaskHookClient) GetX(ctx context.Context, id uuid.UUID) *TaskHook {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryTask queries the task edge of a TaskHook.
+func (c *TaskHookClient) QueryTask(_m *TaskHook) *TaskQuery {
+	query := (&TaskClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(taskhook.Table, taskhook.FieldID, id),
+			sqlgraph.To(task.Table, task.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, taskhook.TaskTable, taskhook.TaskColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryConnection queries the connection edge of a TaskHook.
+func (c *TaskHookClient) QueryConnection(_m *TaskHook) *ConnectionQuery {
+	query := (&ConnectionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(taskhook.Table, taskhook.FieldID, id),
+			sqlgraph.To(connection.Table, connection.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, taskhook.ConnectionTable, taskhook.ConnectionColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *TaskHookClient) Hooks() []Hook {
+	return c.hooks.TaskHook
+}
+
+// Interceptors returns the client interceptors.
+func (c *TaskHookClient) Interceptors() []Interceptor {
+	return c.inters.TaskHook
+}
+
+func (c *TaskHookClient) mutate(ctx context.Context, m *TaskHookMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&TaskHookCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&TaskHookUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&TaskHookUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&TaskHookDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown TaskHook mutation op: %q", m.Op())
+	}
+}
+
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		Connection, Job, JobLog, Task []ent.Hook
+		Connection, Job, JobLog, Task, TaskHook []ent.Hook
 	}
 	inters struct {
-		Connection, Job, JobLog, Task []ent.Interceptor
+		Connection, Job, JobLog, Task, TaskHook []ent.Interceptor
 	}
 )

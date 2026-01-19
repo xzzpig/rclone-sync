@@ -601,3 +601,106 @@ func (s *HelpersTestSuite) TestNonExistentIDs() {
 	require.Empty(s.T(), resp.Errors)
 	assert.True(s.T(), gjson.Get(string(resp.Data), "task.get").Type == gjson.Null)
 }
+
+func (s *HelpersTestSuite) TestEntHookToModel() {
+	connID := s.Env.CreateTestConnection(s.T(), "hook-model-test")
+	task := s.Env.CreateTestTask(s.T(), "hook-model-task", connID)
+
+	createHookMutation := `
+		mutation($taskId: ID, $connectionId: ID, $input: HookInput!) {
+			hook { 
+				create(taskId: $taskId, connectionId: $connectionId, input: $input) { 
+					id
+					enabled
+					priority
+					event
+					type
+					onError
+					config { 
+						url 
+						method
+						body
+					}
+					createdAt
+					updatedAt
+				} 
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), createHookMutation, map[string]interface{}{
+		"taskId": task.ID.String(),
+		"input": map[string]interface{}{
+			"event":    "ON_SUCCESS",
+			"type":     "HTTP",
+			"onError":  "IGNORE",
+			"enabled":  true,
+			"priority": 10,
+			"config": map[string]interface{}{
+				"url":    "https://example.com/helper-test",
+				"method": "POST",
+				"body":   `{"test": "body"}`,
+			},
+		},
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	hook := gjson.Get(data, "hook.create")
+
+	assert.True(s.T(), hook.Get("id").Exists())
+	assert.True(s.T(), hook.Get("enabled").Bool())
+	assert.Equal(s.T(), int64(10), hook.Get("priority").Int())
+	assert.Equal(s.T(), "ON_SUCCESS", hook.Get("event").String())
+	assert.Equal(s.T(), "HTTP", hook.Get("type").String())
+	assert.Equal(s.T(), "IGNORE", hook.Get("onError").String())
+	assert.Equal(s.T(), "https://example.com/helper-test", hook.Get("config.url").String())
+	assert.Equal(s.T(), "POST", hook.Get("config.method").String())
+	assert.Equal(s.T(), `{"test": "body"}`, hook.Get("config.body").String())
+	assert.True(s.T(), hook.Get("createdAt").Exists())
+	assert.True(s.T(), hook.Get("updatedAt").Exists())
+}
+
+func (s *HelpersTestSuite) TestEntHookToModelWithCommandType() {
+	connID := s.Env.CreateTestConnection(s.T(), "hook-cmd-model-test")
+	task := s.Env.CreateTestTask(s.T(), "hook-cmd-model-task", connID)
+
+	createHookMutation := `
+		mutation($taskId: ID, $connectionId: ID, $input: HookInput!) {
+			hook { 
+				create(taskId: $taskId, connectionId: $connectionId, input: $input) { 
+					id
+					type
+					config { 
+						command
+						workDir
+						timeout
+					}
+				} 
+			}
+		}
+	`
+
+	resp := s.Env.ExecuteGraphQLWithVars(s.T(), createHookMutation, map[string]interface{}{
+		"taskId": task.ID.String(),
+		"input": map[string]interface{}{
+			"event":   "ON_SUCCESS",
+			"type":    "COMMAND",
+			"onError": "IGNORE",
+			"config": map[string]interface{}{
+				"command": "echo 'test'",
+				"workDir": "/tmp",
+				"timeout": 60,
+			},
+		},
+	})
+	require.Empty(s.T(), resp.Errors)
+
+	data := string(resp.Data)
+	hook := gjson.Get(data, "hook.create")
+
+	assert.Equal(s.T(), "COMMAND", hook.Get("type").String())
+	assert.Equal(s.T(), "echo 'test'", hook.Get("config.command").String())
+	assert.Equal(s.T(), "/tmp", hook.Get("config.workDir").String())
+	assert.Equal(s.T(), int64(60), hook.Get("config.timeout").Int())
+}

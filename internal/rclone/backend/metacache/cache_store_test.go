@@ -68,7 +68,7 @@ func TestNewCacheStore_SchemaVersionMismatch(t *testing.T) {
 	dbPath := filepath.Join(tmpDir, "test.db")
 
 	// Create database with old schema version
-	dsn := db.FileSDN(dbPath)
+	dsn := db.FileDSN(dbPath)
 	sqlDB, err := sql.Open("sqlite3", dsn)
 	require.NoError(t, err)
 

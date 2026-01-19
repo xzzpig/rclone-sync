@@ -20,6 +20,8 @@ type Tx struct {
 	JobLog *JobLogClient
 	// Task is the client for interacting with the Task builders.
 	Task *TaskClient
+	// TaskHook is the client for interacting with the TaskHook builders.
+	TaskHook *TaskHookClient
 
 	// lazily loaded.
 	client     *Client
@@ -155,6 +157,7 @@ func (tx *Tx) init() {
 	tx.Job = NewJobClient(tx.config)
 	tx.JobLog = NewJobLogClient(tx.config)
 	tx.Task = NewTaskClient(tx.config)
+	tx.TaskHook = NewTaskHookClient(tx.config)
 }
 
 // txDriver wraps the given dialect.Tx with a nop dialect.Driver implementation.

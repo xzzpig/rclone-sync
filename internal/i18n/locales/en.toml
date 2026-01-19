@@ -31,35 +31,14 @@ other = "Connection not found"
 [error_invalid_input]
 other = "Invalid input provided"
 
-[error_invalid_schedule]
-other = "Invalid schedule format"
-
-[error_invalid_id_format]
-other = "Invalid ID format"
-
 [error_database_error]
 other = "Database error"
 
 [error_missing_parameter]
 other = "Missing required parameter"
 
-[error_invalid_request_body]
-other = "Invalid request body"
-
 [error_path_not_exist]
 other = "Path does not exist"
-
-[error_path_not_directory]
-other = "Path is not a directory"
-
-[error_remote_not_found]
-other = "Remote not found"
-
-[error_job_not_active]
-other = "Job not active"
-
-[error_job_not_found]
-other = "Job not found"
 
 [error_provider_not_found]
 other = "Provider not found"
@@ -70,26 +49,11 @@ other = "Connection test failed"
 [error_failed_to_list_remotes]
 other = "Failed to list remotes"
 
-[error_failed_to_create_remote]
-other = "Failed to create remote"
-
-[error_failed_to_get_quota]
-other = "Failed to get remote quota"
-
-[error_import_parse_failed]
-other = "Failed to parse rclone.conf content"
-
-[error_import_empty_list]
-other = "No connections to import"
-
 [error_connection_has_dependent_tasks]
 other = "Cannot delete connection with dependent tasks"
 
 [error_filter_rule_invalid]
 other = "Filter rule #{{.Index}} \"{{.Rule}}\" is invalid: {{.Reason}}"
-
-[error_transfers_out_of_range]
-other = "Transfers must be between 1 and 64, got {{.Value}}"
 
 [error_invalid_info_age]
 other = "Invalid infoAge format: {{.Error}}"
@@ -101,9 +65,6 @@ other = "Invalid changeNotifyPoll format: {{.Error}}"
 other = "changeNotifyPoll must be at least 10s"
 
 # Status messages
-[status_syncing]
-other = "Syncing"
-
 [status_syncing_files]
 one = "Syncing {{.Count}} file"
 other = "Syncing {{.Count}} files"
@@ -124,15 +85,6 @@ other = "Cancelled"
 [success_created]
 other = "Created successfully"
 
-[success_updated]
-other = "Updated successfully"
-
-[success_deleted]
-other = "Deleted successfully"
-
-[success_sync_started]
-other = "Sync started"
-
 # Cache messages
 [cache_clear_success]
 other = "Cache cleared successfully"
@@ -145,3 +97,25 @@ other = "Failed to clear cache: {{.Error}}"
 
 [cache_not_enabled]
 other = "Cache is not enabled for this connection"
+
+# Hook messages
+[error_hook_timeout]
+other = "Hook execution timed out after {{.Timeout}} seconds"
+
+[error_hook_http_failed]
+other = "HTTP hook failed with status {{.Status}}"
+
+[error_hook_command_failed]
+other = "Command hook failed with exit code {{.ExitCode}}"
+
+[error_hook_invalid_url]
+other = "Invalid URL format for HTTP hook"
+
+[error_hook_invalid_template]
+other = "Invalid template syntax: {{.Error}}"
+
+[error_hook_cancelled]
+other = "Hook requested cancellation"
+
+[error_hook_fatal]
+other = "Hook failed fatally"

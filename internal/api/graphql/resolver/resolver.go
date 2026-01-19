@@ -5,8 +5,10 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/generated"
 
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/subscription"
+	"github.com/xzzpig/rclone-sync/internal/core/config"
 	"github.com/xzzpig/rclone-sync/internal/core/crypto"
 	"github.com/xzzpig/rclone-sync/internal/core/db/query"
+	"github.com/xzzpig/rclone-sync/internal/core/ent"
 	"github.com/xzzpig/rclone-sync/internal/core/errs"
 	"github.com/xzzpig/rclone-sync/internal/core/ports"
 	"github.com/xzzpig/rclone-sync/internal/rclone"
@@ -18,6 +20,8 @@ import (
 
 // Dependencies holds all dependencies required by resolvers.
 type Dependencies struct {
+	Client              *ent.Client
+	Config              *config.Config
 	SyncEngine          *rclone.SyncEngine
 	Runner              ports.Runner
 	Watcher             ports.Watcher
@@ -29,6 +33,7 @@ type Dependencies struct {
 	ConnectionQuery     *query.ConnectionQuery
 	TaskQuery           *query.TaskQuery
 	JobQuery            *query.JobQuery
+	HookQuery           *query.HookQuery
 	PinManager          *rclone.PinManager
 }
 

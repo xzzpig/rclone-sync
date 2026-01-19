@@ -259,7 +259,7 @@ func TestSyncEngine_WithDBStorage_Integration(t *testing.T) {
 
 	// Setup SyncEngine
 	dataDir := t.TempDir()
-	syncEngine := rclone.NewSyncEngine(jobSvc, nil, nil, dataDir, false, 0)
+	syncEngine := rclone.NewSyncEngine(jobSvc, nil, nil, dataDir, false, 0, nil)
 
 	// Run the task - this should use DBStorage to read the connection config
 	err = syncEngine.RunTask(ctx, testTask, model.JobTriggerManual)

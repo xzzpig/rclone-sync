@@ -35,6 +35,12 @@
   - **访问控制**: 内置 HTTP Basic 认证，保障 Web 访问安全。
   - **加密存储**: 敏感配置信息（如密钥）加密存储于本地数据库。
   - **配置导入**: 支持从现有 rclone.conf 批量导入连接配置。
+- **事件钩子 (Task Event Hooks)**:
+  - **HTTP 钩子**: 任务开始、完成或失败时向外部服务发送 HTTP 请求。
+  - **命令钩子**: 执行本地 Shell 命令/脚本，实现自定义自动化、邮件通知或触发下游任务。
+  - **模板支持**: 使用 Go text/template 语法，提供任务上下文数据和辅助函数（FormatTime、FormatDuration、FormatSizeBytes 等）。
+  - **错误处理**: 配置每个 Hook 的错误处理行为（忽略、取消、致命）。
+  - **优先级排序**: 多个 Hook 按优先级顺序执行，支持任务级和连接级钩子。
 - **国际化支持**: 原生支持 **简体中文** 和 **English** 界面。
 - **跨平台**: 支持 Linux, Windows, macOS 以及 Docker。
 
@@ -166,7 +172,78 @@ docker run -d \
 - **活跃传输**: 查看当前正在传输的文件列表，实时更新传输进度。
 - **存储配额**: 监控云存储使用情况，包括已用空间、可用空间、回收站占用和对象数量。
 - **历史记录**: 系统会保留最近的同步日志，方便您排查文件传输问题。
-- **详细日志**: 查看文件级事件日志（上传/下载/删除/移动/错误），支持按任务、作业和日志级别（信息/警告/错误）过滤。
+- **详细日志**: 查看文件级事件日志（上传/下载/删除/移动/错误/HOOK），支持按任务、作业和日志级别（信息/警告/错误）过滤。
+
+### 4. 配置任务事件钩子 (Task Event Hooks)
+钩子允许您在任务到达某些生命周期事件时执行自定义操作。在任务设置或连接设置页面中配置钩子。
+
+- **事件类型**:
+    - **On Start (开始)**: 任务开始执行前触发。
+    - **On Success (成功)**: 任务成功完成后触发。
+    - **On Failure (失败)**: 任务失败后触发。
+    - **On End (结束)**: 任务结束后触发（无论成功或失败，总是最后触发）。
+
+- **钩子类型**:
+    - **HTTP 钩子**: 向外部 URL 发送 HTTP 请求（GET/POST/PUT）。
+      - 可配置 URL、HTTP 方法、自定义请求头和请求体。
+      - 所有字段均支持 Go text/template 语法，可使用任务上下文数据。
+    - **命令钩子**: 在服务器上执行 Shell 命令。
+      - 可配置命令内容、工作目录和超时时间。
+      - 任务上下文通过环境变量传递给命令。
+
+- **模板变量**: 在 HTTP 钩子的 URL、请求头、请求体以及命令钩子的命令中可用：
+    - `{{.Task.Name}}` - 任务名称
+    - `{{.Task.ID}}` - 任务 UUID
+    - `{{.Job.ID}}` - 作业 UUID
+    - `{{.Job.Status}}` - 作业状态
+    - `{{.Event}}` - 事件类型 (on_start/on_success/on_failure/on_end)
+    - `{{.Error}}` - 错误信息（如果有）
+    - `{{.Duration}}` - 执行耗时
+    - `{{.Stats.FilesTransferred}}` - 传输文件数
+    - `{{.Stats.BytesTransferred}}` - 传输字节数
+    - `{{.Env.VAR_NAME}}` - 访问环境变量
+
+- **模板函数**:
+    - `{{FormatTime .Job.StartTime}}` - 格式化时间为 RFC3339
+    - `{{FormatDuration .Duration}}` - 人类可读的时长
+    - `{{FormatSizeBytes .Stats.BytesTransferred}}` - 人类可读的大小
+    - `{{JsonMarshal .Stats}}` - 转换为 JSON
+
+- **错误处理**（每个钩子独立配置）:
+    - **忽略** (默认): 钩子失败时继续执行后续钩子。
+    - **取消**: 停止任务，将作业标记为 CANCELLED，仅触发 on_end 钩子。
+    - **致命**: 停止任务，将作业标记为 FAILED，依次触发 on_failure 和 on_end 钩子。
+
+- **示例: Slack 通知** (HTTP 钩子, POST):
+  ```json
+  {
+    "text": "任务 *{{.Task.Name}}* {{.Event}}: {{.Job.Status}}\n耗时: {{FormatDuration .Duration}}\n文件数: {{.Stats.FilesTransferred}}"
+  }
+  ```
+
+- **示例: 钉钉通知** (HTTP 钩子, POST):
+  ```json
+  {
+    "msgtype": "markdown",
+    "markdown": {
+      "title": "同步{{if eq .Event \"on_success\"}}成功{{else}}失败{{end}}",
+      "text": "### {{.Task.Name}}\n- 状态: {{.Job.Status}}\n- 耗时: {{FormatDuration .Duration}}\n- 文件数: {{.Stats.FilesTransferred}}"
+    }
+  }
+  ```
+
+- **命令钩子环境变量**:
+  | 变量名 | 说明 |
+  |--------|------|
+  | `RCLONE_SYNC_TASK_ID` | 任务 UUID |
+  | `RCLONE_SYNC_TASK_NAME` | 任务名称 |
+  | `RCLONE_SYNC_JOB_ID` | 作业 UUID |
+  | `RCLONE_SYNC_EVENT` | 事件类型 |
+  | `RCLONE_SYNC_STATUS` | 作业状态 |
+  | `RCLONE_SYNC_ERROR` | 错误信息 |
+  | `RCLONE_SYNC_FILES_TRANSFERRED` | 传输文件数 |
+  | `RCLONE_SYNC_BYTES_TRANSFERRED` | 传输字节数 |
+  | `RCLONE_SYNC_DURATION_SECONDS` | 执行耗时（秒） |
 
 ## ❓ 常见问题 (FAQ)
 
@@ -250,6 +327,17 @@ cleanup_schedule = "0 * * * *"
 # 默认值: 4
 transfers = 4
 
+[app.hook]
+# 全局启用或禁用钩子功能
+# 禁用时，所有钩子将不会执行，钩子界面将被隐藏
+# 默认值: true
+enabled = true
+
+# 钩子执行的默认超时时间（秒）
+# 单个钩子可以覆盖此值
+# 默认值: 30
+default_timeout = 30
+
 [database]
 # 数据库迁移模式
 # "auto": 自动迁移 (适合开发或简单升级)
@@ -315,6 +403,8 @@ export RCLONESYNC_AUTH_PASSWORD=your-secure-password
 - `RCLONESYNC_AUTH_USERNAME=admin`
 - `RCLONESYNC_AUTH_PASSWORD=your-secure-password`
 - `RCLONESYNC_APP_SYNC_TRANSFERS=8`
+- `RCLONESYNC_APP_HOOK_ENABLED=true`
+- `RCLONESYNC_APP_HOOK_DEFAULT_TIMEOUT=30`
 
 ### 命令行参数
 

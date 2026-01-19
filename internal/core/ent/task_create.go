@@ -15,6 +15,7 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/core/ent/connection"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/job"
 	"github.com/xzzpig/rclone-sync/internal/core/ent/task"
+	"github.com/xzzpig/rclone-sync/internal/core/ent/taskhook"
 )
 
 // TaskCreate is the builder for creating a Task entity.
@@ -173,6 +174,21 @@ func (_c *TaskCreate) AddJobs(v ...*Job) *TaskCreate {
 		ids[i] = v[i].ID
 	}
 	return _c.AddJobIDs(ids...)
+}
+
+// AddHookIDs adds the "hooks" edge to the TaskHook entity by IDs.
+func (_c *TaskCreate) AddHookIDs(ids ...uuid.UUID) *TaskCreate {
+	_c.mutation.AddHookIDs(ids...)
+	return _c
+}
+
+// AddHooks adds the "hooks" edges to the TaskHook entity.
+func (_c *TaskCreate) AddHooks(v ...*TaskHook) *TaskCreate {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddHookIDs(ids...)
 }
 
 // SetConnection sets the "connection" edge to the Connection entity.
@@ -371,6 +387,22 @@ func (_c *TaskCreate) createSpec() (*Task, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(job.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.HooksIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   task.HooksTable,
+			Columns: []string{task.HooksColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(taskhook.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

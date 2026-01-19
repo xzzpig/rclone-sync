@@ -35,6 +35,12 @@ A cloud sync management tool based on `rclone` development, designed to provide 
   - **Access Control**: Built-in HTTP Basic Authentication for web access.
   - **Encrypted Storage**: Sensitive configuration information is encrypted and stored in the local database.
   - **Import Configuration**: Bulk import connections from existing rclone.conf files.
+- **Task Event Hooks**:
+  - **HTTP Hooks**: Send HTTP requests to external services when tasks start, complete, or fail.
+  - **Command Hooks**: Execute local shell commands/scripts for custom automation, email notifications, or triggering downstream tasks.
+  - **Template Support**: Use Go text/template syntax with task context data, helper functions (FormatTime, FormatDuration, FormatSizeBytes, etc.).
+  - **Error Handling**: Configure per-hook behavior on failure (IGNORE, CANCEL, FATAL).
+  - **Priority Ordering**: Multiple hooks execute in priority order with task-level and connection-level hook support.
 ## ☁️ Supported Cloud Storage
 
 Thanks to the powerful ecosystem of Rclone, this tool supports over 40 cloud storage services, including but not limited to:
@@ -163,7 +169,78 @@ On the connection details page, click the **"New Task"** button.
 - **Active Transfers**: View currently transferring files with real-time progress updates.
 - **Storage Quota**: Monitor cloud storage usage including used space, free space, trashed files, and object count.
 - **History**: The system retains recent sync logs for easy troubleshooting of file transfer issues.
-- **Detailed Logs**: View file-level event logs (UPLOAD/DOWNLOAD/DELETE/MOVE/ERROR) with filtering by task, job, and log level (INFO/WARNING/ERROR).
+- **Detailed Logs**: View file-level event logs (UPLOAD/DOWNLOAD/DELETE/MOVE/ERROR/HOOK) with filtering by task, job, and log level (INFO/WARNING/ERROR).
+
+### 4. Configure Task Event Hooks
+Hooks allow you to execute custom actions when tasks reach certain lifecycle events. Configure hooks in the task settings or connection settings page.
+
+- **Event Types**:
+    - **On Start**: Triggered before task execution begins.
+    - **On Success**: Triggered after task completes successfully.
+    - **On Failure**: Triggered after task fails.
+    - **On End**: Triggered after task ends (success or failure, always last).
+
+- **Hook Types**:
+    - **HTTP Hook**: Send HTTP requests (GET/POST/PUT) to external URLs.
+      - Configure URL, method, custom headers, and request body.
+      - All fields support Go text/template syntax with task context.
+    - **Command Hook**: Execute shell commands on the server.
+      - Configure command, working directory, and timeout.
+      - Task context is passed via environment variables.
+
+- **Template Variables**: Available in HTTP Hook URL, headers, body, and Command Hook command:
+    - `{{.Task.Name}}` - Task name
+    - `{{.Task.ID}}` - Task UUID
+    - `{{.Job.ID}}` - Job UUID
+    - `{{.Job.Status}}` - Job status
+    - `{{.Event}}` - Event type (on_start/on_success/on_failure/on_end)
+    - `{{.Error}}` - Error message (if any)
+    - `{{.Duration}}` - Execution duration
+    - `{{.Stats.FilesTransferred}}` - Number of files transferred
+    - `{{.Stats.BytesTransferred}}` - Bytes transferred
+    - `{{.Env.VAR_NAME}}` - Access environment variables
+
+- **Template Functions**:
+    - `{{FormatTime .Job.StartTime}}` - Format time as RFC3339
+    - `{{FormatDuration .Duration}}` - Human-readable duration
+    - `{{FormatSizeBytes .Stats.BytesTransferred}}` - Human-readable size
+    - `{{JsonMarshal .Stats}}` - Convert to JSON
+
+- **Error Handling** (per-hook configuration):
+    - **Ignore** (default): Continue executing subsequent hooks on failure.
+    - **Cancel**: Stop task, mark job as CANCELLED, only trigger on_end hook.
+    - **Fatal**: Stop task, mark job as FAILED, trigger on_failure then on_end hooks.
+
+- **Example: Slack Notification** (HTTP Hook, POST):
+  ```json
+  {
+    "text": "Task *{{.Task.Name}}* {{.Event}}: {{.Job.Status}}\nDuration: {{FormatDuration .Duration}}\nFiles: {{.Stats.FilesTransferred}}"
+  }
+  ```
+
+- **Example: DingTalk Notification** (HTTP Hook, POST):
+  ```json
+  {
+    "msgtype": "markdown",
+    "markdown": {
+      "title": "Sync {{if eq .Event \"on_success\"}}Success{{else}}Failed{{end}}",
+      "text": "### {{.Task.Name}}\n- Status: {{.Job.Status}}\n- Duration: {{FormatDuration .Duration}}\n- Files: {{.Stats.FilesTransferred}}"
+    }
+  }
+  ```
+
+- **Command Hook Environment Variables**:
+  | Variable | Description |
+  |----------|-------------|
+  | `RCLONE_SYNC_TASK_ID` | Task UUID |
+  | `RCLONE_SYNC_TASK_NAME` | Task name |
+  | `RCLONE_SYNC_JOB_ID` | Job UUID |
+  | `RCLONE_SYNC_EVENT` | Event type |
+  | `RCLONE_SYNC_STATUS` | Job status |
+  | `RCLONE_SYNC_ERROR` | Error message |
+  | `RCLONE_SYNC_FILES_TRANSFERRED` | Files transferred |
+  | `RCLONE_SYNC_BYTES_TRANSFERRED` | Bytes transferred |
+  | `RCLONE_SYNC_DURATION_SECONDS` | Duration in seconds |
 
 ## ❓ Frequently Asked Questions (FAQ)
 
@@ -247,6 +324,17 @@ cleanup_schedule = "0 * * * *"
 # Default: 4
 transfers = 4
 
+[app.hook]
+# Enable or disable hook functionality globally
+# When disabled, all hooks will not be executed and hook UI will be hidden
+# Default: true
+enabled = true
+
+# Default timeout for hook execution (seconds)
+# Individual hooks can override this value
+# Default: 30
+default_timeout = 30
+
 [database]
 # Database migration mode
 # "auto": Automatic migration (Suitable for development or simple upgrades)
@@ -312,6 +400,8 @@ Examples:
 - `RCLONESYNC_AUTH_USERNAME=admin`
 - `RCLONESYNC_AUTH_PASSWORD=your-secure-password`
 - `RCLONESYNC_APP_SYNC_TRANSFERS=8`
+- `RCLONESYNC_APP_HOOK_ENABLED=true`
+- `RCLONESYNC_APP_HOOK_DEFAULT_TIMEOUT=30`
 
 ### Command Line Parameters
 

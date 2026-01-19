@@ -12,6 +12,8 @@ import (
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/dataloader"
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/generated"
 	"github.com/xzzpig/rclone-sync/internal/api/graphql/model"
+	"github.com/xzzpig/rclone-sync/internal/core/hook"
+	"github.com/xzzpig/rclone-sync/internal/i18n"
 	"github.com/xzzpig/rclone-sync/internal/utils"
 )
 
@@ -146,6 +148,18 @@ func (r *taskMutationResolver) Create(ctx context.Context, obj *model.TaskMutati
 		return nil, err
 	}
 
+	if len(input.Hooks) > 0 {
+		for _, hInput := range input.Hooks {
+			if err := hook.ValidateHookConfig(hInput.Config, hInput.Type); err != nil {
+				return nil, i18n.NewI18nError(i18n.ErrInvalidInput).WithCause(err)
+			}
+
+			if _, err := r.deps.HookQuery.CreateHook(ctx, &entTask.ID, nil, *hInput); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	// If realtime sync is enabled, add to watcher
 	if realtime && r.deps.Watcher != nil {
 		// Log the error but don't fail the request
@@ -233,6 +247,40 @@ func (r *taskMutationResolver) Update(ctx context.Context, obj *model.TaskMutati
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(input.Hooks) > 0 {
+		for _, nestedInput := range input.Hooks {
+			if nestedInput.Delete != nil && *nestedInput.Delete {
+				if nestedInput.ID == nil {
+					continue
+				}
+				if _, err := r.deps.HookQuery.DeleteHook(ctx, *nestedInput.ID); err != nil {
+					return nil, err
+				}
+				continue
+			}
+
+			if nestedInput.Hook == nil {
+				continue
+			}
+
+			hInput := nestedInput.Hook
+
+			if err := hook.ValidateHookConfig(hInput.Config, hInput.Type); err != nil {
+				return nil, i18n.NewI18nError(i18n.ErrInvalidInput).WithCause(err)
+			}
+
+			if nestedInput.ID == nil {
+				if _, err := r.deps.HookQuery.CreateHook(ctx, &id, nil, *hInput); err != nil {
+					return nil, err
+				}
+			} else {
+				if _, err := r.deps.HookQuery.UpdateHook(ctx, *nestedInput.ID, hInput.ToUpdateInput()); err != nil {
+					return nil, err
+				}
+			}
+		}
 	}
 
 	// Handle watcher updates based on realtime status changes

@@ -13,7 +13,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { TextField, TextFieldInput } from '@/components/ui/text-field';
 import { showToast } from '@/components/ui/toast';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import type { CreateTaskInput, StatusType, TaskListItem, UpdateTaskInput } from '@/lib/types';
+import {
+  type TaskListItem,
+  type UpdateTaskInput,
+  type TaskDetail,
+  type CreateTaskInput,
+  type StatusType,
+} from '@/lib/types';
 import { cn } from '@/lib/utils';
 import * as m from '@/paraglide/messages.js';
 import { useTasks } from '@/store/tasks';
@@ -90,7 +96,7 @@ function Tasks() {
   const selectedTask = () => {
     const id = selectedTaskId();
     if (!id) return null;
-    return state.tasks.find((task) => task.id === id) ?? null;
+    return (state.tasks.find((task) => task.id === id) as unknown as TaskDetail) ?? null;
   };
 
   const handleRunTask = async (task: TaskListItem) => {

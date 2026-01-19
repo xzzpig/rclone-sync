@@ -92,7 +92,7 @@ var (
 		{Name: "level", Type: field.TypeEnum, Enums: []string{"INFO", "WARNING", "ERROR"}},
 		{Name: "time", Type: field.TypeTime},
 		{Name: "path", Type: field.TypeString, Nullable: true},
-		{Name: "what", Type: field.TypeEnum, Enums: []string{"UPLOAD", "DOWNLOAD", "DELETE", "MOVE", "ERROR", "UNKNOWN"}, Default: "UNKNOWN"},
+		{Name: "what", Type: field.TypeEnum, Enums: []string{"UPLOAD", "DOWNLOAD", "DELETE", "MOVE", "ERROR", "UNKNOWN", "HOOK"}, Default: "UNKNOWN"},
 		{Name: "size", Type: field.TypeInt64, Nullable: true},
 		{Name: "job_id", Type: field.TypeUUID},
 	}
@@ -163,12 +163,74 @@ var (
 			},
 		},
 	}
+	// TaskHooksColumns holds the columns for the "task_hooks" table.
+	TaskHooksColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
+		{Name: "priority", Type: field.TypeInt, Nullable: true},
+		{Name: "event", Type: field.TypeEnum, Enums: []string{"ON_START", "ON_SUCCESS", "ON_FAILURE", "ON_END"}},
+		{Name: "type", Type: field.TypeEnum, Enums: []string{"HTTP", "COMMAND"}},
+		{Name: "on_error", Type: field.TypeEnum, Enums: []string{"IGNORE", "CANCEL", "FATAL"}, Default: "IGNORE"},
+		{Name: "config", Type: field.TypeJSON},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "connection_id", Type: field.TypeUUID, Nullable: true},
+		{Name: "task_id", Type: field.TypeUUID, Nullable: true},
+	}
+	// TaskHooksTable holds the schema information for the "task_hooks" table.
+	TaskHooksTable = &schema.Table{
+		Name:       "task_hooks",
+		Columns:    TaskHooksColumns,
+		PrimaryKey: []*schema.Column{TaskHooksColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "task_hooks_connections_hooks",
+				Columns:    []*schema.Column{TaskHooksColumns[9]},
+				RefColumns: []*schema.Column{ConnectionsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+			{
+				Symbol:     "task_hooks_tasks_hooks",
+				Columns:    []*schema.Column{TaskHooksColumns[10]},
+				RefColumns: []*schema.Column{TasksColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "taskhook_task_id",
+				Unique:  false,
+				Columns: []*schema.Column{TaskHooksColumns[10]},
+			},
+			{
+				Name:    "taskhook_connection_id",
+				Unique:  false,
+				Columns: []*schema.Column{TaskHooksColumns[9]},
+			},
+			{
+				Name:    "taskhook_task_id_event_priority_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{TaskHooksColumns[10], TaskHooksColumns[3], TaskHooksColumns[2], TaskHooksColumns[7]},
+			},
+			{
+				Name:    "taskhook_connection_id_event_priority_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{TaskHooksColumns[9], TaskHooksColumns[3], TaskHooksColumns[2], TaskHooksColumns[7]},
+			},
+			{
+				Name:    "taskhook_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{TaskHooksColumns[7]},
+			},
+		},
+	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		ConnectionsTable,
 		JobsTable,
 		JobLogsTable,
 		TasksTable,
+		TaskHooksTable,
 	}
 )
 
@@ -176,4 +238,6 @@ func init() {
 	JobsTable.ForeignKeys[0].RefTable = TasksTable
 	JobLogsTable.ForeignKeys[0].RefTable = JobsTable
 	TasksTable.ForeignKeys[0].RefTable = ConnectionsTable
+	TaskHooksTable.ForeignKeys[0].RefTable = ConnectionsTable
+	TaskHooksTable.ForeignKeys[1].RefTable = TasksTable
 }

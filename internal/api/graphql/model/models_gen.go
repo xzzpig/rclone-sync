@@ -22,6 +22,18 @@ type TestConnectionResult interface {
 	IsTestConnectionResult()
 }
 
+// 应用全局配置
+type AppConfig struct {
+	// Hook 相关配置
+	Hook *AppHookConfig `json:"hook"`
+}
+
+// Hook 全局配置
+type AppHookConfig struct {
+	// 是否全局启用 Hook 功能
+	Enabled bool `json:"enabled"`
+}
+
 // 清理缓存结果
 type ClearCacheResult struct {
 	// 是否成功
@@ -59,6 +71,8 @@ type Connection struct {
 	// 缓存运行时状态（仅当 options.cache.enabled 为 true 时有值）
 	// 这是一个计算字段，不持久化
 	CacheStatus *ConnectionCacheStatus `json:"cacheStatus,omitempty"`
+	// 关联的 Hooks 列表（作为共享 Hooks，关联任务触发事件时会被执行）
+	Hooks []*Hook `json:"hooks"`
 }
 
 // 元数据缓存配置（持久化配置）
@@ -215,6 +229,8 @@ type CreateTaskInput struct {
 	Enabled *bool `json:"enabled,omitempty"`
 	// 同步选项
 	Options *TaskSyncOptionsInput `json:"options,omitempty"`
+	// 关联的 Hooks
+	Hooks []*HookInput `json:"hooks,omitempty"`
 }
 
 // 文件/目录条目
@@ -233,6 +249,108 @@ type FileQuery struct {
 	// 当 connectionId 为空时访问本地路径，否则访问远程连接
 	// 支持过滤器预览功能
 	List []*FileEntry `json:"list"`
+}
+
+// Hook 配置
+type Hook struct {
+	// UUID 主键
+	ID uuid.UUID `json:"id"`
+	// 是否启用
+	Enabled bool `json:"enabled"`
+	// 执行优先级（升序，null 排最后）
+	Priority *int `json:"priority,omitempty"`
+	// 触发事件类型
+	Event HookEvent `json:"event"`
+	// Hook 类型
+	Type HookType `json:"type"`
+	// 错误处理行为
+	OnError HookOnError `json:"onError"`
+	// Hook 配置（强类型结构体）
+	Config *HookConfig `json:"config"`
+	// 关联的任务（与 connection 互斥）
+	Task *Task `json:"task,omitempty"`
+	// 关联的连接（与 task 互斥）
+	Connection *Connection `json:"connection,omitempty"`
+	// 创建时间
+	CreatedAt time.Time `json:"createdAt"`
+	// 更新时间
+	UpdatedAt    time.Time  `json:"updatedAt"`
+	ConnectionID *uuid.UUID `json:"-"`
+	TaskID       *uuid.UUID `json:"-"`
+}
+
+// Hook 配置（统一结构体，根据 Hook.type 使用不同字段子集）
+type HookConfig struct {
+	// 请求 URL（支持 Go text/template 语法）- HTTP Hook
+	URL *string `json:"url,omitempty"`
+	// HTTP 方法（GET/POST/PUT），默认 POST - HTTP Hook
+	Method *string `json:"method,omitempty"`
+	// 自定义请求头 - HTTP Hook
+	Headers map[string]string `json:"headers,omitempty"`
+	// 请求体模板（支持 Go text/template 语法）- HTTP Hook
+	Body *string `json:"body,omitempty"`
+	// Shell 命令（支持 Go text/template 语法）- Command Hook
+	Command *string `json:"command,omitempty"`
+	// 工作目录 - Command Hook
+	WorkDir *string `json:"workDir,omitempty"`
+	// 执行超时时间（秒），默认 30 - Command Hook
+	Timeout *int `json:"timeout,omitempty"`
+}
+
+// Hook 配置输入（统一结构体，根据 Hook.type 填写对应字段）
+type HookConfigInput struct {
+	// 请求 URL（支持 Go text/template 语法）- HTTP Hook 必填
+	URL *string `json:"url,omitempty"`
+	// HTTP 方法（GET/POST/PUT），默认 POST - HTTP Hook
+	Method *string `json:"method,omitempty"`
+	// 自定义请求头 - HTTP Hook
+	Headers map[string]string `json:"headers,omitempty"`
+	// 请求体模板（支持 Go text/template 语法）- HTTP Hook
+	Body *string `json:"body,omitempty"`
+	// Shell 命令（支持 Go text/template 语法）- Command Hook 必填
+	Command *string `json:"command,omitempty"`
+	// 工作目录 - Command Hook
+	WorkDir *string `json:"workDir,omitempty"`
+	// 执行超时时间（秒），默认 30 - Command Hook
+	Timeout *int `json:"timeout,omitempty"`
+}
+
+// Hook 的核心配置字段
+type HookInput struct {
+	// 是否启用，默认 true
+	Enabled *bool `json:"enabled,omitempty"`
+	// 执行优先级（升序，null 排最后）
+	Priority *int `json:"priority,omitempty"`
+	// 触发事件类型
+	Event HookEvent `json:"event"`
+	// Hook 类型
+	Type HookType `json:"type"`
+	// 错误处理行为，默认 IGNORE
+	OnError *HookOnError `json:"onError,omitempty"`
+	// Hook 配置数据
+	Config *HookConfigInput `json:"config"`
+}
+
+// Hook 变更命名空间
+type HookMutation struct {
+	// 创建 Hook。taskId 和 connectionId 作为内联参数（二选一），配置数据通过 input 传递。
+	Create *Hook `json:"create"`
+	// 更新 Hook（失败抛出 GraphQL error）
+	Update *Hook `json:"update"`
+	// 删除 Hook（失败抛出 GraphQL error）
+	Delete *Hook `json:"delete"`
+}
+
+// Hook 查询命名空间
+type HookQuery struct {
+	// 获取 Hook 列表
+	// - taskId: 按任务 ID 过滤
+	// - connectionId: 按连接 ID 过滤
+	// - event: 按事件类型过滤
+	// 至少需要提供 taskId 或 connectionId 之一
+	List []*Hook `json:"list"`
+	// 获取单个 Hook
+	Get *Hook `json:"get,omitempty"`
 }
 
 // 导入连接输入
@@ -349,6 +467,7 @@ type JobLog struct {
 	// 操作类型
 	What LogAction `json:"what"`
 	// 文件大小（字节）
+	// 注意：当 what = HOOK 时，此字段表示 hook 执行耗时（毫秒）
 	Size int64 `json:"size"`
 	// 关联的作业（ent edge）
 	Job   *Job      `json:"job"`
@@ -412,6 +531,16 @@ type LogQuery struct {
 }
 
 type Mutation struct {
+}
+
+// 任务/连接 更新时嵌套的 Hook 变更列表项
+type NestedUpdateHookInput struct {
+	// Hook ID (为空时表示新增)
+	ID *uuid.UUID `json:"id,omitempty"`
+	// 是否删除该 Hook
+	Delete *bool `json:"delete,omitempty"`
+	// Hook 配置数据 (当 delete 为 false 时必填)
+	Hook *HookInput `json:"hook,omitempty"`
 }
 
 // 偏移量分页信息
@@ -531,7 +660,9 @@ type Task struct {
 	// 作业历史（分页查询）
 	Jobs *JobConnection `json:"jobs"`
 	// 最近一次作业（计算字段）
-	LatestJob    *Job      `json:"latestJob,omitempty"`
+	LatestJob *Job `json:"latestJob,omitempty"`
+	// 关联的 Hooks 列表
+	Hooks        []*Hook   `json:"hooks"`
 	ConnectionID uuid.UUID `json:"-"`
 }
 
@@ -636,6 +767,22 @@ type UpdateConnectionInput struct {
 	Options *ConnectionOptionsInput `json:"options,omitempty"`
 }
 
+// 更新 Hook 输入
+type UpdateHookInput struct {
+	// 是否启用
+	Enabled *bool `json:"enabled,omitempty"`
+	// 执行优先级（升序，null 排最后）
+	Priority *int `json:"priority,omitempty"`
+	// 触发事件类型
+	Event *HookEvent `json:"event,omitempty"`
+	// Hook 类型（变更类型时需同时提供对应的配置）
+	Type *HookType `json:"type,omitempty"`
+	// 错误处理行为
+	OnError *HookOnError `json:"onError,omitempty"`
+	// Hook 配置（完整替换）
+	Config *HookConfigInput `json:"config,omitempty"`
+}
+
 // 更新任务输入
 type UpdateTaskInput struct {
 	// 任务名称
@@ -643,7 +790,7 @@ type UpdateTaskInput struct {
 	// 本地源路径
 	SourcePath *string `json:"sourcePath,omitempty"`
 	// 关联连接 ID
-	ConnectionID *uuid.UUID `json:"connectionId,omitempty"`
+	ConnectionID *uuid.UUID `json:"connectionID,omitempty"`
 	// 远程目标路径
 	RemotePath *string `json:"remotePath,omitempty"`
 	// 同步方向
@@ -656,6 +803,8 @@ type UpdateTaskInput struct {
 	Enabled *bool `json:"enabled,omitempty"`
 	// 同步选项
 	Options *TaskSyncOptionsInput `json:"options,omitempty"`
+	// 关联的 Hooks 变更列表
+	Hooks []*NestedUpdateHookInput `json:"hooks,omitempty"`
 }
 
 // 冲突解决策略（仅用于双向同步）
@@ -778,6 +927,189 @@ func (e *ConnectionLoadStatus) UnmarshalJSON(b []byte) error {
 }
 
 func (e ConnectionLoadStatus) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+// Hook 触发事件类型
+type HookEvent string
+
+const (
+	// 任务开始执行前
+	HookEventOnStart HookEvent = "ON_START"
+	// 任务成功完成后
+	HookEventOnSuccess HookEvent = "ON_SUCCESS"
+	// 任务失败后
+	HookEventOnFailure HookEvent = "ON_FAILURE"
+	// 任务结束后（无论成功或失败，最后触发）
+	HookEventOnEnd HookEvent = "ON_END"
+)
+
+var AllHookEvent = []HookEvent{
+	HookEventOnStart,
+	HookEventOnSuccess,
+	HookEventOnFailure,
+	HookEventOnEnd,
+}
+
+func (e HookEvent) IsValid() bool {
+	switch e {
+	case HookEventOnStart, HookEventOnSuccess, HookEventOnFailure, HookEventOnEnd:
+		return true
+	}
+	return false
+}
+
+func (e HookEvent) String() string {
+	return string(e)
+}
+
+func (e *HookEvent) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = HookEvent(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid HookEvent", str)
+	}
+	return nil
+}
+
+func (e HookEvent) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *HookEvent) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e HookEvent) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+// Hook 错误处理行为
+type HookOnError string
+
+const (
+	// 忽略错误，继续执行后续 hooks
+	HookOnErrorIgnore HookOnError = "IGNORE"
+	// 停止任务，Job 标记为 CANCELLED，仅触发 on_end hook
+	HookOnErrorCancel HookOnError = "CANCEL"
+	// 停止任务，Job 标记为 FAILED，依次触发 on_failure 和 on_end hook
+	HookOnErrorFatal HookOnError = "FATAL"
+)
+
+var AllHookOnError = []HookOnError{
+	HookOnErrorIgnore,
+	HookOnErrorCancel,
+	HookOnErrorFatal,
+}
+
+func (e HookOnError) IsValid() bool {
+	switch e {
+	case HookOnErrorIgnore, HookOnErrorCancel, HookOnErrorFatal:
+		return true
+	}
+	return false
+}
+
+func (e HookOnError) String() string {
+	return string(e)
+}
+
+func (e *HookOnError) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = HookOnError(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid HookOnError", str)
+	}
+	return nil
+}
+
+func (e HookOnError) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *HookOnError) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e HookOnError) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+// Hook 类型
+type HookType string
+
+const (
+	// HTTP 请求
+	HookTypeHTTP HookType = "HTTP"
+	// Shell 命令
+	HookTypeCommand HookType = "COMMAND"
+)
+
+var AllHookType = []HookType{
+	HookTypeHTTP,
+	HookTypeCommand,
+}
+
+func (e HookType) IsValid() bool {
+	switch e {
+	case HookTypeHTTP, HookTypeCommand:
+		return true
+	}
+	return false
+}
+
+func (e HookType) String() string {
+	return string(e)
+}
+
+func (e *HookType) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = HookType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid HookType", str)
+	}
+	return nil
+}
+
+func (e HookType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *HookType) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e HookType) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	e.MarshalGQL(&buf)
 	return buf.Bytes(), nil
@@ -927,6 +1259,8 @@ const (
 	LogActionError LogAction = "ERROR"
 	// 未知操作
 	LogActionUnknown LogAction = "UNKNOWN"
+	// Hook 执行记录
+	LogActionHook LogAction = "HOOK"
 )
 
 var AllLogAction = []LogAction{
@@ -936,11 +1270,12 @@ var AllLogAction = []LogAction{
 	LogActionMove,
 	LogActionError,
 	LogActionUnknown,
+	LogActionHook,
 }
 
 func (e LogAction) IsValid() bool {
 	switch e {
-	case LogActionUpload, LogActionDownload, LogActionDelete, LogActionMove, LogActionError, LogActionUnknown:
+	case LogActionUpload, LogActionDownload, LogActionDelete, LogActionMove, LogActionError, LogActionUnknown, LogActionHook:
 		return true
 	}
 	return false

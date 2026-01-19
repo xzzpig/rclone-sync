@@ -32,6 +32,9 @@ if ! command -v atlas &> /dev/null; then
     exit 1
 fi
 
+echo "Rehashing existing migrations..."
+atlas migrate hash --dir "file://$MIGRATIONS_DIR" --dir-format golang-migrate
+
 echo "Generating migration: $MIGRATION_NAME"
 echo "Schema source: ent://$SCHEMA_DIR"
 echo "Migrations dir: file://$MIGRATIONS_DIR"

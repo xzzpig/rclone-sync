@@ -17,3 +17,6 @@ type JobLog func(*sql.Selector)
 
 // Task is the predicate function for task builders.
 type Task func(*sql.Selector)
+
+// TaskHook is the predicate function for taskhook builders.
+type TaskHook func(*sql.Selector)
